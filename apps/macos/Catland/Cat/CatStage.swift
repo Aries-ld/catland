@@ -26,6 +26,8 @@ struct CatStage: View {
     var den: CatDen? = nil
     /// 悬停时某只猫头顶冒出的像素对话气泡，多句时每 3.5 秒轮换一句（第一句通常是「点我开刷 · 21°晴」）。
     var bubbles: [String] = []
+    /// 轮播起点（悬停开始的时刻），保证每次都从第一句开始。
+    var bubbleEpoch: TimeInterval = 0
 
     @Environment(\.displayScale) private var displayScale
 
@@ -47,8 +49,8 @@ struct CatStage: View {
                     if speaker == nil, snap.opacity > 0.9, snap.lift == 0, !hidden { speaker = snap }
                 }
                 if !bubbles.isEmpty, let s = speaker {
-                    // 第一句停留稍短，之后每 3.2 秒换一句。
-                    let text = bubbles[Int(t / 3.2) % bubbles.count]
+                    // 每句停留 5 秒，让人读完再换。
+                    let text = bubbles[max(0, Int((t - bubbleEpoch) / 5)) % bubbles.count]
                     drawBubble(text, above: s, in: &ctx, size: size, px: px)
                 }
             }
@@ -163,6 +165,7 @@ final class CatDirector {
         let rim: Bool
         let skin: String
         let denEffect: DenEffect?
+        var action: String = ""
     }
 
     private enum Phase {
@@ -190,6 +193,8 @@ final class CatDirector {
     private var actors: [String: Actor] = [:]
     /// 调试：下一次决策时强制去猫洞。
     var forceDen = false
+    /// 窗外有事件（流星雨、烟花…）正在进行：所有猫停下来坐着抬头看。
+    var watching = false
     private var onStage: Set<String> { Set(actors.values.map(\.skin)) }
     /// 同一时刻只允许一只猫在洞里（洞口小，效果更清楚）。
     private var denOccupied: Bool { actors.values.contains { if case .inDen = $0.phase { return true }; if case .climbing = $0.phase { return true }; return false } }
@@ -220,7 +225,16 @@ final class CatDirector {
         // 跳进洞需要的高度：整只猫越过刘海底边。
         let denLift = groundToDen + CGFloat(PixelCatArt.height) * pixel
 
-        if excited && !a.wasExcited, case .acting = a.phase { start(&a, action: "hop", time: t) }
+        // 事件开始：正在发呆 / 散步的猫原地坐下看窗外；事件结束：起身继续自己的事。
+        if watching, a.action != "watch" {
+            switch a.phase {
+            case .acting, .walking: start(&a, action: "watch", time: t)
+            default: break
+            }
+        } else if !watching, a.action == "watch", case .acting = a.phase, a.until > t + 1 {
+            a.until = t
+        }
+        if excited && !a.wasExcited, case .acting = a.phase, a.action != "watch" { start(&a, action: "hop", time: t) }
         a.wasExcited = excited
         var effect: DenEffect?
 
@@ -280,7 +294,7 @@ final class CatDirector {
         var opacity = min(1, max(0, Double(edge) / 16))
         if case .inDen = a.phase { opacity = 0 }
         return Snapshot(animation: anim, frame: Self.frameIndex(raw: raw, anim: anim, loops: a.loops), x: a.x, lift: a.lift, facingLeft: a.facingLeft,
-                        opacity: opacity, rim: atlas.rimmed.contains(a.skin), skin: a.skin, denEffect: effect)
+                        opacity: opacity, rim: atlas.rimmed.contains(a.skin), skin: a.skin, denEffect: effect, action: a.action)
     }
 
     /// 分段播放：intro 一次 → 中段循环 loops 次 → outro 一次（停在最后一帧直到动作结束）。

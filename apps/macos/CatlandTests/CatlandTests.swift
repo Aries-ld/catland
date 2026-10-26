@@ -173,3 +173,61 @@ final class RestDaysTests: XCTestCase {
         XCTAssertFalse(offline.isEmpty)
     }
 }
+
+final class EventSchedulerTests: XCTestCase {
+    private func day(_ s: String) -> Date {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd HH:mm"; f.timeZone = .current
+        return f.date(from: s)!
+    }
+
+    override func setUp() { EventScheduler.extra = [] }
+
+    func testMeteorShowerOnRealPeakNight() {
+        let occ = EventScheduler.occurrences(around: day("2026-12-13 12:00"), region: .china, latitude: 31.2)
+        let meteor = occ.first { $0.eventID == "meteorShower" && Calendar.current.isDate($0.start, inSameDayAs: day("2026-12-13 12:00")) }
+        XCTAssertEqual(meteor?.start, day("2026-12-13 22:00"))
+    }
+
+    func testTeaserWithinSixHoursAndCountdown() {
+        let lines = EventScheduler.bubbleLines(now: day("2026-12-13 17:30"), region: .china, latitude: 31.2, condition: "clear", intensity: 0, seed: 1)
+        XCTAssertTrue(lines.contains { $0.contains("今晚 22:00") }, "\(lines)")
+        XCTAssertTrue(lines.contains("距流星雨还有 4 小时 30 分"), "\(lines)")
+        // 6 小时之外不预告
+        let early = EventScheduler.bubbleLines(now: day("2026-12-13 15:00"), region: .china, latitude: 31.2, condition: "clear", intensity: 0, seed: 1)
+        XCTAssertFalse(early.contains { $0.contains("流星雨") })
+    }
+
+    func testLiveCountdownAndWeatherCancellation() {
+        let live = EventScheduler.bubbleLines(now: day("2026-12-13 22:04"), region: .china, latitude: 31.2, condition: "clear", intensity: 0, seed: 2)
+        XCTAssertTrue(live.contains("流星雨还剩 6 分钟"), "\(live)")
+        let rained = EventScheduler.bubbleLines(now: day("2026-12-13 22:04"), region: .china, latitude: 31.2, condition: "rain", intensity: 0.6, seed: 2)
+        XCTAssertEqual(rained, ["天公不作美，流星雨看不成了 T_T"])
+        XCTAssertNil(EventScheduler.active(now: day("2026-12-13 22:11"), region: .china, latitude: 31.2).flatMap { $0.eventID == "meteorShower" ? $0 : nil })
+    }
+
+    func testSingaporeLightShowEveryNightAndScheduleIsDeterministic() {
+        let a = EventScheduler.occurrences(around: day("2026-10-28 12:00"), region: .singapore, latitude: 1.29)
+        XCTAssertTrue(a.contains { $0.eventID == "lightShow" && $0.start == day("2026-10-28 20:00") })
+        XCTAssertEqual(a, EventScheduler.occurrences(around: day("2026-10-28 12:00"), region: .singapore, latitude: 1.29))
+    }
+
+    func testTriggeredEventAndCatsWatch() {
+        let now = day("2026-10-28 15:00")
+        EventScheduler.trigger("rainbowAfterRain", at: now)
+        XCTAssertEqual(EventScheduler.active(now: now.addingTimeInterval(60), region: .china, latitude: 31.2)?.eventID, "rainbowAfterRain")
+        let director = CatDirector()
+        director.watching = true
+        let lane = CatDirector.Lane(min: 40, max: 120, exitLeft: true)
+        var snap = director.tick(actor: "w", lane: lane, pixel: 1.5, time: 100, excited: false)
+        for k in 1..<60 { snap = director.tick(actor: "w", lane: lane, pixel: 1.5, time: 100 + Double(k) / 30, excited: false) }
+        XCTAssertEqual(snap.action, "watch")
+    }
+
+    func testEveryRegisteredEventHasCopy() {
+        for e in Events.all {
+            XCTAssertFalse(e.lives.isEmpty, e.id)
+            XCTAssertFalse(e.cancelLine.isEmpty, e.id)
+            if !e.triggered { XCTAssertFalse(e.teasers.isEmpty, e.id) }
+        }
+    }
+}

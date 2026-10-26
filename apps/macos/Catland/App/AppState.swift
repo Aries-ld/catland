@@ -1,6 +1,7 @@
 // AppState：全局状态（连接、设置、通知分发），视图只读它、调它的方法。
 import AppKit
 import Foundation
+import SwiftUI
 import Observation
 import os
 
@@ -21,9 +22,92 @@ final class AppState {
     var section: Section = .content
     var overlay: Overlay = .none
     var expanded = false
-    var hovering = false { didSet { if hovering && !oldValue { hoverSession = UInt64.random(in: 1...UInt64.max / 2) } } }
+    var hovering = false {
+        didSet {
+            guard hovering && !oldValue else { return }
+            hoverSession = UInt64.random(in: 1...UInt64.max / 2)
+            hoverStartedAt = Date().timeIntervalSinceReferenceDate
+        }
+    }
+    /// 本次悬停开始的时刻：气泡从第一句（事件预告 / 倒计时）开始轮播。
+    private(set) var hoverStartedAt: TimeInterval = 0
     /// 每次悬停一个新种子：气泡语料的轮播顺序随之变化。
     private(set) var hoverSession: UInt64 = 1
+
+    // MARK: - 事件预告（小猫主动探出来说一句）
+
+    /// 小猫主动说的话：刘海会像悬停一样探出来，气泡显示 8 秒后收回。
+    private(set) var peekMessage: String?
+    var peeking: Bool { peekMessage != nil }
+    /// 悬停或主动探出时，刘海都展开成「大窗」。
+    var showingRoom: Bool { hovering || peeking }
+    private var peekTask: Task<Void, Never>?
+    private var announced: Set<String> = []
+    private var eventsTask: Task<Void, Never>?
+
+    func announce(_ text: String, seconds: Double = 8) {
+        AppLog.info("cat announce", ["text": text])
+        peekTask?.cancel()
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { peekMessage = text }
+        peekTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled else { return }
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { self?.peekMessage = nil }
+        }
+    }
+
+    /// 每 15 秒看一眼事件：开始前 6 小时 / 1 小时 / 10 分钟各预告一次，开始时喊一声（天气不允许就说取消了）。
+    func startEventWatcher() {
+        eventsTask?.cancel()
+        eventsTask = Task { [weak self] in
+            while !Task.isCancelled {
+                self?.checkEvents()
+                try? await Task.sleep(for: .seconds(15))
+            }
+        }
+    }
+
+    func checkEvents() {
+        let env = sceneEnv(now: Date())
+        let now = env.date, region = RestDays.region(for: location), lat = location.latitude
+        if let a = EventScheduler.active(now: now, region: region, latitude: lat) {
+            let key = "\(a.eventID)@\(a.start.timeIntervalSince1970)@live"
+            guard !announced.contains(key) else { return }
+            announced.insert(key)
+            let e = a.event
+            announce(e.canRun(condition: env.condition, intensity: env.intensity) ? (e.lives.first ?? e.name) : e.cancelLine)
+            return
+        }
+        guard let u = EventScheduler.upcoming(now: now, region: region, latitude: lat) else { return }
+        let left = u.start.timeIntervalSince(now)
+        let bucket = left <= 600 ? "10m" : (left <= 3600 ? "1h" : "6h")
+        let key = "\(u.eventID)@\(u.start.timeIntervalSince1970)@\(bucket)"
+        guard !announced.contains(key) else { return }
+        announced.insert(key)
+        let e = u.event, time = EventScheduler.timeLabel(u.start, now: now)
+        switch bucket {
+        case "10m": announce("\(e.name)马上开始！快来窗边")
+        case "1h": announce("还有 \(EventScheduler.countdown(left))就是\(e.name)啦，\(time) 别错过")
+        default: announce((e.teasers.first ?? "{time} 有\(e.name)").replacingOccurrences(of: "{time}", with: time))
+        }
+    }
+
+    /// 天气触发型事件：白天雨转晴 → 雨后彩虹；这个冬天第一次下雪 → 初雪。
+    private func triggerWeatherEvents(from old: WeatherInfo?, to new: WeatherInfo) {
+        let now = Date()
+        let wasWet = old.map { WeatherStyle.of($0.condition).wet } ?? false
+        let daytime = SceneClock.sun(at: now, location: location).altitude > 5
+        if wasWet, ["clear", "partly"].contains(new.condition), daytime { EventScheduler.trigger("rainbowAfterRain", at: now) }
+        if ["snow", "sleet"].contains(new.condition) {
+            let cal = Calendar.current
+            let winter = cal.component(.year, from: now) + (cal.component(.month, from: now) == 12 ? 1 : 0)
+            let key = "firstSnow-\(winter)"
+            if !UserDefaults.standard.bool(forKey: key) {
+                UserDefaults.standard.set(true, forKey: key)
+                EventScheduler.trigger("firstSnow", at: now)
+            }
+        }
+    }
     var commentsOpen = false
     /// 内嵌网页登录窗口打开时，点击面板外不收起。
     var webLoginActive = false
@@ -52,6 +136,7 @@ final class AppState {
             feed.muted = settings.muted
             phase = .ready
             startWeather()
+            startEventWatcher()
         } catch {
             log.error("start failed: \(error.localizedDescription, privacy: .public)")
             phase = .failed(error.localizedDescription)
@@ -222,6 +307,7 @@ final class AppState {
         let params: [String: Any] = ["latitude": location.latitude, "longitude": location.longitude]
         do {
             let w: WeatherInfo? = try await sidecar.call("weather.get", params)
+            if let w { triggerWeatherEvents(from: weather, to: w) }
             weather = w
             if let w { AppLog.info("weather", ["condition": w.condition, "text": w.text, "temp": w.temperature ?? -1, "city": location.name]) }
         } catch {

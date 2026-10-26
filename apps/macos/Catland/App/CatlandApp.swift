@@ -84,7 +84,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self.screenChanged()
                 case "den": CatDirector.shared.forceDen = true
                 case let c where c.hasPrefix("egg:"):
-                    IslandRenderer.forcedEgg = IslandRenderer.Egg(rawValue: String(c.dropFirst(4)))
+                    let id = String(c.dropFirst(4)); Eggs.forced = id == "none" ? nil : id
+                case let c where c.hasPrefix("event:"):
+                    // event:<id> 立即开始；event:<id>:<分钟> 在 N 分钟后开始（看预告）；event:none 清除
+                    let parts = c.split(separator: ":").map(String.init)
+                    if parts.count >= 2, parts[1] == "none" { EventScheduler.extra = [] } else if parts.count >= 2 {
+                        let start = self.state.sceneEnv(now: Date()).date.addingTimeInterval((Double(parts.count > 2 ? parts[2] : "0") ?? 0) * 60)
+                        EventScheduler.extra = [EventOccurrence(eventID: parts[1], start: start)]
+                        self.state.checkEvents()
+                    }
+                case let c where c.hasPrefix("say:"): self.state.announce(String(c.dropFirst(4)))
                 case let c where c.hasPrefix("date:"):
                     // date:2026-12-24T21:00 覆盖日期与时间（看季节 / 节日）；date:off 恢复
                     let f = ISO8601DateFormatter(); f.formatOptions = [.withFullDate, .withTime, .withColonSeparatorInTime]; f.timeZone = .current

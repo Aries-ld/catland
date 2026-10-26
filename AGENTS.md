@@ -40,21 +40,13 @@
 - 现有 10 种花色 × 12 个动作：idle walk look sit groom yawn nap loaf stretch hop play roll。动作带 intro / 循环段 / outro 与权重，由 `CatDirector`（`CatStage.swift`）随机编排。
 - 新增动作：在 `PixelCatArt.actions` 里加一组 Frame；跑 Swift 测试（尺寸、可渲染）并生成预览图人工把关后再提交。
 - 刘海下方「小猫步道」（默认开，设置里可关）：物理刘海没有像素，步道让小猫能从刘海下方走过。
-- **刘海场景**（`apps/macos/Catland/Scene/IslandScene.swift`，代码手绘、与小猫同一像素网格）：收起态本身就是一面落地窗，物理刘海当窗上横梁。分层：天空（太阳高度按新加坡经纬度本地计算，`SceneClock`）→ 日月星 → 云 → 远景楼群 → 近景楼群 + 地标（左翼金沙、右翼摩天轮）→ 海湾 → 天气（NEA：晴 / 少云 / 多云 / 霾 / 雨 / 雷雨 / 风）→ 窗框 → 地板。彩蛋：白天飞鸟、夜航飞机、元旦 / 国庆 / 跨年夜烟花。鼠标移动有视差。
-- 刘海创意（实验中，默认两个都开）：**猫洞**（刘海 = 天花板猫洞，猫走到刘海下方跳进去，洞口垂尾巴 / 扒爪子 / 飘 z，过一阵跳下来；`CatDirector` 的 toDen → climbing → inDen → dropping）和**地铁隧道**（刘海 = 隧道口，刘海底边下是高架桥，MRT 小列车每 50 秒穿过一次）。切换：`catland-debug notch:den|tunnel|both|beam`，`catland-debug den` 强制一只猫进洞。
-- 地面是深色抛光地面（颜色取自窗外天色，白天映天光、夜里映城市灯），猫脚下有影子。
-- 刘海创意（实验中，默认两个都开）：**猫洞**（刘海 = 天花板猫洞，猫走到刘海下方跳进去，洞口垂尾巴 / 扒爪子 / 飘 z，过一阵跳下来；CatDirector 的 toDen → climbing → inDen → dropping）和**地铁隧道**（刘海 = 隧道口，刘海底边下是高架桥，MRT 小列车每 50 秒穿过一次）。切换：`catland-debug notch:den|tunnel|both|beam`，`catland-debug den` 强制一只猫进洞。
-- 地面是深色抛光地面（颜色取自窗外天色，白天映天光、夜里映城市灯），猫脚下有影子。
-- 所在地：Mac 系统定位（CoreLocation，基于 Wi-Fi，与 VPN / IP 无关），未授权时按系统时区估计城市（`LocationProvider`）。太阳位置、天气、窗外地标都跟随所在地：新加坡（金沙、摩天轮）、上海（东方明珠、上海中心、环球金融中心），其他城市用通用楼群。`catland-debug city:shanghai|singapore` 可切换预览。
-- 平台图标：各平台官方 App 图标，`scripts/fetch_platform_icons.py` 下载到 `apps/macos/Resources/PlatformIcons`（地址固定在脚本的 PINNED 里，都是人工确认过的干净版本，不随 App Store 的双 11 等活动图标变化；B 站去掉官网图标的 WEB 角标）。界面里统一用 `PlatformIcon` / `PlatformBadge`。
-- 天气（`classify` / `classifyWmo` → condition + intensity）：晴、少云、多云 / 阴、雾、霾、毛毛雨、小 / 中 / 大雨、雷雨、冰雹、雨夹雪 / 冻雨、小 / 中 / 大雪、大风（雨雪随风倾斜）。
-- 季节（`SceneSeason`，按日期 + 纬度，南半球相反，回归线内为「常夏」）：岸边行道树（春嫩绿带粉花 / 夏浓绿 / 秋红橙黄 / 冬枯枝，雪天枝头积雪）、春樱花瓣、秋落叶、夏夜萤火虫、冬天玻璃结霜、天色倾向；小猫行为权重随季节变（冬天更爱睡）。
-- 节日（`SceneHoliday`）：春节红灯笼、中秋金色满月、万圣节南瓜灯、圣诞彩灯、元旦 / 跨年 / 新加坡国庆烟花。
-- 悬停：整面窗变大，楼群按比例长高（地平线贴地，中间只隔 3 行海湾），小猫蹦一下，其中一只冒出像素对话气泡，每 3.2 秒轮播。语料在 `BubbleCopy`，小红书风（可爱、有梗），分三类交错：闲聊语（天气 / 季节 / 时段 / 星期 / 鼓励）、时间语（距周末 / 下班 / 节假日 / 月底 / 年度进度，节假日表在 `RestDays`）、戳我语（俏皮邀请点击，不直说「开刷」）。每次悬停换随机顺序；单句不超过 22 个字。
-- 季节在夜里也要看得出：窗角季节装饰（春樱枝、夏常春藤 + 风铃、秋枫枝、冬冰凌、热带龟背竹叶），岸边路灯照亮行道树。
-- 随机彩蛋（`IslandRenderer.Egg`，按日期抽签：工作日约 45%、周末约 80%，只抽符合季节的）：雨天纸船、夏日午后彩虹、春秋风筝、周末热气球、晴夜流星、稀有 UFO；地面上工作日上午的咖啡、夏天西瓜、雪天雪人、秋天落叶堆。`catland-debug egg:<名字>` 强制显示，`egg:none` 恢复。
-- 调试：`catland-debug date:2026-12-24T21:00:00`（看季节 / 节日，`date:off` 恢复）、`intensity:0~1`（天气强度）、`hoverpin` / `hoverunpin`。
-- 调试：`catland-debug scene:<小时>:<天气>`（如 `scene:21.5:thunder`），`scene:off` 恢复真实时间与天气。
+- **表现层**（刘海里的落地窗场景：天空、城市、天气、季节、节日、彩蛋、事件、室内）在 `apps/macos/Catland/Presentation/`，结构、原则与扩展清单见 `docs/decisions/0003-presentation-layer.md`。新增内容走对应注册表（`Presentation.layers` / `WeatherEffects.all` / `SeasonStyle.of` / `Landmarks.all` / `HolidayCatalog.all` / `Eggs.all` / `Events.all`），模块之间不互相调用，只读 `SceneCanvas`。
+- 刘海创意（默认都开）：**猫洞**（猫走到刘海下方跳进去，洞口垂尾巴 / 扒爪子 / 飘 z，过一阵跳下来；`CatDirector` 的 toDen → climbing → inDen → dropping）和**地铁隧道**（刘海 = 隧道口，MRT 小列车每 50 秒穿过，`MetroLayer`）。切换：`catland-debug notch:den|tunnel|both|beam`，`catland-debug den` 强制一只猫进洞。
+- 所在地：Mac 系统定位（CoreLocation，与 VPN / IP 无关），未授权时按系统时区估计（`LocationProvider`）。太阳、天气、地标、节日地区都跟随所在地。
+- 事件：每次 10 分钟；开始前 6 小时 / 1 小时 / 10 分钟小猫主动探出刘海预告，悬停气泡最前面显示倒计时；开始时天气不允许就取消；进行中小猫坐着抬头看（`watch`）。
+- 气泡语料在 `apps/macos/Catland/Scene/BubbleCopy.swift`：受众是打工人，做陪伴——不说教、不打鸡血，站在打工人这边，小红书风（可爱、有梗）。三类交错（闲聊 / 时间 / 戳我），每句停 5 秒，每次悬停从第一句开始；单句不超过 22 个字。
+- 平台图标：`scripts/fetch_platform_icons.py`，地址固定在 PINNED（人工确认的干净版本，不随活动图标变化）。界面统一用 `PlatformIcon` / `PlatformBadge`。
+- 调试命令见 ADR 0003（`catland-debug date: / scene: / event: / egg: / say: / hoverpin` 等）。
 
 ## 3. 约定
 

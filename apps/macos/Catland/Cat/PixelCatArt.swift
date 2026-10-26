@@ -225,6 +225,14 @@ enum PixelCatArt {
             Frame(pose: s, tail: .up, legs: crouchLegs, lift: 1),
         ], fps: 2.5, intro: 1, outro: 1, loops: 2...5, weight: 2))
 
+        // 看窗外的事件（流星雨、烟花…）：坐下、抬头望着，偶尔眨眼甩尾。权重 0：只在事件进行中由引擎指定。
+        a.append(Action(name: "watch", frames: [
+            Frame(pose: s, tail: .up, legs: crouchLegs, lift: 1),
+            Frame(pose: si, head: .lookUp, tail: .sitFlat), Frame(pose: si, head: .lookUp, tail: .sitFlat), Frame(pose: si, head: .lookUp, tail: .sitTip),
+            Frame(pose: si, head: .lookUp, tail: .sitFlat), Frame(pose: si, head: .blink, tail: .sitFlat), Frame(pose: si, head: .lookUp, tail: .sitTip),
+            Frame(pose: s, tail: .up, legs: crouchLegs, lift: 1),
+        ], fps: 2, intro: 1, outro: 1, loops: 300...300, weight: 0))
+
         // 坐下舔爪：抬起前爪凑到嘴边，低头舔两下。
         let paw: [(Int, Int, Character)] = [(1, 8, "L"), (1, 9, "L")]
         a.append(Action(name: "groom", frames: [

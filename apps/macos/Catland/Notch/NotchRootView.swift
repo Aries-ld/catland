@@ -7,13 +7,13 @@ struct NotchRootView: View {
     private var size: CGSize {
         let c = state.notch.collapsedSize
         if state.expanded { return NotchGeometry.expandedSize }
-        return state.hovering ? CGSize(width: c.width + NotchGeometry.hoverGrow.width, height: c.height + NotchGeometry.hoverGrow.height) : c
+        return state.showingRoom ? CGSize(width: c.width + NotchGeometry.hoverGrow.width, height: c.height + NotchGeometry.hoverGrow.height) : c
     }
 
     var body: some View {
         VStack(spacing: 0) {
             ZStack(alignment: .top) {
-                NotchShape(bottomRadius: state.expanded ? 24 : (state.hovering ? 14 : 10)).fill(Color.black)
+                NotchShape(bottomRadius: state.expanded ? 24 : (state.showingRoom ? 14 : 10)).fill(Color.black)
                 if state.expanded {
                     ExpandedPanel(state: state)
                         .padding(.top, state.notch.notchSize.height)
@@ -24,7 +24,7 @@ struct NotchRootView: View {
                 }
             }
             .frame(width: size.width, height: size.height)
-            .clipShape(NotchShape(bottomRadius: state.expanded ? 24 : (state.hovering ? 14 : 10)))
+            .clipShape(NotchShape(bottomRadius: state.expanded ? 24 : (state.showingRoom ? 14 : 10)))
             .shadow(color: .black.opacity(state.expanded ? 0.45 : 0), radius: 18, y: 8)
 
             Spacer(minLength: 0)
@@ -63,7 +63,7 @@ struct NotchShape: Shape {
 struct CollapsedView: View {
     let state: AppState
 
-    private var width: CGFloat { state.notch.collapsedSize.width + (state.hovering ? NotchGeometry.hoverGrow.width : 0) }
+    private var width: CGFloat { state.notch.collapsedSize.width + (state.showingRoom ? NotchGeometry.hoverGrow.width : 0) }
 
     /// 猫洞 = 物理刘海所在区域（需要有刘海且开了步道，猫才走得到洞口下方）。
     private var denRect: CatDen? {
@@ -73,15 +73,19 @@ struct CollapsedView: View {
         return CatDen(minX: left, maxX: left + n.notchSize.width, bottom: n.notchSize.height)
     }
 
-    /// 悬停时轮播的语料（闲聊 / 时间 / 戳我三类交错）；每次悬停换一个随机顺序。
+    /// 悬停时轮播：事件预告 / 倒计时排最前，后面是闲聊 / 时间 / 戳我三类交错；每次悬停换一个随机顺序。
+    /// 没悬停但小猫主动探出来时，只说那一句。
     private var bubbles: [String] {
-        guard state.hovering else { return [] }
+        if !state.hovering { return state.peekMessage.map { [$0] } ?? [] }
         let env = state.sceneEnv(now: Date())
+        let region = RestDays.region(for: state.location)
+        let events = EventScheduler.bubbleLines(now: env.date, region: region, latitude: state.location.latitude,
+                                                condition: env.condition, intensity: env.intensity, seed: state.hoverSession)
         let ctx = BubbleCopy.Context(now: env.date, region: RestDays.region(for: state.location), city: state.location.name,
                                      condition: state.weather?.condition, temperature: state.weather?.temperature,
                                      season: SceneSeason.of(env.date, latitude: state.location.latitude),
                                      connected: !state.connectedContentPlatforms.isEmpty)
-        return BubbleCopy.rotation(ctx, seed: state.hoverSession)
+        return events + BubbleCopy.rotation(ctx, seed: state.hoverSession)
     }
 
     var body: some View {
@@ -89,9 +93,10 @@ struct CollapsedView: View {
             IslandScene(state: state)
             CatStage(cats: state.notch.shelf > 0 ? 3 : 2,
                      hiddenWidth: state.notch.hasNotch && state.notch.shelf == 0 ? state.notch.notchSize.width : 0,
-                     excited: state.hovering,
+                     excited: state.showingRoom,
                      den: denRect,
-                     bubbles: bubbles)
+                     bubbles: bubbles,
+                     bubbleEpoch: state.hoverStartedAt)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
