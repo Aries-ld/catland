@@ -7,7 +7,7 @@ struct NotchRootView: View {
     private var size: CGSize {
         let c = state.notch.collapsedSize
         if state.expanded { return NotchGeometry.expandedSize }
-        return state.hovering ? CGSize(width: c.width + 24, height: c.height + 28) : c
+        return state.hovering ? CGSize(width: c.width + NotchGeometry.hoverGrow.width, height: c.height + NotchGeometry.hoverGrow.height) : c
     }
 
     var body: some View {
@@ -26,11 +26,7 @@ struct NotchRootView: View {
             .frame(width: size.width, height: size.height)
             .clipShape(NotchShape(bottomRadius: state.expanded ? 24 : (state.hovering ? 14 : 10)))
             .shadow(color: .black.opacity(state.expanded ? 0.45 : 0), radius: 18, y: 8)
-            .contentShape(NotchShape(bottomRadius: 10))
-            .onTapGesture {
-                guard !state.expanded else { return }
-                withAnimation(.spring(response: 0.38, dampingFraction: 0.82)) { state.expanded = true }
-            }
+
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -68,7 +64,7 @@ struct CollapsedView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            CatStrip(cats: max(1, min(3, state.connectedContentPlatforms.count)), hiddenWidth: state.notch.hasNotch ? state.notch.notchSize.width : 0)
+            CatStrip(cats: state.notch.hasNotch ? 2 : max(1, min(3, state.connectedContentPlatforms.count)), hiddenWidth: state.notch.hasNotch ? state.notch.notchSize.width : 0)
                 .frame(height: state.notch.notchSize.height)
             if state.hovering {
                 HStack(spacing: 6) {

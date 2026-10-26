@@ -132,17 +132,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         monitors.append(NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
             MainActor.assumeIsolated { self?.updateMouse(NSEvent.mouseLocation) }
         } as Any)
+        // 鼠标移动事件在顶边附近可能来得晚，再用 60Hz 轮询兜底（只比较坐标，开销可忽略）。
+        let poll = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, !self.state.expanded else { return }
+                self.updateMouse(NSEvent.mouseLocation)
+            }
+        }
+        RunLoop.main.add(poll, forMode: .common)
         monitors.append(NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved]) { [weak self] e in
             self?.updateMouse(NSEvent.mouseLocation)
             return e
         } as Any)
-        // 点击面板外收起。
-        monitors.append(NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+        // 全局点击：收起态点在刘海区域 → 展开（兜底：鼠标从屏幕顶边直接移入时面板可能还在穿透状态）；
+        // 展开态点在面板外 → 收起。
+        monitors.append(NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] e in
             MainActor.assumeIsolated {
-                guard let self, self.state.expanded, !self.geometry.activeRect(expanded: true).contains(NSEvent.mouseLocation) else { return }
-                if self.state.webLoginActive || self.pinned { return }
+                guard let self else { return }
+                let p = NSEvent.mouseLocation
+                if !self.state.expanded {
+                    if e.type == .leftMouseDown, self.geometry.activeRect(expanded: false, hovering: self.state.hovering).contains(p) { self.expand(source: "global-click") }
+                    return
+                }
+                guard !self.geometry.activeRect(expanded: true).contains(p), !self.state.webLoginActive, !self.pinned else { return }
                 self.collapse()
             }
+        } as Any)
+        // 本 App 内的点击：收起态点刘海直接展开，在 AppKit 层处理，不依赖 SwiftUI 手势识别。
+        monitors.append(NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] e in
+            guard let self, e.window === self.panel, !self.state.expanded else { return e }
+            self.expand(source: "click")
+            return nil
         } as Any)
         monitors.append(NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel]) { [weak self] e in
             guard let self, self.state.expanded, e.window === self.panel, self.state.overlay == .none, !self.state.commentsOpen else { return e }
@@ -154,8 +174,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } as Any)
     }
 
+    private func expand(source: String) {
+        guard !state.expanded else { return }
+        AppLog.info("expand", ["source": source])
+        withAnimation(.spring(response: 0.38, dampingFraction: 0.82)) { state.expanded = true }
+    }
+
     private func updateMouse(_ p: NSPoint) {
-        let inside = geometry.activeRect(expanded: state.expanded).contains(p)
+        let inside = geometry.activeRect(expanded: state.expanded, hovering: state.hovering).contains(p)
         panel.ignoresMouseEvents = !(inside || state.expanded)
         if state.hovering != inside {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) { state.hovering = inside }

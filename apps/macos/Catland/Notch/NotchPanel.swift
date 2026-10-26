@@ -20,7 +20,7 @@ struct NotchGeometry: Equatable {
     }
 
     /// 刘海两侧各留一小段「翅膀」给小猫散步；太宽会压住菜单栏项目。
-    static let wing: CGFloat = 30
+    static let wing: CGFloat = 36
     var collapsedSize: CGSize { CGSize(width: notchSize.width + Self.wing * 2, height: notchSize.height) }
 
     var windowFrame: CGRect {
@@ -28,11 +28,15 @@ struct NotchGeometry: Equatable {
         return CGRect(x: screenFrame.midX - s.width / 2, y: screenFrame.maxY - s.height, width: s.width, height: s.height)
     }
 
-    /// 屏幕坐标下的可交互区域。
-    func activeRect(expanded: Bool) -> CGRect {
-        let s = expanded ? Self.expandedSize : collapsedSize
-        return CGRect(x: screenFrame.midX - s.width / 2, y: screenFrame.maxY - s.height, width: s.width, height: s.height)
+    /// 屏幕坐标下的可交互区域。向上多留几个点：鼠标顶到屏幕最上沿时 y 可能等于 maxY。
+    func activeRect(expanded: Bool, hovering: Bool = false) -> CGRect {
+        var s = expanded ? Self.expandedSize : collapsedSize
+        if !expanded && hovering { s = CGSize(width: s.width + Self.hoverGrow.width, height: s.height + Self.hoverGrow.height) }
+        return CGRect(x: screenFrame.midX - s.width / 2, y: screenFrame.maxY - s.height, width: s.width, height: s.height + 4)
     }
+
+    /// 悬停时面板下探的尺寸（与 NotchRootView 一致）。
+    static let hoverGrow = CGSize(width: 24, height: 28)
 }
 
 final class NotchPanel: NSPanel {
@@ -49,7 +53,8 @@ final class NotchPanel: NSPanel {
         isMovable = false
         isReleasedWhenClosed = false
         ignoresMouseEvents = true
-        let host = NSHostingView(rootView: rootView)
+        acceptsMouseMovedEvents = true
+        let host = FirstMouseHostingView(rootView: AnyView(rootView))
         host.wantsLayer = true
         host.layer?.backgroundColor = .clear
         contentView = host
@@ -58,4 +63,9 @@ final class NotchPanel: NSPanel {
     func reposition(_ g: NotchGeometry) {
         setFrame(g.windowFrame, display: true)
     }
+}
+
+/// 面板不抢焦点：默认第一次点击只会激活窗口而不传给内容，导致「点了没反应」。
+final class FirstMouseHostingView: NSHostingView<AnyView> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }

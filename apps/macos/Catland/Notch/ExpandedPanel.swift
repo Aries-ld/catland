@@ -41,7 +41,16 @@ struct ExpandedPanel: View {
             }
             Spacer()
             iconButton("heart.text.square", active: state.overlay == .saved) { toggleOverlay(.saved) }
-            iconButton("link", active: state.overlay == .connections, badge: state.connectedContentPlatforms.count) { toggleOverlay(.connections) }
+            Button { toggleOverlay(.connections) } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "plus").font(.system(size: 10, weight: .bold))
+                    Text("连接 \(state.connectedContentPlatforms.count)").font(.system(size: 11, weight: .medium))
+                }
+                .foregroundStyle(state.overlay == .connections ? .black : .white.opacity(0.85))
+                .padding(.horizontal, 9).frame(height: 24)
+                .background(Capsule().fill(state.overlay == .connections ? Color.white : .white.opacity(0.12)))
+            }
+            .buttonStyle(PressStyle())
             iconButton("slider.horizontal.3", active: state.overlay == .settings) { toggleOverlay(.settings) }
         }
         .padding(.horizontal, 18)

@@ -15,7 +15,7 @@ struct CatStrip: View {
                 Canvas { ctx, size in
                     let t = tl.date.timeIntervalSinceReferenceDate
                     for i in 0..<cats {
-                        let cat = CatBrain.shared.state(for: "\(id)#\(i)", width: size.width, hidden: hiddenWidth, time: t)
+                        let cat = CatBrain.shared.state(for: "\(id)#\(i)", width: size.width, hidden: hiddenWidth, side: i % 2, time: t)
                         PixelCat.draw(in: &ctx, at: CGPoint(x: cat.x, y: size.height - 3), frame: cat.frame, facingLeft: cat.facingLeft, palette: PixelCat.palettes[i % PixelCat.palettes.count], pose: cat.pose)
                     }
                 }
@@ -44,28 +44,24 @@ final class CatBrain {
 
     private var cats: [String: Cat] = [:]
 
-    /// 在可见区域（两侧翅膀，或没有刘海时整条）里随机取一个落脚点；15% 概率换到另一侧（穿过刘海）。
-    private func pickTarget(current x: CGFloat, width: CGFloat, hidden: CGFloat) -> CGFloat {
-        let margin: CGFloat = 10
+    /// 在可见区域里随机取落脚点。有刘海时每只猫固定在一侧翅膀，不穿过刘海（物理刘海处没有像素，会像「消失」）。
+    private func pickTarget(width: CGFloat, hidden: CGFloat, side: Int) -> CGFloat {
+        let margin: CGFloat = 9
         guard hidden > 0, width - hidden > margin * 4 else { return CGFloat.random(in: margin...max(margin + 1, width - margin)) }
         let wing = (width - hidden) / 2
-        let left = margin...max(margin + 1, wing - margin / 2)
-        let right = min(width - margin - 1, width - wing + margin / 2)...(width - margin)
-        let onLeft = x < width / 2
-        let switchSide = Double.random(in: 0..<1) < 0.15
-        return CGFloat.random(in: (onLeft != switchSide) ? left : right)
+        return side == 0 ? CGFloat.random(in: margin...max(margin + 1, wing - margin / 2)) : CGFloat.random(in: min(width - margin - 1, width - wing + margin / 2)...(width - margin))
     }
 
-    func state(for i: String, width: CGFloat, hidden: CGFloat = 0, time t: TimeInterval) -> Snapshot {
+    func state(for i: String, width: CGFloat, hidden: CGFloat = 0, side: Int = 0, time t: TimeInterval) -> Snapshot {
         var c = cats[i] ?? Cat(x: 0, target: 0, speed: CGFloat.random(in: 12...20))
-        if c.last == 0 { c.x = pickTarget(current: Bool.random() ? 0 : width, width: width, hidden: hidden) }
+        if c.last == 0 { c.x = pickTarget(width: width, hidden: hidden, side: side) }
         let dt = c.last == 0 ? 0 : min(0.1, t - c.last)
         c.last = t
         if t >= c.until {
             switch Int.random(in: 0..<10) {
             case 0..<6:
                 c.pose = .walk
-                c.target = pickTarget(current: c.x, width: width, hidden: hidden)
+                c.target = pickTarget(width: width, hidden: hidden, side: side)
                 c.until = t + 20
             case 6..<8:
                 c.pose = .stand
