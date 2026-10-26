@@ -41,6 +41,8 @@
 - 新依赖锁精确版本，且选发布满 7 天的版本。
 - 内容体验对标抖音 / 小红书（手感、布局、时延），指标与预加载策略见 `docs/decisions/0002-content-pipeline-and-preloading.md`；改动内容管线后跑 `npm run smoke:feed` 对照指标。
 - 媒体请求头按平台给（`MEDIA_HEADERS`），不要统一加 Referer：X 带错 Referer 会 403。
+- 界面自检截图只用 `shot-window`（只拍 catland 窗口），不要全屏截图，避免拍到用户其他应用的内容。
+- 面板是不抢焦点的 NSPanel：系统控件（Toggle 等）会显示为非活跃样式，用自绘控件（如 `PillToggle`）。
 
 ## 4. 常用命令
 
@@ -51,6 +53,13 @@ npm run smoke                                       # 真机只读冒烟，日�
 npm run smoke:accounts [platform]                   # 账号面板 + 体检 + 扫码取到二维码后立即取消
 npm run smoke:feed [条数] [停留ms]                   # 混排刷 N 条：首屏、划动等待、媒体可达性
 npm run smoke:rpc                                   # 以子进程启动 sidecar，经 stdio RPC 走全流程（临时数据目录）
+
+# macOS App（apps/macos，XcodeGen 生成工程，project.yml 是唯一来源）
+apps/macos/scripts/run.sh                           # 生成工程 + 构建 + 启动调试版
+cd apps/macos && xcodebuild -project Catland.xcodeproj -scheme Catland -derivedDataPath build/DerivedData test
+apps/macos/build/catland-debug <pin|unpin|toggle|next|prev|right|pause|comments|connections|settings|saved|close|boss>  # 仅调试版：驱动界面
+apps/macos/build/shot-window /tmp/x.png             # 只截 catland 自己的窗口（不拍用户其他应用）
+# App 日志：~/Library/Logs/catland/app.log；sidecar 日志：~/Library/Logs/catland/sidecar.log
 
 
 catbus auth list                                  # 已登录的平台

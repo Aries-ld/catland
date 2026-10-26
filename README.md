@@ -6,7 +6,17 @@
 
 ## 状态
 
-MVP 开发中：sidecar 已完成 catbus 调用层（`apps/sidecar`）。
+MVP 开发中：sidecar（账号、内容管线、本地库、RPC）与 macOS App 首版（刘海面板、刷刷页、评论、连接、设置）已可运行；小猫为占位像素画，正式美术待生成。
+
+## 运行（开发版）
+
+```bash
+cd apps/sidecar && npm install          # 首次
+brew install xcodegen                   # 首次
+apps/macos/scripts/run.sh               # 构建并启动，刘海处出现小猫
+```
+
+快捷键：`⌥ \`` 呼出 / 收起，`⌥ Esc` 老板键；展开后 ↑↓ / 触控板上下滑翻页，L 点赞，S 收藏，C 评论，M 静音。
 
 ## 架构
 
