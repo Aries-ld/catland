@@ -1,0 +1,19 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# third-party reference (read-only clone of cv-cat/catbus)
+vendor/
+
+# build / deps
+node_modules/
+dist/
+build/
+DerivedData/
+.build/
+*.xcuserstate
+xcuserdata/
+
+# os
+.DS_Store
