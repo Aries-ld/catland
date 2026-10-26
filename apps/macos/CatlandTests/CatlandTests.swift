@@ -101,3 +101,27 @@ final class SceneClockTests: XCTestCase {
         XCTAssertEqual(SceneClock.darkness(midnight), 1)
     }
 }
+
+final class CatDenTests: XCTestCase {
+    func testCatClimbsIntoDenHidesShowsEffectThenDropsBack() {
+        let director = CatDirector()
+        director.forceDen = true
+        let lane = CatDirector.Lane(min: 100, max: 160, exitLeft: true)
+        let den = CatDen(minX: 80, maxX: 240, bottom: 32)
+        var t: TimeInterval = 1000
+        var sawHidden = false, sawEffect = false, landed = false
+        var snap = director.tick(actor: "a", lane: lane, pixel: 1.5, time: t, excited: false, den: den, groundToDen: 12)
+        for _ in 0..<(60 * 30 * 3) { // 最多模拟 3 分钟（30fps）
+            t += 1.0 / 30
+            snap = director.tick(actor: "a", lane: lane, pixel: 1.5, time: t, excited: false, den: den, groundToDen: 12)
+            if snap.opacity == 0 { sawHidden = true; XCTAssertGreaterThan(snap.lift, 12) }
+            if snap.denEffect != nil { sawEffect = true }
+            if sawHidden && snap.opacity > 0 && snap.lift == 0 { landed = true; break }
+        }
+        XCTAssertTrue(sawHidden, "cat never entered the den")
+        XCTAssertTrue(sawEffect, "no tail / paws / peek / zzz while in den")
+        XCTAssertTrue(landed, "cat never came back down")
+        XCTAssertGreaterThanOrEqual(snap.x, den.minX)
+        XCTAssertLessThanOrEqual(snap.x, den.maxX)
+    }
+}

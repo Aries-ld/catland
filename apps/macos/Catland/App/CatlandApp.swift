@@ -76,6 +76,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     // scene:<小时>:<天气>，如 scene:19.2:rain；scene:off 恢复真实时间与天气
                     let parts = c.split(separator: ":")
                     if parts.count == 3, let h = Double(parts[1]) { self.state.sceneOverride = (h, String(parts[2])) } else { self.state.sceneOverride = nil }
+                case let c where c.hasPrefix("notch:"):
+                    // notch:tunnel / notch:den / notch:both / notch:beam
+                    let m = c.dropFirst(6)
+                    UserDefaults.standard.set(m == "tunnel" || m == "both", forKey: NotchGeometry.tunnelKey)
+                    UserDefaults.standard.set(m == "den" || m == "both", forKey: NotchGeometry.denKey)
+                    self.screenChanged()
+                case "den": CatDirector.shared.forceDen = true
+                case "ceiling:on", "ceiling:off":
+                    UserDefaults.standard.set(cmd == "ceiling:on", forKey: NotchGeometry.ceilingKey)
+                    self.screenChanged()
                 case "hoverpin": self.state.hovering = true; self.pinnedHover = true
                 case "hoverunpin": self.pinnedHover = false
                 default: break

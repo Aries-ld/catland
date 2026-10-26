@@ -2,7 +2,16 @@
 // 每只猫是一个「演员」：在自己的活动区间里按权重随机选动作（发呆、东张西望、坐下、舔爪、打哈欠、打盹、
 // 趴成面包、伸懒腰、追蝴蝶、翻肚皮、走几步），节奏和停顿随机；悬停时开心地蹦一下冒爱心；
 // 每隔几分钟有一只猫走出画面「下班」，换一只随机花色的新猫走进来。
+// 猫洞（刘海 = 天花板上的猫洞）：猫会走到刘海下方跳进洞里「消失」，在洞里时洞口会垂下尾巴、
+// 伸出爪子、倒挂探头或飘出 z，过一阵再跳下来。
 import SwiftUI
+
+/// 猫洞位置（CatStage 坐标，pt）：刘海的左右边界与底边。
+struct CatDen: Equatable {
+    let minX: CGFloat
+    let maxX: CGFloat
+    let bottom: CGFloat
+}
 
 struct CatStage: View {
     /// 同时在场的猫数量。
@@ -14,6 +23,7 @@ struct CatStage: View {
     var pixel: CGFloat = 0
     /// 悬停 / 点开时让猫开心地蹦一下。
     var excited = false
+    var den: CatDen? = nil
 
     @Environment(\.displayScale) private var displayScale
 
@@ -24,8 +34,10 @@ struct CatStage: View {
                 let t = tl.date.timeIntervalSinceReferenceDate
                 for i in 0..<cats {
                     let lane = CatDirector.shared.lane(for: i, count: cats, width: size.width, hidden: hiddenWidth, catWidth: CGFloat(PixelCatArt.width) * px)
-                    let snap = CatDirector.shared.tick(actor: "\(id)#\(i)", lane: lane, pixel: px, time: t, excited: excited)
-                    draw(snap, in: &ctx, size: size, px: px)
+                    let snap = CatDirector.shared.tick(actor: "\(id)#\(i)", lane: lane, pixel: px, time: t, excited: excited,
+                                                       den: den, groundToDen: den.map { size.height - px - $0.bottom } ?? 0)
+                    if let effect = snap.denEffect, let den { drawDenEffect(effect, skin: snap.skin, den: den, in: &ctx, px: px, t: t) }
+                    if snap.opacity > 0 { draw(snap, in: &ctx, size: size, px: px) }
                 }
             }
         }
@@ -36,10 +48,18 @@ struct CatStage: View {
         let a = s.animation
         let frame = a.frames[min(max(s.frame, 0), a.frames.count - 1)]
         let w = CGFloat(a.frameWidth) * px, h = CGFloat(a.frameHeight) * px
-        var rect = CGRect(x: s.x - w / 2, y: size.height - h, width: w, height: h)
+        // 脚踩在倒数第二行，最后一行留给影子；lift 为跳进 / 跳出猫洞时的离地高度。
+        var rect = CGRect(x: s.x - w / 2, y: size.height - h - px - s.lift, width: w, height: h)
         rect.origin.x = (rect.origin.x / px).rounded() * px // 对齐像素网格，避免发糊
+        rect.origin.y = (rect.origin.y / px).rounded() * px
         var c = ctx
         c.opacity = s.opacity
+        // 脚下的影子：离地越高越淡。
+        let shadowW = CGFloat(PixelCatArt.width - 5) * px
+        let shadowA = 0.28 * max(0, 1 - Double(s.lift / (12 * px)))
+        if shadowA > 0.02 {
+            c.fill(Path(CGRect(x: ((s.x - shadowW / 2) / px).rounded() * px, y: size.height - px, width: shadowW, height: px)), with: .color(.black.opacity(shadowA)))
+        }
         // 美术朝左绘制；朝右时水平翻转。
         if s.facingLeft != CatAtlas.shared.facesLeft {
             c.translateBy(x: rect.midX * 2, y: 0)
@@ -52,6 +72,48 @@ struct CatStage: View {
         }
         c.draw(c.resolve(Image(decorative: frame, scale: 1).interpolation(.none)), in: rect)
     }
+
+    /// 猫在洞里时，洞口（刘海底边）露出来的小动作。
+    private func drawDenEffect(_ e: CatDirector.DenEffect, skin name: String, den: CatDen, in ctx: inout GraphicsContext, px: CGFloat, t: TimeInterval) {
+        guard let skin = PixelCatArt.skins.first(where: { $0.name == name }) else { return }
+        let base = PixelCatArt.color("B", x: 0, y: 0, skin: skin).map(Self.color) ?? .orange
+        let tail = PixelCatArt.color("T", x: 1, y: 0, skin: skin).map(Self.color) ?? base
+        let paw = PixelCatArt.color("L", x: 0, y: 11, skin: skin).map(Self.color) ?? base
+        let x0 = (e.x / px).rounded() * px, y0 = (den.bottom / px).rounded() * px
+        func dot(_ dx: Int, _ dy: Int, _ c: Color) { ctx.fill(Path(CGRect(x: x0 + CGFloat(dx) * px, y: y0 + CGFloat(dy) * px, width: px, height: px)), with: .color(c)) }
+        switch e.kind {
+        case .tail:
+            // 垂下的尾巴，末端左右摆动。
+            let len = 5
+            for k in 0..<len {
+                let sway = k >= 2 ? Int((sin(t * 2.2 + Double(k) * 0.6) * Double(k - 1) * 0.6).rounded()) : 0
+                dot(sway, k, k % 2 == 0 ? tail : base)
+            }
+        case .paws:
+            // 两只前爪扒着洞口边，偶尔动一下。
+            let wiggle = Int(t * 1.5) % 5 == 0 ? 1 : 0
+            dot(-2, 0, paw); dot(-2, 1 + wiggle, paw); dot(-1, 1 + wiggle, paw)
+            dot(2, 0, paw); dot(2, 1, paw); dot(3, 1, paw)
+        case .peek:
+            // 倒挂探头：头部像素上下翻转画在洞口下沿。
+            let rows = PixelCatArt.Head.normal.rows.reversed()
+            for (r, line) in rows.enumerated() {
+                for (c, ch) in line.enumerated() where ch != "." {
+                    if let rgb = PixelCatArt.color(ch, x: c, y: r, skin: skin) { dot(c - 3, r, Self.color(rgb)) }
+                }
+            }
+        case .sleep:
+            // 洞里在睡觉：飘出 z。
+            let phase = t.truncatingRemainder(dividingBy: 3) / 3
+            let z = Color(red: 0.8, green: 0.85, blue: 1).opacity(1 - phase)
+            dot(1 + Int(phase * 3), 1 + Int(phase * 4), z)
+            if phase > 0.4 { dot(3 + Int(phase * 2), 2 + Int(phase * 5), z.opacity(0.6)) }
+        }
+    }
+
+    private static func color(_ rgb: UInt32) -> Color {
+        Color(red: Double(rgb >> 16 & 0xFF) / 255, green: Double(rgb >> 8 & 0xFF) / 255, blue: Double(rgb & 0xFF) / 255)
+    }
 }
 
 /// 所有猫演员的状态与随机决策。
@@ -60,20 +122,34 @@ final class CatDirector {
 
     struct Lane { let min: CGFloat; let max: CGFloat; let exitLeft: Bool }
 
+    struct DenEffect {
+        enum Kind: CaseIterable { case tail, paws, peek, sleep }
+        let kind: Kind
+        let x: CGFloat
+    }
+
     struct Snapshot {
         let animation: CatAnimation
         let frame: Int
         let x: CGFloat
+        let lift: CGFloat
         let facingLeft: Bool
         let opacity: Double
         let rim: Bool
+        let skin: String
+        let denEffect: DenEffect?
     }
 
-    private enum Phase { case acting, walking(to: CGFloat), entering, leaving }
+    private enum Phase {
+        case acting, walking(to: CGFloat), entering, leaving
+        /// 走到洞口下方 → 起跳钻进洞 → 在洞里 → 跳下来
+        case toDen(x: CGFloat), climbing(from: TimeInterval), inDen(until: TimeInterval, effect: DenEffect.Kind), dropping(from: TimeInterval)
+    }
 
     private struct Actor {
         var skin: String
         var x: CGFloat
+        var lift: CGFloat = 0
         var facingLeft = true
         var action = "idle"
         var phase: Phase = .acting
@@ -83,14 +159,20 @@ final class CatDirector {
         var nextSwap: TimeInterval = 0
         var wasExcited = false
         var loops = 1
+        var effectChange: TimeInterval = 0
     }
 
     private var actors: [String: Actor] = [:]
+    /// 调试：下一次决策时强制去猫洞。
+    var forceDen = false
     private var onStage: Set<String> { Set(actors.values.map(\.skin)) }
+    /// 同一时刻只允许一只猫在洞里（洞口小，效果更清楚）。
+    private var denOccupied: Bool { actors.values.contains { if case .inDen = $0.phase { return true }; if case .climbing = $0.phase { return true }; return false } }
     /// 走路速度：每秒多少个美术像素。
     private let walkSpeed: CGFloat = 9
     /// 离场 / 入场时走到区间外多远。
     private let offstage: CGFloat = 26
+    private let jumpTime: TimeInterval = 0.45
 
     /// 每只猫的活动区间（猫的中心点范围）。
     func lane(for i: Int, count: Int, width: CGFloat, hidden: CGFloat, catWidth: CGFloat) -> Lane {
@@ -104,20 +186,23 @@ final class CatDirector {
         return Lane(min: seg * CGFloat(i) + half, max: max(seg * CGFloat(i) + half + 1, seg * CGFloat(i + 1) - half), exitLeft: i % 2 == 0)
     }
 
-    func tick(actor id: String, lane: Lane, pixel: CGFloat, time t: TimeInterval, excited: Bool) -> Snapshot {
+    func tick(actor id: String, lane: Lane, pixel: CGFloat, time t: TimeInterval, excited: Bool, den: CatDen? = nil, groundToDen: CGFloat = 0) -> Snapshot {
         let atlas = CatAtlas.shared
         var a = actors[id] ?? newActor(lane: lane, time: t)
         let dt = a.lastTick == 0 ? 0 : min(0.1, t - a.lastTick)
         a.lastTick = t
         let step = walkSpeed * pixel * CGFloat(dt)
+        // 跳进洞需要的高度：整只猫越过刘海底边。
+        let denLift = groundToDen + CGFloat(PixelCatArt.height) * pixel
 
         if excited && !a.wasExcited, case .acting = a.phase { start(&a, action: "hop", time: t) }
         a.wasExcited = excited
+        var effect: DenEffect?
 
         switch a.phase {
         case .walking(let goal):
             moveToward(&a, goal: goal, step: step)
-            if abs(a.x - goal) < 0.5 { decide(&a, lane: lane, time: t) }
+            if abs(a.x - goal) < 0.5 { decide(&a, lane: lane, time: t, den: den) }
         case .entering:
             let goal = lane.exitLeft ? lane.min + 4 : lane.max - 4
             moveToward(&a, goal: goal, step: step)
@@ -127,15 +212,50 @@ final class CatDirector {
             moveToward(&a, goal: exit, step: step)
             if abs(a.x - exit) < 0.5 { a = newActor(lane: lane, time: t, entering: true, excluding: onStage) }
         case .acting:
-            if t >= a.until { decide(&a, lane: lane, time: t) }
+            if t >= a.until { decide(&a, lane: lane, time: t, den: den) }
+        case .toDen(let goal):
+            moveToward(&a, goal: goal, step: step)
+            if abs(a.x - goal) < 0.5 {
+                a.phase = .climbing(from: t)
+                a.action = "hop"
+                a.started = t
+            }
+        case .climbing(let from):
+            let k = min(1, (t - from) / jumpTime)
+            a.lift = denLift * CGFloat(1 - pow(1 - k, 2)) // 先快后慢的起跳
+            if k >= 1 {
+                a.phase = .inDen(until: t + Double.random(in: 18...50), effect: DenEffect.Kind.allCases.randomElement()!)
+                a.effectChange = t + Double.random(in: 5...10)
+            }
+        case .inDen(let until, var kind):
+            if t >= a.effectChange {
+                kind = DenEffect.Kind.allCases.randomElement()!
+                a.effectChange = t + Double.random(in: 5...10)
+                a.phase = .inDen(until: until, effect: kind)
+            }
+            effect = DenEffect(kind: kind, x: a.x)
+            if t >= until {
+                a.phase = .dropping(from: t)
+                a.action = "hop"
+                a.started = t
+            }
+        case .dropping(let from):
+            let k = min(1, (t - from) / (jumpTime * 0.8))
+            a.lift = denLift * CGFloat(1 - k * k) // 自由落体般加速落地
+            if k >= 1 {
+                a.lift = 0
+                start(&a, action: "look", time: t)
+            }
         }
         actors[id] = a
 
         let anim = atlas.cats[a.skin]?[a.action] ?? atlas.cats[a.skin]!["idle"]!
         let raw = Int((t - a.started) * anim.fps)
         let edge = lane.exitLeft ? a.x - (lane.min - offstage) : (lane.max + offstage) - a.x
-        return Snapshot(animation: anim, frame: Self.frameIndex(raw: raw, anim: anim, loops: a.loops), x: a.x, facingLeft: a.facingLeft,
-                        opacity: min(1, max(0, Double(edge) / 16)), rim: atlas.rimmed.contains(a.skin))
+        var opacity = min(1, max(0, Double(edge) / 16))
+        if case .inDen = a.phase { opacity = 0 }
+        return Snapshot(animation: anim, frame: Self.frameIndex(raw: raw, anim: anim, loops: a.loops), x: a.x, lift: a.lift, facingLeft: a.facingLeft,
+                        opacity: opacity, rim: atlas.rimmed.contains(a.skin), skin: a.skin, denEffect: effect)
     }
 
     /// 分段播放：intro 一次 → 中段循环 loops 次 → outro 一次（停在最后一帧直到动作结束）。
@@ -176,11 +296,22 @@ final class CatDirector {
     }
 
     /// 按动作权重随机选下一个动作；刚做完的动作降低权重，避免连续重复。
-    private func decide(_ a: inout Actor, lane: Lane, time t: TimeInterval) {
+    private func decide(_ a: inout Actor, lane: Lane, time t: TimeInterval, den: CatDen?) {
         if t >= a.nextSwap {
             a.phase = .leaving
             a.action = "walk"
             a.facingLeft = lane.exitLeft
+            a.started = t
+            return
+        }
+        // 去猫洞：洞没人占、并且这只猫离洞不太远时才考虑。
+        if let den, !denOccupied, forceDen || Double.random(in: 0..<1) < 0.14 {
+            forceDen = false
+            let margin = CGFloat(PixelCatArt.width)
+            let target = CGFloat.random(in: (den.minX + margin)...max(den.minX + margin + 1, den.maxX - margin))
+            a.facingLeft = target < a.x
+            a.phase = .toDen(x: target)
+            a.action = "walk"
             a.started = t
             return
         }

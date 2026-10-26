@@ -14,6 +14,17 @@ struct NotchGeometry: Equatable {
     static let shelfHeight: CGFloat = 15
     static let catwalkKey = "catwalk"
     static var catwalkEnabled: Bool { UserDefaults.standard.object(forKey: catwalkKey) as? Bool ?? true }
+    /// 天花板模式：刘海融进整条黑色天花板，窗户在下方，步道需要更高才放得下窗外的楼。
+    static let ceilingKey = "notchCeiling"
+    static var ceilingEnabled: Bool { UserDefaults.standard.object(forKey: ceilingKey) as? Bool ?? false }
+    static let ceilingShelfHeight: CGFloat = 27
+    var ceiling = false
+    /// 刘海创意：tunnel = 刘海是地铁隧道口，MRT 小列车从中穿过；den = 刘海是猫洞，小猫钻进钻出。
+    static let tunnelKey = "notchTunnel", denKey = "notchDen"
+    static var tunnelEnabled: Bool { UserDefaults.standard.object(forKey: tunnelKey) as? Bool ?? true }
+    static var denEnabled: Bool { UserDefaults.standard.object(forKey: denKey) as? Bool ?? true }
+    var tunnel = false
+    var den = false
 
     static let expandedSize = CGSize(width: 400, height: 720)
 
@@ -21,7 +32,8 @@ struct NotchGeometry: Equatable {
         let f = screen.frame
         if screen.safeAreaInsets.top > 0, let l = screen.auxiliaryTopLeftArea, let r = screen.auxiliaryTopRightArea {
             return NotchGeometry(screenFrame: f, notchSize: CGSize(width: f.width - l.width - r.width, height: screen.safeAreaInsets.top), hasNotch: true,
-                                 shelf: catwalkEnabled ? shelfHeight : 0)
+                                 shelf: ceilingEnabled ? ceilingShelfHeight : (catwalkEnabled ? shelfHeight : 0), ceiling: ceilingEnabled,
+                                 tunnel: tunnelEnabled && !ceilingEnabled, den: denEnabled && !ceilingEnabled)
         }
         return NotchGeometry(screenFrame: f, notchSize: CGSize(width: 180, height: 28), hasNotch: false, shelf: catwalkEnabled ? shelfHeight : 0)
     }

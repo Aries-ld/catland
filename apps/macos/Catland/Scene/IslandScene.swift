@@ -10,7 +10,7 @@ struct IslandScene: View {
 
     /// 地板厚度（美术像素）。小猫站在地板上，CatStage 底部留出这么多空间。
     static let floorRows = 3
-    static var floorInset: CGFloat { 1.5 }
+    static var floorInset: CGFloat { 0 }
 
     @Environment(\.displayScale) private var displayScale
 
@@ -51,6 +51,10 @@ struct IslandRenderer {
         return left...(left + w - 1)
     }
     var notchRows: Int { notch.hasNotch ? Int((notch.notchSize.height / p).rounded()) : 0 }
+    /// 天花板模式：顶部整条与刘海同为黑色天花板，刘海「融进」天花板；窗户从天花板下沿开始。
+    var ceilingMode: Bool { notch.ceiling && notchRows > 0 }
+    /// 窗户可见区域的最上一行。
+    var skyTop: Int { ceilingMode ? notchRows + 1 : 0 }
 
     // 场景参数
     private var sun: SunPosition { SceneClock.sun(at: env.date) }
@@ -70,8 +74,10 @@ struct IslandRenderer {
         drawFarCity(sky)
         drawNearCity()
         drawWater(sky)
+        drawMetro()
         drawWeather()
         drawFrame()
+        drawCeiling()
         drawFloor()
     }
 
@@ -101,7 +107,7 @@ struct IslandRenderer {
         if dark < 0.85, overcast < 0.85 {
             // 太阳：东升（左）西落（右），高度映射到天空纵向；晨昏变橙。
             let x = Int(Double(cols) * min(1, max(0, (sun.azimuth - 60) / 240)))
-            let y = horizon - 3 - Int(Double(horizon - 6) * min(1, max(0, sun.altitude / 50)))
+            let y = horizon - 3 - Int(Double(max(1, horizon - skyTop - 6)) * min(1, max(0, sun.altitude / 50)))
             let core = rgb(0xFFF1B8).mix(rgb(0xFF9A55), dusk).color.opacity(1 - overcast * 0.7)
             fill(x - 1, y - 2, 3, 5, core); fill(x - 2, y - 1, 5, 3, core)
             fill(x - 3, y - 3, 7, 7, core.opacity(0.18))
@@ -110,14 +116,14 @@ struct IslandRenderer {
             let a = (dark - 0.55) / 0.45 * (1 - overcast)
             var rng = SeededRandom(seed: 7)
             for _ in 0..<40 {
-                let x = Int(rng.next() % UInt64(max(1, cols))), y = Int(rng.next() % UInt64(max(1, horizon - 8)))
+                let x = Int(rng.next() % UInt64(max(1, cols))), y = skyTop + Int(rng.next() % UInt64(max(1, horizon - skyTop - 8)))
                 let tw = 0.5 + 0.5 * sin(t * (0.8 + Double(rng.next() % 7) * 0.3) + Double(x))
                 fill(x, y, 1, 1, Color.white.opacity(a * tw))
             }
             // 月亮（新月形），夜里从左慢慢移到右。
             let h = Double(Calendar.current.component(.hour, from: env.date)) + Double(Calendar.current.component(.minute, from: env.date)) / 60
             let prog = min(1, max(0, ((h - 19 + 24).truncatingRemainder(dividingBy: 24)) / 11))
-            let mx = Int(Double(cols - 6) * prog) + 2, my = 3
+            let mx = Int(Double(cols - 6) * prog) + 2, my = skyTop + 2
             let moon = rgb(0xF4F1DE).color.opacity(min(1, a + 0.3))
             fill(mx, my, 3, 4, moon); fill(mx - 1, my + 1, 1, 2, moon); fill(mx + 3, my + 1, 1, 2, moon)
             fill(mx + 1, my, 3, 3, s.top.color.opacity(min(1, a + 0.3)))
@@ -130,7 +136,7 @@ struct IslandRenderer {
         var rng = SeededRandom(seed: 42)
         let speed = cond == "windy" ? 3.0 : 0.6
         for i in 0..<count {
-            let w = 10 + Int(rng.next() % 12), y = 2 + Int(rng.next() % UInt64(max(1, floorTop / 3)))
+            let w = 10 + Int(rng.next() % 12), y = skyTop + 1 + Int(rng.next() % UInt64(max(1, (floorTop - skyTop) / 3)))
             let span = Double(cols + w * 2)
             let x = Int((Double(rng.next() % 500) + t * speed * (0.6 + Double(i % 3) * 0.35)).truncatingRemainder(dividingBy: span)) - w
             let c = tone.color.opacity(0.55 + overcast * 0.4)
@@ -142,7 +148,7 @@ struct IslandRenderer {
     private func drawFlyers() {
         let period = 40.0, phase = t.truncatingRemainder(dividingBy: period) / 12
         guard phase < 1, !raining else { return }
-        let x = Int(Double(cols + 10) * phase) - 5, y = 3 + Int(t / period) % 4
+        let x = Int(Double(cols + 10) * phase) - 5, y = skyTop + 2 + Int(t / period) % 4
         if dark > 0.5 {
             fill(x, y, 3, 1, Color(white: 0.55))
             if Int(t * 2) % 2 == 0 { fill(x + 3, y, 1, 1, .red) }
@@ -162,7 +168,7 @@ struct IslandRenderer {
             let cycle = 3.2, local = (t + Double(k) * 1.6).truncatingRemainder(dividingBy: cycle)
             let n = Int((t + Double(k) * 1.6) / cycle)
             var rng = SeededRandom(seed: UInt64(n * 31 + k))
-            let cx = 6 + Int(rng.next() % UInt64(max(1, cols - 12))), cy = 4 + Int(rng.next() % 6)
+            let cx = 6 + Int(rng.next() % UInt64(max(1, cols - 12))), cy = skyTop + 3 + Int(rng.next() % 4)
             let colors: [UInt32] = [0xFF5D7A, 0xFFD84A, 0x6DD3FF, 0xB98CFF]
             let c = rgb(colors[Int(rng.next() % 4)]).color
             if local < 0.6 { fill(cx, floorTop - 3 - Int(Double(floorTop - 3 - cy) * local / 0.6), 1, 1, c) }
@@ -216,7 +222,7 @@ struct IslandRenderer {
         }
 
         // 金沙酒店（左翼）：三栋塔楼 + 顶上的「船」。
-        let mbsH = min(14, base - 4)
+        let mbsH = min(14, base - skyTop - 3)
         for i in 0..<3 {
             let tx = mbsX + i * 4
             fill(tx, base - mbsH, 3, mbsH, body.color); fill(tx + 2, base - mbsH, 1, mbsH, shade.color)
@@ -227,7 +233,7 @@ struct IslandRenderer {
         if dark > 0.5 { fill(mbsX, base - mbsH - 1, 12, 1, Color(red: 0.6, green: 0.8, blue: 1).opacity(0.6 * dark)) }
 
         // 摩天轮（右翼）：像素圆环 + 辐条 + 支架；夜里灯光沿圆环流动变色。
-        let r = min(6, max(4, (base - 4) / 3))
+        let r = min(6, max(3, (base - skyTop - 4) / 3))
         let cy = base - r - 3
         let ring = rgb(0xE8EDF2).mix(rgb(0x6A7798), dark * 0.6).color
         let points = ringPoints(r)
@@ -323,17 +329,27 @@ struct IslandRenderer {
         let frame = Color(red: 0.12, green: 0.13, blue: 0.17)
         let edge = Color(red: 0.26, green: 0.27, blue: 0.33)
         let nc = notchCols
-        if notchRows > 0 {
+        if notchRows > 0 && !ceilingMode {
             // 物理刘海 = 窗上的黑色横梁；沿刘海外沿描一圈窗框，让它看起来是有意的结构。
-            fill(nc.lowerBound - 2, 0, 2, floorTop, frame)
-            fill(nc.upperBound + 1, 0, 2, floorTop, frame)
-            fill(nc.lowerBound - 2, notchRows, nc.count + 4, 1, frame)
-            fill(nc.lowerBound - 1, notchRows + 1, nc.count + 2, 1, edge.opacity(0.6))
+            // 隧道模式下，刘海两侧窗框在列车高度处让位给隧道口。
+            let barTop = notch.tunnel ? notchRows + 1 : 0
+            fill(nc.lowerBound - 2, barTop, 2, floorTop - barTop, frame)
+            fill(nc.upperBound + 1, barTop, 2, floorTop - barTop, frame)
+            if notch.den {
+                // 猫洞模式：洞口一圈木质边框（外沿深、内沿浅），像天花板上开的猫洞。
+                let woodDark = rgb(0x5A3A26).mix(rgb(0x1E140F), dark * 0.6).color
+                let woodLight = rgb(0xA8744A).mix(rgb(0x3A271B), dark * 0.6).color
+                fill(nc.lowerBound - 2, notchRows, nc.count + 4, 1, woodLight)
+                fill(nc.lowerBound - 1, notchRows + 1, nc.count + 2, 1, woodDark)
+            } else {
+                fill(nc.lowerBound - 2, notchRows, nc.count + 4, 1, frame)
+                fill(nc.lowerBound - 1, notchRows + 1, nc.count + 2, 1, edge.opacity(0.6))
+            }
             fill(0, 0, nc.lowerBound, 1, frame)
             fill(nc.upperBound + 1, 0, cols, 1, frame)
         }
         // 玻璃反光：每块玻璃一道淡淡的斜线。
-        let panes: [ClosedRange<Int>] = notchRows > 0 ? [0...(nc.lowerBound - 3), (nc.upperBound + 3)...(cols - 1), (nc.lowerBound)...(nc.upperBound)] : [0...(cols - 1)]
+        let panes: [ClosedRange<Int>] = notchRows > 0 && !ceilingMode ? [0...(nc.lowerBound - 3), (nc.upperBound + 3)...(cols - 1), (nc.lowerBound)...(nc.upperBound)] : [0...(cols - 1)]
         for pane in panes where pane.count > 6 {
             let top = pane == nc ? notchRows + 2 : 1
             for k in 0..<(floorTop - top) {
@@ -343,23 +359,91 @@ struct IslandRenderer {
         }
     }
 
+    // MARK: - 地铁隧道
+
+    /// 列车行驶的轨面行：刚好在刘海底边之上，车身在两翼完整可见、经过刘海时整列「钻进隧道」。
+    private var trackRow: Int { notchRows - 1 }
+
+    /// 刘海 = 隧道口：两侧画混凝土洞口，刘海底边下方是贯穿全宽的高架桥；MRT 小列车每隔一阵从左右随机方向穿过。
+    private func drawMetro() {
+        guard notch.tunnel, notchRows > 6 else { return }
+        let nc = notchCols
+        let concrete = rgb(0xB9BEC7).mix(rgb(0x3A4054), dark * 0.75)
+        let concreteDark = concrete.mix(rgb(0x10131C), 0.35)
+        let bridgeY = notchRows
+        // 高架桥：桥面 + 桥墩
+        fill(0, bridgeY, cols, 1, concrete.color)
+        fill(0, bridgeY + 1, cols, 1, concreteDark.color.opacity(0.8))
+        for x in stride(from: 6 + parallax(3), to: cols, by: 22) where !nc.contains(x) {
+            fill(x, bridgeY + 2, 2, max(0, floorTop - 2 - bridgeY - 2), concreteDark.color.opacity(0.85))
+        }
+        // 列车：每 50 秒一班，方向随班次交替；穿越全程约 7 秒
+        let period = 50.0, run = 7.0
+        let n = Int(t / period), local = t.truncatingRemainder(dividingBy: period)
+        if local < run {
+            let leftToRight = n % 2 == 0
+            let cars = 3, carW = 12, gap = 1
+            let trainW = cars * carW + (cars - 1) * gap
+            let prog = local / run
+            let x0 = leftToRight ? Int(Double(cols + trainW) * prog) - trainW : cols - Int(Double(cols + trainW) * prog)
+            let top = trackRow - 4
+            let shell = rgb(0xF2F4F7).mix(rgb(0x8A93A8), dark * 0.6)
+            let stripe = rgb(0xE5322D)
+            let window = dark > 0.5 ? Color(red: 1, green: 0.86, blue: 0.55) : rgb(0x2A3346).color
+            for c in 0..<cars {
+                let cx = x0 + c * (carW + gap)
+                fill(cx, top, carW, 4, shell.color)
+                fill(cx, top + 2, carW, 1, stripe.color)
+                for wx in stride(from: cx + 1, to: cx + carW - 1, by: 3) { fill(wx, top + 1, 2, 1, window) }
+                fill(cx, top + 4, carW, 1, concreteDark.color) // 转向架阴影
+            }
+            // 车头灯
+            let head = leftToRight ? x0 + trainW : x0 - 1
+            fill(head, top + 2, 1, 1, Color(red: 1, green: 0.95, blue: 0.7).opacity(dark > 0.4 ? 1 : 0.7))
+            if dark > 0.4 { fill(leftToRight ? head + 1 : head - 4, top + 2, 4, 1, Color(red: 1, green: 0.95, blue: 0.7).opacity(0.25)) }
+        }
+        // 隧道口：刘海左右两侧的混凝土洞框（画在列车之上，列车像是钻进去）
+        for side in [nc.lowerBound - 2, nc.upperBound + 1] {
+            fill(side, trackRow - 6, 2, 7, concrete.color)
+            fill(side + (side < nc.lowerBound ? 1 : 0), trackRow - 5, 1, 6, concreteDark.color)
+        }
+        fill(nc.lowerBound - 3, trackRow - 7, 4, 1, concrete.color)
+        fill(nc.upperBound, trackRow - 7, 4, 1, concrete.color)
+    }
+
+    /// 天花板（仅天花板模式）：纯黑与刘海融为一体，下沿一道暗边，夜里亮起一排暖色筒灯。
+    private func drawCeiling() {
+        guard ceilingMode else { return }
+        fill(0, 0, cols, notchRows + 1, .black)
+        fill(0, notchRows + 1, cols, 1, Color(red: 0.12, green: 0.13, blue: 0.17))
+        let lamps = max(3, cols / 28)
+        for i in 0..<lamps {
+            let x = cols * (2 * i + 1) / (2 * lamps)
+            if notchCols.contains(x) { continue }
+            fill(x - 1, notchRows, 3, 1, Color(red: 1, green: 0.84, blue: 0.58).opacity(0.25 + 0.6 * dark))
+        }
+    }
+
+    /// 地面：都市感的深色抛光地面，颜色取自窗外天色；窗台一条细高光过渡。
+    /// 白天映出天空的亮带，夜里映出城市灯光的竖向倒影。
     private func drawFloor() {
         let y = floorTop
-        let wood = rgb(0x9A6A45).mix(rgb(0x2B1E19), dark * 0.65)
-        fill(0, y, cols, 1, Color(red: 0.18, green: 0.14, blue: 0.12))
-        fill(0, y + 1, cols, IslandScene.floorRows - 1, wood.color)
-        var rng = SeededRandom(seed: 3)
-        var x = Int(rng.next() % 9)
-        while x < cols { fill(x, y + 1, 1, IslandScene.floorRows - 1, Color.black.opacity(0.15)); x += 12 + Int(rng.next() % 9) }
-        // 白天：窗外的光在地板上的反光；夜里：城市灯光的倒影。
-        if dark < 0.6, overcast < 0.7 {
-            fill(0, y + 1, cols, 1, Color(red: 1, green: 0.9, blue: 0.65).opacity(0.18 * (1 - dark) * (1 - overcast)))
-        } else if dark > 0.5 {
-            var lr = SeededRandom(seed: 17)
-            for _ in 0..<(cols / 8) {
+        let sky = SkyPalette.stops(darkness: dark, twilight: dusk, overcast: overcast)
+        let sill = sky.horizon.mix(rgb(0xFFFFFF), 0.35).mix(rgb(0x2A3045), dark * 0.7)
+        fill(0, y, cols, 1, sill.color.opacity(0.9))
+        let floorTone = sky.horizon.mix(rgb(0x151A26), 0.72 + dark * 0.18)
+        for k in 1..<IslandScene.floorRows {
+            fill(0, y + k, cols, 1, floorTone.mix(rgb(0x0B0E15), Double(k) / Double(IslandScene.floorRows) * 0.5).color)
+        }
+        var lr = SeededRandom(seed: 17)
+        if dark > 0.45 {
+            for _ in 0..<(cols / 5) {
                 let lx = Int(lr.next() % UInt64(max(1, cols)))
-                fill(lx, y + 1, 1, IslandScene.floorRows - 1, (lr.next() % 3 == 0 ? Color(red: 0.6, green: 0.8, blue: 1) : Color(red: 1, green: 0.82, blue: 0.5)).opacity(0.25 * dark))
+                let warm = lr.next() % 3 != 0
+                fill(lx, y + 1, 1, IslandScene.floorRows - 1, (warm ? Color(red: 1, green: 0.82, blue: 0.5) : Color(red: 0.6, green: 0.8, blue: 1)).opacity(0.28 * dark))
             }
+        } else {
+            fill(0, y + 1, cols, 1, sky.horizon.mix(rgb(0xFFFFFF), 0.3).color.opacity(0.22 * (1 - overcast * 0.6)))
         }
     }
 }

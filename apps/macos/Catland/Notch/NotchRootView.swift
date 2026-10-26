@@ -62,13 +62,22 @@ struct NotchShape: Shape {
 struct CollapsedView: View {
     let state: AppState
 
+    /// 猫洞 = 物理刘海所在区域（需要有刘海且开了步道，猫才走得到洞口下方）。
+    private var denRect: CatDen? {
+        let n = state.notch
+        guard n.den, n.hasNotch, n.shelf > 0 else { return nil }
+        let left = (n.collapsedSize.width - n.notchSize.width) / 2
+        return CatDen(minX: left, maxX: left + n.notchSize.width, bottom: n.notchSize.height)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             ZStack {
                 IslandScene(state: state)
                 CatStage(cats: state.notch.shelf > 0 ? 3 : 2,
                          hiddenWidth: state.notch.hasNotch && state.notch.shelf == 0 ? state.notch.notchSize.width : 0,
-                         excited: state.hovering)
+                         excited: state.hovering,
+                         den: denRect)
                     .padding(.bottom, IslandScene.floorInset)
             }
             .frame(width: state.notch.collapsedSize.width, height: state.notch.collapsedSize.height)
