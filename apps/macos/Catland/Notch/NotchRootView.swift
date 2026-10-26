@@ -64,8 +64,10 @@ struct CollapsedView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            CatStage(cats: state.notch.hasNotch ? 2 : max(1, min(3, state.connectedContentPlatforms.count)), hiddenWidth: state.notch.hasNotch ? state.notch.notchSize.width : 0, excited: state.hovering)
-                .frame(height: state.notch.notchSize.height)
+            CatStage(cats: state.notch.shelf > 0 ? 3 : 2,
+                     hiddenWidth: state.notch.hasNotch && state.notch.shelf == 0 ? state.notch.notchSize.width : 0,
+                     excited: state.hovering)
+                .frame(height: state.notch.notchSize.height + state.notch.shelf)
             if state.hovering {
                 HStack(spacing: 6) {
                     ForEach(state.connectedContentPlatforms.prefix(5)) { p in

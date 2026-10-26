@@ -13,6 +13,14 @@ struct SettingsView: View {
                     section("播放") {
                         PillToggle(isOn: state.settings.muted, action: { state.setMuted(!state.settings.muted) }) { Text("默认静音").font(.system(size: 12)) }
                     }
+                    section("小猫") {
+                        PillToggle(isOn: state.catwalk, action: { state.setCatwalk(!state.catwalk) }) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("刘海下方小猫步道").font(.system(size: 12))
+                                Text("刘海处没有屏幕像素；打开后小猫能从刘海下方走过，会遮住其下约 15pt").font(.system(size: 10)).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
                     section("视频板块的信息源") {
                         if state.connectedContentPlatforms.isEmpty { Text("还没有连接内容平台").font(.system(size: 12)).foregroundStyle(.secondary) }
                         ForEach(state.connectedContentPlatforms) { p in

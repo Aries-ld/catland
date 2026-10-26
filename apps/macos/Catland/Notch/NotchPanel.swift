@@ -8,20 +8,27 @@ struct NotchGeometry: Equatable {
     let screenFrame: CGRect
     let notchSize: CGSize
     let hasNotch: Bool
+    /// 刘海下方的小猫步道高度（0 = 关闭）。物理刘海处没有像素，步道让小猫能从刘海下面走过去。
+    var shelf: CGFloat = 0
+
+    static let shelfHeight: CGFloat = 15
+    static let catwalkKey = "catwalk"
+    static var catwalkEnabled: Bool { UserDefaults.standard.object(forKey: catwalkKey) as? Bool ?? true }
 
     static let expandedSize = CGSize(width: 400, height: 720)
 
     static func current(_ screen: NSScreen) -> NotchGeometry {
         let f = screen.frame
         if screen.safeAreaInsets.top > 0, let l = screen.auxiliaryTopLeftArea, let r = screen.auxiliaryTopRightArea {
-            return NotchGeometry(screenFrame: f, notchSize: CGSize(width: f.width - l.width - r.width, height: screen.safeAreaInsets.top), hasNotch: true)
+            return NotchGeometry(screenFrame: f, notchSize: CGSize(width: f.width - l.width - r.width, height: screen.safeAreaInsets.top), hasNotch: true,
+                                 shelf: catwalkEnabled ? shelfHeight : 0)
         }
-        return NotchGeometry(screenFrame: f, notchSize: CGSize(width: 180, height: 28), hasNotch: false)
+        return NotchGeometry(screenFrame: f, notchSize: CGSize(width: 180, height: 28), hasNotch: false, shelf: catwalkEnabled ? shelfHeight : 0)
     }
 
     /// 刘海两侧各留一小段「翅膀」给小猫散步；太宽会压住菜单栏项目。
     static let wing: CGFloat = 36
-    var collapsedSize: CGSize { CGSize(width: notchSize.width + Self.wing * 2, height: notchSize.height) }
+    var collapsedSize: CGSize { CGSize(width: notchSize.width + Self.wing * 2, height: notchSize.height + shelf) }
 
     var windowFrame: CGRect {
         let s = Self.expandedSize

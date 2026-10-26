@@ -155,10 +155,23 @@ final class AppState {
         }
     }
 
+    var catwalk = NotchGeometry.catwalkEnabled
+
+    /// 刘海下方小猫步道开关：存在本机 UserDefaults，改完重算刘海几何。
+    func setCatwalk(_ on: Bool) {
+        catwalk = on
+        UserDefaults.standard.set(on, forKey: NotchGeometry.catwalkKey)
+        NotificationCenter.default.post(name: .catlandGeometryChanged, object: nil)
+    }
+
     /// 老板键：立刻收起、暂停、静音。
     func bossKey() {
         expanded = false
         overlay = .none
         feed.pauseAll()
     }
+}
+
+extension Notification.Name {
+    static let catlandGeometryChanged = Notification.Name("app.catland.geometryChanged")
 }

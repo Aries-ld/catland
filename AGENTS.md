@@ -29,18 +29,17 @@
 | 美术（Meowa game-assets skill） | `~/.agents/skills/game-assets/meowart_api.py`，用 conda env `catlands` 运行，key 从项目根 `.env` 的 `MEOWART_API_KEY` 读取 |
 | Python 环境 | conda env `catlands`（Python 3.12）：`~/miniconda3/envs/catlands/bin/python` |
 
-| 小猫美术 | 基础形象 `assets/art/cats/base/v1`（Meowa `cat_4` 模板，32×32，8 只）；动画原始产物 `assets/art/cats/anim/<猫>/<动作>`；生成 `scripts/gen_cats.py`（跳过已完成的任务），打包 + 校验 `scripts/pack_cats.py` → `apps/macos/Resources/Cats` |
+| 小猫美术 | **手绘像素（代码生成）**：`apps/macos/Catland/Cat/PixelCatArt.swift`。Meowa 版（`assets/art/cats/`，`scripts/gen_cats.py` / `pack_cats.py`）用户觉得不如手绘可爱，已不打包进 App，仅留档 |
 
 后续新资源统一补充到本表。
 
 ### 2.1 小猫美术规范
 
-- 像素风，32×32 站姿源图，侧面朝右；动画都从站姿开始、回到站姿，便于随机串接。
-- 显示：一个美术像素 = 一个物理像素（Retina 0.5pt），只做整数倍缩放；刘海是纯黑底，绘制时加 1 像素浅色剪影描边。
-- 现有：8 种形象（orange white black calico tabby siamese tuxedo blue）。前 4 只有 6 个动作（walk idle groom stretch hop nap），后 4 只有 walk idle。
-- 行为由 `CatDirector`（`apps/macos/Catland/Cat/CatStage.swift`）随机决定：动作权重、停顿、打盹分段循环、悬停时蹦一下，每 2~5 分钟换一只猫走进来。
-- 新增动作：先在 `gen_cats.py` 和 `pack_cats.py` 的 ACTIONS 登记（帧数 + 四向留白），生成后跑 pack，看 `/tmp/cats_contact.png` 把关。
-- 成本参考：Meowa 动画 8 帧约 30、12 帧约 40、16 帧约 50 积分；8 只基础形象一次约 30 积分。
+- 风格：手绘像素、Q 版大头、色块干净。画布 16×12，朝左绘制；一个美术像素 = 1.5pt（Retina 上 3 个物理像素，整数倍保证锐利）。
+- 部件化：头（normal / blink / happy / yawn / lick / lookAhead / lookBack / lookUp）+ 身体姿势（stand / sit / loaf / stretch / back）+ 腿 + 尾巴 + 粒子（z、爱心、蝴蝶）组合成帧；花色由涂装规则上色（条纹、三花色块、暹罗重点色、白袜子），深色猫加浅色描边。
+- 现有 10 种花色 × 12 个动作：idle walk look sit groom yawn nap loaf stretch hop play roll。动作带 intro / 循环段 / outro 与权重，由 `CatDirector`（`CatStage.swift`）随机编排。
+- 新增动作：在 `PixelCatArt.actions` 里加一组 Frame；跑 Swift 测试（尺寸、可渲染）并生成预览图人工把关后再提交。
+- 刘海下方「小猫步道」（默认开，设置里可关）：物理刘海没有像素，步道让小猫能从刘海下方走过。
 
 ## 3. 约定
 

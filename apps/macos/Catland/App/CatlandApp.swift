@@ -28,14 +28,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         geometry = NotchGeometry.current(Self.targetScreen())
+        state.notch = geometry
         panel = NotchPanel(rootView: NotchRootView(state: state), geometry: geometry)
         panel.orderFrontRegardless()
         setupStatusItem()
         setupMonitors()
         setupHotKeys()
         observeExpanded()
-        NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.screenChanged() }
+        for name in [NSApplication.didChangeScreenParametersNotification, .catlandGeometryChanged] {
+            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.screenChanged() }
+            }
         }
         pager.onPage = { [weak self] dir in self?.page(dir) }
         pager.onHorizontal = { [weak self] dir in self?.state.feed.carousel(dir) }
@@ -86,7 +89,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func screenChanged() {
         geometry = NotchGeometry.current(Self.targetScreen())
         panel.reposition(geometry)
-        state.notch = geometry
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { state.notch = geometry }
     }
 
     // MARK: - 展开 / 收起

@@ -36,3 +36,52 @@ final class NotchGeometryTests: XCTestCase {
         XCTAssertTrue(g.activeRect(expanded: false, hovering: true).contains(CGPoint(x: 756, y: 982 - 32 - 20)))
     }
 }
+
+final class PixelCatArtTests: XCTestCase {
+    func testAllPosesAndHeadsHaveValidSize() {
+        for p in [PixelCatArt.stand, PixelCatArt.sit, PixelCatArt.loaf, PixelCatArt.stretch, PixelCatArt.back] {
+            XCTAssertEqual(p.rows.count, PixelCatArt.height)
+            for r in p.rows { XCTAssertEqual(r.count, PixelCatArt.width, r) }
+        }
+        for h in PixelCatArt.Head.allCases { XCTAssertTrue(h.rows.allSatisfy { $0.count == 6 }) }
+    }
+
+    func testEveryActionComposesAndRendersForEverySkin() {
+        XCTAssertGreaterThanOrEqual(PixelCatArt.skins.count, 10)
+        XCTAssertGreaterThanOrEqual(PixelCatArt.actions.count, 12)
+        for action in PixelCatArt.actions {
+            XCTAssertTrue(action.intro + action.outro < action.frames.count || (action.intro == 0 && action.outro == 0), action.name)
+            for f in action.frames {
+                let g = PixelCatArt.compose(f)
+                XCTAssertEqual(g.count, PixelCatArt.height)
+                XCTAssertTrue(g.joined().contains("E") || g.joined().contains("C"), "\(action.name) frame without eyes")
+            }
+        }
+        for skin in PixelCatArt.skins {
+            XCTAssertNotNil(PixelCatArt.render(PixelCatArt.compose(.init(pose: PixelCatArt.stand)), skin: skin), skin.name)
+        }
+    }
+
+    func testHopLiftsBodyButNotParticles() {
+        let hop = PixelCatArt.actions.first { $0.name == "hop" }!
+        let g = PixelCatArt.compose(hop.frames[2])
+        XCTAssertEqual(g[0][2], "V") // 爱心留在画布顶部
+        XCTAssertTrue(g[11].allSatisfy { $0 == "." }) // 身体离地
+    }
+
+    func testSegmentedPlayback() {
+        let nap = CatAtlas.shared.cats["orange"]!["nap"]!
+        let mid = nap.frames.count - nap.intro - nap.outro
+        XCTAssertEqual(CatDirector.frameIndex(raw: 0, anim: nap, loops: 3), 0)
+        XCTAssertEqual(CatDirector.frameIndex(raw: nap.intro + mid, anim: nap, loops: 3), nap.intro) // 中段循环
+        XCTAssertEqual(CatDirector.frameIndex(raw: 999, anim: nap, loops: 3), nap.frames.count - 1) // 停在最后一帧
+        XCTAssertEqual(CatDirector.duration(nap, loops: 3), Double(nap.intro + mid * 3 + nap.outro) / nap.fps, accuracy: 0.001)
+    }
+
+    func testCatwalkMakesCollapsedTaller() {
+        var g = NotchGeometry(screenFrame: CGRect(x: 0, y: 0, width: 1512, height: 982), notchSize: CGSize(width: 200, height: 32), hasNotch: true)
+        let h0 = g.collapsedSize.height
+        g.shelf = NotchGeometry.shelfHeight
+        XCTAssertEqual(g.collapsedSize.height, h0 + NotchGeometry.shelfHeight)
+    }
+}
