@@ -29,8 +29,10 @@ final class NotchGeometryTests: XCTestCase {
         let g = NotchGeometry(screenFrame: CGRect(x: 0, y: 0, width: 1512, height: 982), notchSize: CGSize(width: 200, height: 32), hasNotch: true)
         let c = g.activeRect(expanded: false)
         XCTAssertEqual(c.midX, 756)
-        XCTAssertEqual(c.maxY, 982)
+        XCTAssertEqual(c.minY, 982 - 32)
+        XCTAssertGreaterThan(c.maxY, 982) // 向上多留几个点，覆盖屏幕最上沿
         XCTAssertEqual(c.width, 200 + NotchGeometry.wing * 2)
-        XCTAssertEqual(g.activeRect(expanded: true).size, NotchGeometry.expandedSize)
+        XCTAssertEqual(g.activeRect(expanded: true).width, NotchGeometry.expandedSize.width)
+        XCTAssertTrue(g.activeRect(expanded: false, hovering: true).contains(CGPoint(x: 756, y: 982 - 32 - 20)))
     }
 }
