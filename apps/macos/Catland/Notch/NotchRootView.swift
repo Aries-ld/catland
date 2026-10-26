@@ -84,8 +84,8 @@ struct CollapsedView: View {
             .clipShape(NotchShape(bottomRadius: 10))
             if state.hovering {
                 HStack(spacing: 6) {
-                    ForEach(state.connectedContentPlatforms.prefix(5)) { p in
-                        Circle().fill(PlatformBrand.swiftColor(p.id)).frame(width: 6, height: 6)
+                    HStack(spacing: -3) {
+                        ForEach(state.connectedContentPlatforms.prefix(5)) { p in PlatformIcon(platform: p.id, size: 13) }
                     }
                     Text(state.connectedContentPlatforms.isEmpty ? "点一下，连接平台" : "点一下，开刷")
                         .font(.system(size: 11, weight: .medium))

@@ -83,6 +83,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     UserDefaults.standard.set(m == "den" || m == "both", forKey: NotchGeometry.denKey)
                     self.screenChanged()
                 case "den": CatDirector.shared.forceDen = true
+                case "city:shanghai": self.state.location = SceneLocation(name: "上海", latitude: 31.23, longitude: 121.47, source: .timezone)
+                case "city:singapore": self.state.location = .singapore
                 case "ceiling:on", "ceiling:off":
                     UserDefaults.standard.set(cmd == "ceiling:on", forKey: NotchGeometry.ceilingKey)
                     self.screenChanged()

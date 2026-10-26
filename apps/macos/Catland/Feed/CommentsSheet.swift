@@ -10,6 +10,9 @@ struct CommentsSheet: View {
     @State private var loading = false
     @State private var error: String?
     @State private var replies: [String: [Comment]] = [:]
+    /// 正在加载回复的评论：点击后立即展开并显示加载态，接口慢也有即时反馈。
+    @State private var loadingReplies: Set<String> = []
+    @State private var failedReplies: Set<String> = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -26,7 +29,7 @@ struct CommentsSheet: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 14) {
                     ForEach(comments) { c in
-                        CommentRow(comment: c, replies: replies[c.id]) { Task { await loadReplies(c) } }
+                        CommentRow(comment: c, replies: replies[c.id], loading: loadingReplies.contains(c.id), failed: failedReplies.contains(c.id)) { Task { await loadReplies(c) } }
                     }
                     if loading { ProgressView().controlSize(.small).frame(maxWidth: .infinity).padding() }
                     if let e = error { Text(e).font(.system(size: 11)).foregroundStyle(.secondary).frame(maxWidth: .infinity) }
@@ -70,11 +73,22 @@ struct CommentsSheet: View {
     }
 
     private func loadReplies(_ c: Comment) async {
-        guard replies[c.id] == nil else { return replies[c.id] = nil }
-        if let page: CommentPage = try? await state.sidecar.call("comments.replies", ["key": card.key, "commentId": c.id]) {
-            replies[c.id] = page.comments
-        } else {
+        // 已展开（含加载中）再点一次就收起。
+        if replies[c.id] != nil, !failedReplies.contains(c.id) {
+            withAnimation(.easeOut(duration: 0.15)) { replies[c.id] = nil }
+            loadingReplies.remove(c.id)
+            return
+        }
+        withAnimation(.easeOut(duration: 0.15)) {
             replies[c.id] = []
+            loadingReplies.insert(c.id)
+            failedReplies.remove(c.id)
+        }
+        let page: CommentPage? = try? await state.sidecar.call("comments.replies", ["key": card.key, "commentId": c.id])
+        guard loadingReplies.contains(c.id) else { return } // 加载期间被收起
+        withAnimation(.easeOut(duration: 0.2)) {
+            loadingReplies.remove(c.id)
+            if let page { replies[c.id] = page.comments } else { failedReplies.insert(c.id) }
         }
     }
 }
@@ -82,6 +96,8 @@ struct CommentsSheet: View {
 struct CommentRow: View {
     let comment: Comment
     let replies: [Comment]?
+    var loading = false
+    var failed = false
     let toggleReplies: () -> Void
 
     var body: some View {
@@ -93,10 +109,29 @@ struct CommentRow: View {
                 HStack(spacing: 12) {
                     if let l = comment.stats.likes, l > 0 { Label(Format.count(l), systemImage: "heart").font(.system(size: 10)).foregroundStyle(.secondary) }
                     if let r = comment.stats.replies, r > 0 {
-                        Button(replies == nil ? "展开 \(r) 条回复" : "收起", action: toggleReplies).buttonStyle(.plain).font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
+                        Button(action: toggleReplies) {
+                            HStack(spacing: 3) {
+                                Image(systemName: replies == nil ? "chevron.down" : "chevron.up").font(.system(size: 8, weight: .bold))
+                                Text(replies == nil ? "展开 \(r) 条回复" : "收起")
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(PressStyle()).font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
                     }
                 }
-                if let rs = replies {
+                if loading {
+                    HStack(spacing: 6) {
+                        ProgressView().controlSize(.mini)
+                        Text("正在加载回复…").font(.system(size: 11)).foregroundStyle(.secondary)
+                    }
+                    .padding(.leading, 4)
+                    .transition(.opacity)
+                } else if failed {
+                    Button("回复加载失败，点击重试", action: toggleReplies).buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(.orange)
+                } else if let rs = replies, rs.isEmpty {
+                    Text("暂时看不到回复").font(.system(size: 11)).foregroundStyle(.tertiary).padding(.leading, 4)
+                }
+                if let rs = replies, !loading {
                     ForEach(rs) { r in
                         HStack(alignment: .top, spacing: 6) {
                             Text(r.author?.name ?? "匿名").font(.system(size: 11)).foregroundStyle(.secondary)

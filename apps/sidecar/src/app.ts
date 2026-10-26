@@ -186,7 +186,12 @@ export class App {
         return null
       })
 
-      .register('weather.get', () => (this.store.getSettings().weather ? this.weather.get() : null))
+      .register('weather.get', (p) => {
+        if (!this.store.getSettings().weather) return null
+        const lat = p.latitude, lon = p.longitude
+        const ok = typeof lat === 'number' && typeof lon === 'number' && Math.abs(lat) <= 90 && Math.abs(lon) <= 180
+        return this.weather.get(ok ? { latitude: lat, longitude: lon } : undefined)
+      })
 
       .register('settings.get', () => this.store.getSettings())
       .register('settings.update', (p) => {

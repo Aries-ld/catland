@@ -27,7 +27,7 @@ struct IslandScene: View {
     }
 
     static func weatherName(_ c: String) -> String {
-        ["clear": "晴", "partly": "少云", "cloudy": "多云", "haze": "霾", "rain": "雨", "thunder": "雷雨", "windy": "有风"][c] ?? c
+        ["clear": "晴", "partly": "少云", "cloudy": "多云", "haze": "雾霾", "rain": "雨", "thunder": "雷雨", "windy": "有风", "snow": "雪"][c] ?? c
     }
 }
 
@@ -57,11 +57,11 @@ struct IslandRenderer {
     var skyTop: Int { ceilingMode ? notchRows + 1 : 0 }
 
     // 场景参数
-    private var sun: SunPosition { SceneClock.sun(at: env.date) }
+    private var sun: SunPosition { SceneClock.sun(at: env.date, location: env.location) }
     private var dark: Double { SceneClock.darkness(sun) }
     private var dusk: Double { SceneClock.twilight(sun) }
     private var cond: String { env.condition }
-    private var overcast: Double { ["cloudy": 0.55, "rain": 0.8, "thunder": 0.95, "haze": 0.45, "partly": 0.15, "windy": 0.2][cond] ?? 0 }
+    private var overcast: Double { ["cloudy": 0.55, "rain": 0.8, "thunder": 0.95, "haze": 0.45, "partly": 0.15, "windy": 0.2, "snow": 0.7][cond] ?? 0 }
     private var raining: Bool { cond == "rain" || cond == "thunder" }
 
     mutating func draw() {
@@ -131,7 +131,7 @@ struct IslandRenderer {
     }
 
     private func drawClouds() {
-        let count = ["clear": 1, "partly": 3, "windy": 4, "cloudy": 5, "haze": 3, "rain": 6, "thunder": 6][cond] ?? 2
+        let count = ["clear": 1, "partly": 3, "windy": 4, "cloudy": 5, "haze": 3, "rain": 6, "thunder": 6, "snow": 5][cond] ?? 2
         let tone = rgb(0xFFFFFF).mix(rgb(0x5C6475), overcast).mix(rgb(0x1E2742), dark * 0.85).mix(rgb(0xF6A27C), dusk * 0.4)
         var rng = SeededRandom(seed: 42)
         let speed = cond == "windy" ? 3.0 : 0.6
@@ -210,16 +210,23 @@ struct IslandRenderer {
         let leftWing = 0..<nc.lowerBound, rightWing = (nc.upperBound + 1)..<cols
 
         // 普通高楼：避开地标所在位置，两翼与刘海下方都铺满。
+        let skyline = env.location.skyline
         var rng = SeededRandom(seed: 88)
         var x = -2 + off
         let mbsX = leftWing.lowerBound + max(1, leftWing.count / 2 - 6) + off
         let flyerX = rightWing.lowerBound + rightWing.count / 2 + off
+        let reserved: [ClosedRange<Int>] = skyline == .generic ? [] : [(mbsX - 1)...(mbsX + 13), (flyerX - 9)...(flyerX + 9)]
         while x < cols + 2 {
             let w = 3 + Int(rng.next() % 4), h = 4 + Int(rng.next() % 8)
-            let skip = (x + w > mbsX - 1 && x < mbsX + 13) || (x + w > flyerX - 9 && x < flyerX + 9)
+            let skip = reserved.contains { $0.overlaps(x...(x + w)) }
             if !skip { building(x: x, w: w, h: h, base: base, body: body, shade: shade, windowDay: windowDay, rng: &rng) }
             x += w + Int(rng.next() % 3)
         }
+        if skyline == .shanghai {
+            drawShanghai(left: mbsX, right: flyerX, base: base, body: body, shade: shade, windowDay: windowDay)
+            return
+        }
+        guard skyline == .singapore else { return }
 
         // 金沙酒店（左翼）：三栋塔楼 + 顶上的「船」。
         let mbsH = min(14, base - skyTop - 3)
@@ -249,6 +256,42 @@ struct IslandRenderer {
         let spoke = ring.opacity(0.45)
         for k in 1..<r { fill(flyerX + k, cy, 1, 1, spoke); fill(flyerX - k, cy, 1, 1, spoke); fill(flyerX, cy + k, 1, 1, spoke); fill(flyerX, cy - k, 1, 1, spoke) }
         for k in 0..<(base - cy) { fill(flyerX - 1 - k / 2, cy + k, 1, 1, shade.color); fill(flyerX + 1 + k / 2, cy + k, 1, 1, shade.color) }
+    }
+
+    /// 上海：左翼东方明珠（两颗球 + 天线），右翼上海中心（扭转的高塔）和环球金融中心（「开瓶器」）。
+    private func drawShanghai(left: Int, right: Int, base: Int, body: SkyPalette.RGB, shade: SkyPalette.RGB, windowDay: SkyPalette.RGB) {
+        let pink = rgb(0xE0607E).mix(rgb(0x7A2E52), dark * 0.5)
+        let glow = Color(red: 1, green: 0.45, blue: 0.7).opacity(0.85)
+        let h = min(18, base - skyTop - 2)
+        // 东方明珠
+        let cx = left + 6
+        fill(cx - 2, base - 3, 1, 3, shade.color); fill(cx + 2, base - 3, 1, 3, shade.color)  // 底座斜撑
+        fill(cx, base - h + 2, 1, h - 2, body.color)                                         // 主杆
+        let ball = dark > 0.5 ? glow : pink.color
+        let hi = pink.mix(rgb(0xFFFFFF), 0.35).color
+        // 上球 5×5 圆、下球 3×3 圆，左上角一点高光
+        let top = base - h * 3 / 4
+        fill(cx - 1, top - 2, 3, 1, ball); fill(cx - 2, top - 1, 5, 3, ball); fill(cx - 1, top + 2, 3, 1, ball)
+        if dark <= 0.5 { fill(cx - 1, top - 1, 1, 1, hi) }
+        let low = base - h * 2 / 5
+        fill(cx, low - 1, 1, 1, ball); fill(cx - 1, low, 3, 1, ball); fill(cx, low + 1, 1, 1, ball)
+        fill(cx, base - h - 2, 1, 4, body.mix(rgb(0xFFFFFF), 0.3).color)                     // 天线
+        if dark > 0.5, Int(t * 2) % 2 == 0 { fill(cx, base - h - 2, 1, 1, .red) }
+        // 上海中心：越往上越细，侧面一道扭转的亮边
+        let sx = right - 3
+        let th = min(20, base - skyTop - 1)
+        for k in 0..<th {
+            let w = k < th / 3 ? 5 : (k < th * 2 / 3 ? 4 : 3)
+            let y = base - 1 - k
+            fill(sx + (5 - w) / 2, y, w, 1, body.color)
+            fill(sx + (5 - w) / 2 + (k / 3) % w, y, 1, 1, windowDay.color.opacity(dark > 0.5 ? 0 : 0.8))
+        }
+        if dark > 0.5 { for k in stride(from: 1, to: th, by: 2) { fill(sx + 2, base - 1 - k, 1, 1, Color(red: 0.7, green: 0.9, blue: 1).opacity(0.7)) } }
+        // 环球金融中心：顶部带梯形开口
+        let wx = right + 4, wh = min(16, th - 3)
+        fill(wx, base - wh, 4, wh, shade.mix(body, 0.5).color)
+        fill(wx + 1, base - wh + 1, 2, 2, (dark > 0.5 ? Color(red: 0.6, green: 0.8, blue: 1).opacity(0.7) : rgb(0xBFD3E6).color))
+        litWindows(x: wx, w: 4, top: base - wh + 4, bottom: base, seed: 777, windowDay: windowDay)
     }
 
     private func building(x: Int, w: Int, h: Int, base: Int, body: SkyPalette.RGB, shade: SkyPalette.RGB, windowDay: SkyPalette.RGB, rng: inout SeededRandom) {
@@ -302,6 +345,18 @@ struct IslandRenderer {
 
     private func drawWeather() {
         if cond == "haze" { fill(0, 0, cols, floorTop, Color(red: 0.86, green: 0.82, blue: 0.74).opacity(0.32)) }
+        if cond == "snow" {
+            var rng = SeededRandom(seed: 61)
+            for _ in 0..<(cols / 3) {
+                let x0 = Int(rng.next() % UInt64(cols + 4)), ph = Double(rng.next() % 1000) / 1000
+                let y = Int((ph + t * 0.18).truncatingRemainder(dividingBy: 1) * Double(floorTop))
+                let sway = Int((sin(t * 1.3 + Double(x0)) * 1.2).rounded())
+                fill(x0 + sway, y, 1, 1, Color.white.opacity(0.85))
+            }
+            // 窗台积了一层薄雪
+            fill(0, floorTop - 1, cols, 1, Color.white.opacity(0.55))
+            return
+        }
         guard raining else { return }
         fill(0, 0, cols, floorTop, Color(red: 0.5, green: 0.56, blue: 0.68).opacity(0.16))
         var rng = SeededRandom(seed: 99)

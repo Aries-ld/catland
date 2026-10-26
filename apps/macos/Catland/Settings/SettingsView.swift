@@ -13,6 +13,21 @@ struct SettingsView: View {
                     section("播放") {
                         PillToggle(isOn: state.settings.muted, action: { state.setMuted(!state.settings.muted) }) { Text("默认静音").font(.system(size: 12)) }
                     }
+                    section("窗外") {
+                        HStack(spacing: 6) {
+                            Image(systemName: state.location.source == .system ? "location.fill" : "clock").font(.system(size: 10)).foregroundStyle(.secondary)
+                            Text("\(state.location.name) · \(state.location.source == .system ? "系统定位" : "按系统时区估计")").font(.system(size: 12))
+                            if let w = state.weather {
+                                Text("· \(w.temperature.map { "\(Int($0.rounded()))°" } ?? "") \(IslandScene.weatherName(w.condition))").font(.system(size: 12)).foregroundStyle(.secondary)
+                            }
+                        }
+                        PillToggle(isOn: state.settings.weather ?? true, action: { state.setWeatherEnabled(!(state.settings.weather ?? true)) }) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("天气联动").font(.system(size: 12))
+                                Text("新加坡用 NEA、其他地区用 Open-Meteo；只发送约 10km 精度的坐标").font(.system(size: 10)).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
                     section("小猫") {
                         PillToggle(isOn: state.catwalk, action: { state.setCatwalk(!state.catwalk) }) {
                             VStack(alignment: .leading, spacing: 2) {

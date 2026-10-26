@@ -1,0 +1,52 @@
+{
+  "xhs": {
+    "app": "小红书 - 你的生活兴趣社区",
+    "appStoreId": 741292507,
+    "artwork": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/01/f5/1e/01f51e82-86bf-2056-0e8d-ba7efb3dca55/AppIcon-0-0-1x_U007epad-0-11-0-85-220.png/512x512bb.png"
+  },
+  "douyin": {
+    "app": "抖音",
+    "appStoreId": 1142110895,
+    "artwork": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/56/0d/e6/560de620-6e7e-4679-43e4-689a52d71e4c/AppIcon-0-0-1x_U007emarketing-0-0-0-7-0-0-85-220.png/512x512bb.png"
+  },
+  "bilibili": {
+    "app": "哔哩哔哩-弹幕番剧直播高清视频",
+    "appStoreId": 736536022,
+    "artwork": "https://i0.hdslb.com/bfs/static/jinkela/long/images/512.png"
+  },
+  "kuaishou": {
+    "app": "快手",
+    "appStoreId": 440948110,
+    "artwork": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/e5/3e/b0/e53eb002-33fd-db94-75f9-459f2acff796/AppIcon-0-0-1x_U007emarketing-0-8-0-sRGB-85-220.png/512x512bb.png"
+  },
+  "x": {
+    "app": "X",
+    "appStoreId": 333903271,
+    "artwork": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/8a/c8/0d/8ac80d53-9d93-b659-94b3-6b7a87379b90/ProductionAppIcon-0-0-1x_U007emarketing-0-8-0-0-0-85-220.png/512x512bb.png"
+  },
+  "tiktok": {
+    "app": "TikTok - Videos, Shop & LIVE",
+    "appStoreId": 835599320,
+    "artwork": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/99/33/74/99337468-d03a-5efc-d436-67c0f4d918e1/TikTok_AppIcon26-0-0-1x_U007epad-0-1-0-85-220.png/512x512bb.png"
+  },
+  "weibo": {
+    "app": "微博",
+    "appStoreId": 350962117,
+    "artwork": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/0d/cb/53/0dcb5343-74eb-a65a-bb19-304fe55da537/WeiboAppIcon-0-0-1x_U007epad-0-1-0-85-220.png/512x512bb.png"
+  },
+  "jd": {
+    "app": "京东-又好又便宜",
+    "appStoreId": 414245413,
+    "artwork": "https://storage.360buyimg.com/retail-mall/mall-common-component/favicon.ico"
+  },
+  "taobao": {
+    "app": "淘宝-万能的淘宝！",
+    "appStoreId": 387682726,
+    "artwork": "https://img.alicdn.com/tps/i3/T1OjaVFl4dXXa.JOZB-114-114.png"
+  },
+  "xianyu": {
+    "app": "闲鱼 - 上闲鱼，赚一笔 !",
+    "appStoreId": 510909506,
+    "artwork": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/c1/e1/9f/c1e19fc8-8acb-9f5d-64fd-222a57b4c8a6/AppIcon-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.png"
+  }
+}

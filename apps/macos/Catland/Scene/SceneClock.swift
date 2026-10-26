@@ -3,14 +3,6 @@
 import Foundation
 import SwiftUI
 
-struct SceneLocation {
-    let name: String
-    let latitude: Double
-    let longitude: Double
-
-    static let singapore = SceneLocation(name: "新加坡", latitude: 1.2903, longitude: 103.8520)
-}
-
 struct SunPosition {
     /// 太阳高度角（度），负数为地平线以下。
     let altitude: Double
@@ -83,6 +75,7 @@ struct SceneEnv {
     var temperature: Double?
     /// 鼠标在刘海区域内的水平位置，-1（左）~ 1（右）。
     var mouse: CGFloat
+    var location: SceneLocation = .singapore
 }
 
 /// 确定性伪随机（SplitMix64）：同一种子每帧生成相同的楼群 / 星星 / 雨滴，画面稳定不闪。

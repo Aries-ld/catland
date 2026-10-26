@@ -3,7 +3,7 @@
 // 趴成面包、伸懒腰、追蝴蝶、翻肚皮、走几步），节奏和停顿随机；悬停时开心地蹦一下冒爱心；
 // 每隔几分钟有一只猫走出画面「下班」，换一只随机花色的新猫走进来。
 // 猫洞（刘海 = 天花板上的猫洞）：猫会走到刘海下方跳进洞里「消失」，在洞里时洞口会垂下尾巴、
-// 伸出爪子、倒挂探头或飘出 z，过一阵再跳下来。
+// 伸出爪子或飘出 z，过一阵再跳下来。
 import SwiftUI
 
 /// 猫洞位置（CatStage 坐标，pt）：刘海的左右边界与底边。
@@ -94,14 +94,6 @@ struct CatStage: View {
             let wiggle = Int(t * 1.5) % 5 == 0 ? 1 : 0
             dot(-2, 0, paw); dot(-2, 1 + wiggle, paw); dot(-1, 1 + wiggle, paw)
             dot(2, 0, paw); dot(2, 1, paw); dot(3, 1, paw)
-        case .peek:
-            // 倒挂探头：头部像素上下翻转画在洞口下沿。
-            let rows = PixelCatArt.Head.normal.rows.reversed()
-            for (r, line) in rows.enumerated() {
-                for (c, ch) in line.enumerated() where ch != "." {
-                    if let rgb = PixelCatArt.color(ch, x: c, y: r, skin: skin) { dot(c - 3, r, Self.color(rgb)) }
-                }
-            }
         case .sleep:
             // 洞里在睡觉：飘出 z。
             let phase = t.truncatingRemainder(dividingBy: 3) / 3
@@ -123,7 +115,7 @@ final class CatDirector {
     struct Lane { let min: CGFloat; let max: CGFloat; let exitLeft: Bool }
 
     struct DenEffect {
-        enum Kind: CaseIterable { case tail, paws, peek, sleep }
+        enum Kind: CaseIterable { case tail, paws, sleep }
         let kind: Kind
         let x: CGFloat
     }

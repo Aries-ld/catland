@@ -49,14 +49,10 @@ struct PlatformTile: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            ZStack {
-                Circle().fill(PlatformBrand.swiftColor(platform.id).opacity(platform.connected ? 1 : 0.18)).frame(width: 30, height: 30)
-                Text(String(PlatformBrand.shortName(platform.id).prefix(1))).font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(platform.connected ? (platform.id == "x" ? .black : .white) : .white.opacity(0.5))
-            }
-            .overlay(alignment: .bottomTrailing) {
-                if platform.connected { Circle().fill(platform.health == "expired" ? .orange : .green).frame(width: 8, height: 8).overlay(Circle().stroke(.black, lineWidth: 1.5)) }
-            }
+            PlatformIcon(platform: platform.id, size: 30, dimmed: !platform.connected)
+                .overlay(alignment: .bottomTrailing) {
+                    if platform.connected { Circle().fill(platform.health == "expired" ? .orange : .green).frame(width: 9, height: 9).overlay(Circle().stroke(.black, lineWidth: 1.5)).offset(x: 2, y: 2) }
+                }
             VStack(alignment: .leading, spacing: 2) {
                 Text(platform.name).font(.system(size: 13, weight: .medium))
                 Text(statusText).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
@@ -95,7 +91,7 @@ struct QRLoginView: View {
         ZStack {
             Color.black.opacity(0.6).onTapGesture { state.cancelQrLogin() }
             VStack(spacing: 14) {
-                Text("用\(PlatformBrand.shortName(platform)) App 扫码").font(.system(size: 15, weight: .semibold))
+                HStack(spacing: 6) { PlatformIcon(platform: platform, size: 20); Text("用\(PlatformBrand.shortName(platform)) App 扫码").font(.system(size: 15, weight: .semibold)) }
                 ZStack {
                     RoundedRectangle(cornerRadius: 14).fill(.white).frame(width: 200, height: 200)
                     if let png, let img = NSImage(data: png) {

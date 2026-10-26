@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createMemoryLogger } from '../src/log.ts'
-import { classify, WeatherService } from '../src/weather/weather.ts'
+import { classify, classifyWmo, coarse, inSingapore, WeatherService } from '../src/weather/weather.ts'
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 
@@ -59,4 +59,31 @@ describe('WeatherService', () => {
     expect((await w.get())?.condition).toBe('cloudy')
     expect(await new WeatherService({ logger: createMemoryLogger(), fetch: fakeNea('x', { fail: true }).fetch }).get()).toBeNull()
   })
+})
+
+describe('按位置选择数据源', () => {
+  it('新加坡境内走 NEA，其他地区走 Open-Meteo，且只发粗化后的坐标', async () => {
+    const urls: string[] = []
+    const fetch = (async (url: string) => {
+      urls.push(url)
+      if (url.includes('open-meteo')) return json({ current: { temperature_2m: 21.14, weather_code: 61, wind_speed_10m: 5 } })
+      return fakeNea('Fair (Day)').fetch(url)
+    }) as typeof globalThis.fetch
+    const w = new WeatherService({ logger: createMemoryLogger(), fetch })
+    expect(await w.get({ latitude: 31.230416, longitude: 121.473701 })).toMatchObject({ condition: 'rain', temperature: 21.1, source: 'Open-Meteo' })
+    expect(urls[0]).toContain('latitude=31.2&longitude=121.5')
+    expect(urls[0]).not.toContain('31.23')
+    expect(await w.get({ latitude: 1.3521, longitude: 103.8198 })).toMatchObject({ condition: 'clear', source: 'NEA' })
+  })
+
+  it('坐标粗化与新加坡判定', () => {
+    expect(coarse({ latitude: 31.2304, longitude: 121.4737 })).toEqual({ latitude: 31.2, longitude: 121.5 })
+    expect(inSingapore({ latitude: 1.35, longitude: 103.82 })).toBe(true)
+    expect(inSingapore({ latitude: 31.2, longitude: 121.5 })).toBe(false)
+  })
+
+  it.each([
+    [0, 0, 'clear'], [2, 0, 'partly'], [3, 0, 'cloudy'], [45, 0, 'haze'], [61, 0, 'rain'], [81, 0, 'rain'],
+    [73, 0, 'snow'], [86, 0, 'snow'], [95, 0, 'thunder'], [1, 35, 'windy'], [3, 40, 'cloudy'],
+  ])('WMO %i（风速 %i）→ %s', (code, wind, c) => expect(classifyWmo(code, wind)).toBe(c))
 })

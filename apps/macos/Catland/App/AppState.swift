@@ -172,26 +172,52 @@ final class AppState {
     /// 调试：覆盖场景的时间（小时）与天气。
     var sceneOverride: (hour: Double, condition: String)?
     private var weatherTask: Task<Void, Never>?
+    var location: SceneLocation = LocationProvider.fromTimeZone()
+    private let locationProvider = LocationProvider()
 
     func sceneEnv(now: Date) -> SceneEnv {
         if let o = sceneOverride {
             let start = Calendar.current.startOfDay(for: now)
-            return SceneEnv(date: start.addingTimeInterval(o.hour * 3600), condition: o.condition, temperature: weather?.temperature, mouse: roomMouse)
+            return SceneEnv(date: start.addingTimeInterval(o.hour * 3600), condition: o.condition, temperature: weather?.temperature, mouse: roomMouse, location: location)
         }
-        return SceneEnv(date: now, condition: weather?.condition ?? "partly", temperature: weather?.temperature, mouse: roomMouse)
+        return SceneEnv(date: now, condition: weather?.condition ?? "partly", temperature: weather?.temperature, mouse: roomMouse, location: location)
+    }
+
+    func setWeatherEnabled(_ on: Bool) {
+        settings.weather = on
+        Task {
+            let _: Settings? = try? await sidecar.call("settings.update", ["weather": on])
+            if on { await fetchWeather() } else { weather = nil }
+        }
     }
 
     /// 每 30 分钟取一次天气（sidecar 侧有缓存；设置关闭时返回 null）。
     func startWeather() {
+        locationProvider.start { [weak self] loc in
+            guard let self else { return }
+            let moved = abs(loc.latitude - self.location.latitude) > 0.05 || abs(loc.longitude - self.location.longitude) > 0.05
+            self.location = loc
+            if moved { Task { await self.fetchWeather() } }
+        }
         weatherTask?.cancel()
         weatherTask = Task { [weak self] in
             while !Task.isCancelled {
-                if let self, let w: WeatherInfo? = try? await self.sidecar.call("weather.get") {
-                    self.weather = w
-                    if let w { AppLog.info("weather", ["condition": w.condition, "text": w.text, "temp": w.temperature ?? -1]) }
-                }
+                await self?.fetchWeather()
                 try? await Task.sleep(for: .seconds(30 * 60))
+                self?.locationProvider.refresh()
             }
+        }
+    }
+
+    /// 按当前位置取天气（坐标由 sidecar 粗化后再发出）。
+    func fetchWeather() async {
+        let params: [String: Any] = ["latitude": location.latitude, "longitude": location.longitude]
+        do {
+            let w: WeatherInfo? = try await sidecar.call("weather.get", params)
+            weather = w
+            if let w { AppLog.info("weather", ["condition": w.condition, "text": w.text, "temp": w.temperature ?? -1, "city": location.name]) }
+        } catch {
+            AppLog.warn("weather failed", ["err": error.localizedDescription])
         }
     }
 

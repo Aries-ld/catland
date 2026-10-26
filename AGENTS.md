@@ -12,7 +12,7 @@
 
 ### 1.1 已定决策（详见 `docs/decisions/0001-architecture-and-mvp-scope.md`）
 
-- **纯本地（红线）**：无自有服务器、无账号体系、无遥测；网络请求只发往用户连接的平台。唯一例外：猫咪场景的天气联动请求新加坡 NEA 开放数据（data.gov.sg，匿名 GET、不带用户信息、30 分钟缓存，设置里可关）。sidecar 与 App 走 stdio，不监听端口；新增密钥存钥匙串。
+- **纯本地（红线）**：无自有服务器、无账号体系、无遥测；网络请求只发往用户连接的平台。例外：刘海场景的天气联动（匿名 GET、不带用户信息、30 分钟缓存，设置里可关）——新加坡用 NEA（data.gov.sg），其他地区用 Open-Meteo，坐标先粗化到 0.1°。sidecar 与 App 走 stdio，不监听端口；新增密钥存钥匙串。
 - 技术栈：Swift 原生客户端（刘海 NSPanel + AVPlayer）+ Node sidecar 包装 catbus。
 - MVP：连接面板 + 登录、灵动岛 + 小猫动画、视频/内容板块；电商延后到 v2。
 - 点赞 / 收藏 / 历史只存本地，不回写原平台。
@@ -41,10 +41,12 @@
 - 新增动作：在 `PixelCatArt.actions` 里加一组 Frame；跑 Swift 测试（尺寸、可渲染）并生成预览图人工把关后再提交。
 - 刘海下方「小猫步道」（默认开，设置里可关）：物理刘海没有像素，步道让小猫能从刘海下方走过。
 - **刘海场景**（`apps/macos/Catland/Scene/IslandScene.swift`，代码手绘、与小猫同一像素网格）：收起态本身就是一面落地窗，物理刘海当窗上横梁。分层：天空（太阳高度按新加坡经纬度本地计算，`SceneClock`）→ 日月星 → 云 → 远景楼群 → 近景楼群 + 地标（左翼金沙、右翼摩天轮）→ 海湾 → 天气（NEA：晴 / 少云 / 多云 / 霾 / 雨 / 雷雨 / 风）→ 窗框 → 地板。彩蛋：白天飞鸟、夜航飞机、元旦 / 国庆 / 跨年夜烟花。鼠标移动有视差。
-- 刘海创意（实验中，默认两个都开）：**猫洞**（刘海 = 天花板猫洞，猫走到刘海下方跳进去，洞口垂尾巴 / 扒爪子 / 倒挂探头 / 飘 z，过一阵跳下来；`CatDirector` 的 toDen → climbing → inDen → dropping）和**地铁隧道**（刘海 = 隧道口，刘海底边下是高架桥，MRT 小列车每 50 秒穿过一次）。切换：`catland-debug notch:den|tunnel|both|beam`，`catland-debug den` 强制一只猫进洞。
+- 刘海创意（实验中，默认两个都开）：**猫洞**（刘海 = 天花板猫洞，猫走到刘海下方跳进去，洞口垂尾巴 / 扒爪子 / 飘 z，过一阵跳下来；`CatDirector` 的 toDen → climbing → inDen → dropping）和**地铁隧道**（刘海 = 隧道口，刘海底边下是高架桥，MRT 小列车每 50 秒穿过一次）。切换：`catland-debug notch:den|tunnel|both|beam`，`catland-debug den` 强制一只猫进洞。
 - 地面是深色抛光地面（颜色取自窗外天色，白天映天光、夜里映城市灯），猫脚下有影子。
-- 刘海创意（实验中，默认两个都开）：**猫洞**（刘海 = 天花板猫洞，猫走到刘海下方跳进去，洞口垂尾巴 / 扒爪子 / 倒挂探头 / 飘 z，过一阵跳下来；CatDirector 的 toDen → climbing → inDen → dropping）和**地铁隧道**（刘海 = 隧道口，刘海底边下是高架桥，MRT 小列车每 50 秒穿过一次）。切换：`catland-debug notch:den|tunnel|both|beam`，`catland-debug den` 强制一只猫进洞。
+- 刘海创意（实验中，默认两个都开）：**猫洞**（刘海 = 天花板猫洞，猫走到刘海下方跳进去，洞口垂尾巴 / 扒爪子 / 飘 z，过一阵跳下来；CatDirector 的 toDen → climbing → inDen → dropping）和**地铁隧道**（刘海 = 隧道口，刘海底边下是高架桥，MRT 小列车每 50 秒穿过一次）。切换：`catland-debug notch:den|tunnel|both|beam`，`catland-debug den` 强制一只猫进洞。
 - 地面是深色抛光地面（颜色取自窗外天色，白天映天光、夜里映城市灯），猫脚下有影子。
+- 所在地：Mac 系统定位（CoreLocation，基于 Wi-Fi，与 VPN / IP 无关），未授权时按系统时区估计城市（`LocationProvider`）。太阳位置、天气、窗外地标都跟随所在地：新加坡（金沙、摩天轮）、上海（东方明珠、上海中心、环球金融中心），其他城市用通用楼群。`catland-debug city:shanghai|singapore` 可切换预览。
+- 平台图标：各平台官方 App 图标，`scripts/fetch_platform_icons.py` 下载到 `apps/macos/Resources/PlatformIcons`（来源记录在 SOURCES.json；B 站去掉官网图标的 WEB 角标，京东 / 淘宝用官网常规图标，避开 App Store 的活动版）。界面里统一用 `PlatformIcon` / `PlatformBadge`。
 - 调试：`catland-debug scene:<小时>:<天气>`（如 `scene:21.5:thunder`），`scene:off` 恢复真实时间与天气。
 
 ## 3. 约定

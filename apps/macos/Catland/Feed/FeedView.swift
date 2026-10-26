@@ -178,14 +178,47 @@ struct PressStyle: ButtonStyle {
     }
 }
 
+/// 平台官方图标（圆角方形，按 App 图标比例裁切）。未连接时可显示为灰度。
+struct PlatformIcon: View {
+    let platform: String
+    var size: CGFloat = 16
+    var dimmed = false
+
+    private static let images: [String: NSImage] = {
+        guard let dir = Bundle.main.url(forResource: "PlatformIcons", withExtension: nil) else { return [:] }
+        var out: [String: NSImage] = [:]
+        for id in ["xhs", "douyin", "bilibili", "kuaishou", "x", "tiktok", "weibo", "jd", "taobao", "xianyu"] {
+            if let img = NSImage(contentsOf: dir.appendingPathComponent("\(id).png")) { out[id] = img }
+        }
+        return out
+    }()
+
+    var body: some View {
+        Group {
+            if let img = Self.images[platform] {
+                Image(nsImage: img).resizable().interpolation(.high)
+            } else {
+                PlatformBrand.swiftColor(platform)
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: size * 0.225, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: size * 0.225, style: .continuous).stroke(.white.opacity(0.12), lineWidth: 0.5))
+        .saturation(dimmed ? 0 : 1)
+        .opacity(dimmed ? 0.45 : 1)
+    }
+}
+
+/// 内容来源标签：平台图标 + 名称。
 struct PlatformBadge: View {
     let platform: String
     var body: some View {
-        Text(PlatformBrand.shortName(platform))
-            .font(.system(size: 9, weight: .bold))
-            .padding(.horizontal, 5).padding(.vertical, 2)
-            .background(RoundedRectangle(cornerRadius: 4).fill(PlatformBrand.swiftColor(platform).opacity(0.9)))
-            .foregroundStyle(platform == "x" || platform == "xianyu" ? .black : .white)
+        HStack(spacing: 4) {
+            PlatformIcon(platform: platform, size: 14)
+            Text(PlatformBrand.shortName(platform)).font(.system(size: 10, weight: .semibold)).foregroundStyle(.white.opacity(0.92))
+        }
+        .padding(.leading, 2).padding(.trailing, 6).padding(.vertical, 2)
+        .background(Capsule().fill(.black.opacity(0.35)))
     }
 }
 
