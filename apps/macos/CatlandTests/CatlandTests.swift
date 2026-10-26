@@ -30,7 +30,7 @@ final class NotchGeometryTests: XCTestCase {
         let c = g.activeRect(expanded: false)
         XCTAssertEqual(c.midX, 756)
         XCTAssertEqual(c.maxY, 982)
-        XCTAssertEqual(c.width, 290)
+        XCTAssertEqual(c.width, 200 + NotchGeometry.wing * 2)
         XCTAssertEqual(g.activeRect(expanded: true).size, NotchGeometry.expandedSize)
     }
 }
