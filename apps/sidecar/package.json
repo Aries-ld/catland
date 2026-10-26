@@ -11,7 +11,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "smoke": "node scripts/smoke.ts"
+    "smoke": "node scripts/smoke.ts",
+    "smoke:accounts": "node scripts/smoke-accounts.ts"
   },
   "dependencies": {
     "catbus-cli": "0.2.1"

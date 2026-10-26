@@ -46,6 +46,7 @@
 # sidecar（apps/sidecar，Node 26 直接运行 .ts，TS 7 只做类型检查）
 cd apps/sidecar && npm run typecheck && npm test   # 每次改动后必跑
 npm run smoke                                       # 真机只读冒烟，日志在 ~/Library/Logs/catland/sidecar.log
+npm run smoke:accounts [platform]                   # 账号面板 + 体检 + 扫码取到二维码后立即取消
 
 
 catbus auth list                                  # 已登录的平台
