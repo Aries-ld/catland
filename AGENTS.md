@@ -86,7 +86,7 @@ apps/macos/build/shot-window /tmp/x.png             # 只截 catland 自己的�
 apps/macos/scripts/run.sh                           # 开发版：构建并启动
 scripts/package-dmg.sh [arm64|x86_64]               # 打包可分发的 DMG（自带 Node + sidecar + catbus，ad-hoc 签名），产物在 dist/
 ~/miniconda3/envs/catlands/bin/python scripts/make_icons.py        # App 图标 + 菜单栏图标
-~/miniconda3/envs/catlands/bin/python scripts/make_readme_art.py   # README banner / 场景拼图（输入为实机截图）
+~/miniconda3/envs/catlands/bin/python scripts/make_readme_art.py   # README banner / 场景拼图（先 catland-debug snapshots:/tmp/catland-snaps 离屏渲染）
 
 catbus auth list                                  # 已登录的平台
 catbus <platform> feed list --limit 10            # 推荐流

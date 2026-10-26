@@ -28,14 +28,22 @@ struct CatStage: View {
     var bubbles: [String] = []
     /// 轮播起点（悬停开始的时刻），保证每次都从第一句开始。
     var bubbleEpoch: TimeInterval = 0
+    /// 离屏渲染（宣传图）用：固定在某一时刻、不跑动画。
+    var frozenTime: TimeInterval? = nil
 
     @Environment(\.displayScale) private var displayScale
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30)) { tl in
+        if let ft = frozenTime {
+            canvas(t: ft)
+        } else {
+            TimelineView(.animation(minimumInterval: 1.0 / 30)) { tl in canvas(t: tl.date.timeIntervalSinceReferenceDate) }
+        }
+    }
+
+    private func canvas(t: TimeInterval) -> some View {
             Canvas { ctx, size in
                 let px = pixel > 0 ? pixel : max(1, (1.5 * displayScale).rounded()) / max(displayScale, 1)
-                let t = tl.date.timeIntervalSinceReferenceDate
                 var speaker: CatDirector.Snapshot?
                 for i in 0..<cats {
                     let lane = CatDirector.shared.lane(for: i, count: cats, width: size.width, hidden: hiddenWidth, catWidth: CGFloat(PixelCatArt.width) * px)
@@ -54,8 +62,7 @@ struct CatStage: View {
                     drawBubble(text, above: s, in: &ctx, size: size, px: px)
                 }
             }
-        }
-        .allowsHitTesting(false)
+            .allowsHitTesting(false)
     }
 
     private func draw(_ s: CatDirector.Snapshot, in ctx: inout GraphicsContext, size: CGSize, px: CGFloat) {

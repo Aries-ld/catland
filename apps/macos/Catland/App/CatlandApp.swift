@@ -83,6 +83,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     UserDefaults.standard.set(m == "den" || m == "both", forKey: NotchGeometry.denKey)
                     self.screenChanged()
                 case "den": CatDirector.shared.forceDen = true
+                case let c where c.hasPrefix("snapshots:"):
+                    let files = SceneSnapshot.renderAll(to: URL(fileURLWithPath: String(c.dropFirst(10))))
+                    AppLog.info("snapshots", ["count": files.count])
                 case let c where c.hasPrefix("weblogin:"):
                     if let p = self.state.platforms.first(where: { $0.id == String(c.dropFirst(9)) }) { WebLoginController.shared.open(state: self.state, platform: p) }
                 case let c where c.hasPrefix("egg:"):

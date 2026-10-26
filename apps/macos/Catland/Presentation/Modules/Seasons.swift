@@ -72,15 +72,27 @@ struct SeasonStyle {
 struct TreesLayer: SceneLayer {
     let id = "trees"
     let stage = SceneStage.shore
+
+    /// 行道树的位置与宽度（事件等其他模块也会用到，比如樱花雨让树开满花）。
+    static func positions(_ c: SceneCanvas) -> [(x: Int, w: Int)] {
+        var rng = SeededRandom(seed: 404)
+        var x = 2 + c.parallax(4)
+        var out: [(Int, Int)] = []
+        while x < c.cols {
+            let w = 3 + Int(rng.next() % 2)
+            out.append((x, w))
+            x += w + 3 + Int(rng.next() % 4)
+        }
+        return out
+    }
+
     func draw(_ c: SceneCanvas) {
         let style = c.seasonStyle
         let y = c.cityBase
-        var rng = SeededRandom(seed: 404)
-        var x = 2 + c.parallax(4)
+        var rng = SeededRandom(seed: 405) // 只管配色，位置统一来自 positions()
         let night = c.dark * 0.3 // 岸边有路灯照着，夜里也看得出季节颜色
         let sway = c.cond == "windy" ? Int((sin(c.t * 3) * 1).rounded()) : 0
-        while x < c.cols {
-            let w = 3 + Int(rng.next() % 2)
+        for (x, w) in Self.positions(c) {
             let trunk = c.rgb(0x6B4E3D).mix(c.rgb(0x1E1612), night).color
             c.fill(x + w / 2, y - 1, 1, 2, trunk)
             if let colors = style.treeColors {
@@ -94,7 +106,6 @@ struct TreesLayer: SceneLayer {
                 c.fill(x + w / 2 - 1 + sway, y - 2, 1, 1, trunk); c.fill(x + w / 2 + 1 + sway, y - 2, 1, 1, trunk); c.fill(x + w / 2, y - 3, 1, 1, trunk)
                 if c.cond == "snow" || c.cond == "sleet" { c.fill(x + w / 2 - 1 + sway, y - 3, 3, 1, Color.white.opacity(0.85)) }
             }
-            x += w + 3 + Int(rng.next() % 4)
         }
     }
 }

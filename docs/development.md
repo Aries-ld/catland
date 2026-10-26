@@ -22,7 +22,7 @@ scripts/package-dmg.sh x86_64     # 指定架构
 ## 品牌素材
 
 - `scripts/make_icons.py`：App 图标（`apps/macos/Resources/AppIcon.icns`、`assets/brand/icon-1024.png`）与菜单栏模板图。
-- `scripts/make_readme_art.py`：README 的 banner 与场景拼图（输入是用 `catland-debug` 拍的实机截图）。
+- `scripts/make_readme_art.py`：README 的 banner 与场景拼图。素材来自 App 的离屏渲染（同一套表现层代码，不截屏，没有物理刘海黑块）：先运行 App，执行 `apps/macos/build/catland-debug snapshots:/tmp/catland-snaps`，再跑脚本 `--snaps /tmp/catland-snaps`。渲染预设在 `SceneSnapshot.presets`，事件会自动挑最热闹的一帧。
 - `scripts/fetch_platform_icons.py`：各平台官方图标（固定的干净版本）。
 
 ## 架构

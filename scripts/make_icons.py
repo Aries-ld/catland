@@ -21,38 +21,44 @@ RES = ROOT / "apps/macos/Resources"
 BRAND = ROOT / "assets/brand"
 
 CREAM = (255, 244, 230, 255)
-PINK = (255, 143, 177, 255)
+PINK = (255, 150, 182, 255)
+HIGHLIGHT = (255, 214, 226, 255)
 OUTLINE = (42, 30, 46, 255)
 
 
-def paw_grid(n: int = 20) -> list[list[str]]:
-    """在 n×n 网格上画猫爪：' ' 空、'C' 奶白、'P' 粉色肉垫、'O' 描边。"""
+def paw_grid(n: int = 32) -> list[list[str]]:
+    """在 n×n 网格上画一只比例正经的猫爪印：三瓣掌垫 + 四颗朝外斜的椭圆趾垫。
+    ' ' 空、'P' 肉垫粉、'H' 高光、'O' 描边。坐标按 32 格设计，其他尺寸等比缩放。"""
     g = [[" "] * n for _ in range(n)]
-    s = n / 20
+    s = n / 32
 
-    def ellipse(cx, cy, rx, ry, ch):
+    def inside_ellipse(x, y, cx, cy, rx, ry, angle=0.0):
+        a = math.radians(angle)
+        dx, dy = x - cx * s, y - cy * s
+        u = dx * math.cos(a) + dy * math.sin(a)
+        v = -dx * math.sin(a) + dy * math.cos(a)
+        return (u / (rx * s)) ** 2 + (v / (ry * s)) ** 2 <= 1
+
+    # 掌垫：上半是宽椭圆，下沿三个圆瓣
+    pad = [(16, 20.6, 8.0, 5.6, 0), (10.6, 23.6, 3.9, 3.9, 0), (16, 25.0, 4.2, 4.2, 0), (21.4, 23.6, 3.9, 3.9, 0)]
+    # 趾垫：呈扇形排开，外侧两颗更低、向外倾斜
+    toes = [(6.4, 12.6, 2.9, 3.9, -28), (12.0, 7.6, 3.1, 4.2, -10), (20.0, 7.6, 3.1, 4.2, 10), (25.6, 12.6, 2.9, 3.9, 28)]
+    for y in range(n):
+        for x in range(n):
+            px, py = x + 0.5, y + 0.5
+            if any(inside_ellipse(px, py, *e) for e in pad + toes):
+                g[y][x] = "P"
+    # 每颗肉垫左上方一点高光，看起来软软的
+    for cx, cy, rx, ry, ang in [pad[0]] + toes:
+        hx, hy = cx - rx * 0.35, cy - ry * 0.4
         for y in range(n):
             for x in range(n):
-                if ((x + 0.5 - cx * s) / (rx * s)) ** 2 + ((y + 0.5 - cy * s) / (ry * s)) ** 2 <= 1:
-                    g[y][x] = ch
-
-    # 四个趾头与掌垫之间留出空隙，轮廓才像猫爪
-    toes = [(3.1, 8.7, 2.0, 2.1), (7.4, 5.2, 2.1, 2.2), (12.6, 5.2, 2.1, 2.2), (16.9, 8.7, 2.0, 2.1)]
-    ellipse(10, 14.6, 4.9, 3.9, "C")
-    ellipse(7.2, 13.4, 2.4, 2.4, "C")
-    ellipse(12.8, 13.4, 2.4, 2.4, "C")
-    for cx, cy, rx, ry in toes:
-        ellipse(cx, cy, rx, ry, "C")
-    ellipse(10, 15.0, 2.9, 2.2, "P")
-    for cx, cy, rx, ry in toes:
-        ellipse(cx, cy + 0.3, rx * 0.55, ry * 0.5, "P")
-    # 描边：紧贴实心像素的空格
+                if g[y][x] == "P" and inside_ellipse(x + 0.5, y + 0.5, hx, hy, rx * 0.28, ry * 0.22, ang):
+                    g[y][x] = "H"
     out = [row[:] for row in g]
     for y in range(n):
         for x in range(n):
-            if g[y][x] != " ":
-                continue
-            if any(0 <= y + dy < n and 0 <= x + dx < n and g[y + dy][x + dx] != " " for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+            if g[y][x] == " " and any(0 <= y + dy < n and 0 <= x + dx < n and g[y + dy][x + dx] != " " for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
                 out[y][x] = "O"
     return out
 
@@ -88,11 +94,11 @@ def app_icon(size: int = 1024) -> Image.Image:
                     d.rectangle([wx, wy, wx + px // 2, wy + px // 2], fill=(255, 210, 120, 255))
         x += w + px
         i += 1
-    # 猫爪：20×20 网格，每格 28px
-    g = paw_grid(20)
-    cell = 28
-    ox, oy = (body - 20 * cell) // 2, (body - 20 * cell) // 2 - 40
-    colors = {"C": CREAM, "P": PINK, "O": OUTLINE}
+    # 猫爪：32×32 网格，每格 18px
+    g = paw_grid(32)
+    cell = 18
+    ox, oy = (body - 32 * cell) // 2, (body - 32 * cell) // 2 - 36
+    colors = {"P": PINK, "H": HIGHLIGHT, "O": OUTLINE}
     for yy, row in enumerate(g):
         for xx, ch in enumerate(row):
             if ch in colors:
@@ -109,7 +115,7 @@ def app_icon(size: int = 1024) -> Image.Image:
 
 def menubar_icon(pt: int, scale: int) -> Image.Image:
     """菜单栏模板图：只用黑色 + 透明，系统按深浅色自动着色。"""
-    n = 20
+    n = 32
     g = paw_grid(n)
     size = pt * scale
     work = n * 2 * scale  # 先按整数格画大图，再缩到目标尺寸
@@ -118,9 +124,8 @@ def menubar_icon(pt: int, scale: int) -> Image.Image:
     d = ImageDraw.Draw(img)
     for y, row in enumerate(g):
         for x, ch in enumerate(row):
-            if ch in ("C", "P"):
-                # 肉垫挖空一点，模板图里也看得出「肉垫」
-                alpha = 255 if ch == "C" else 110
+            if ch in ("P", "H"):
+                alpha = 255
                 d.rectangle([math.floor(x * cell), math.floor(y * cell), math.ceil((x + 1) * cell) - 1, math.ceil((y + 1) * cell) - 1], fill=(0, 0, 0, alpha))
     return img.resize((size, size), Image.LANCZOS)
 

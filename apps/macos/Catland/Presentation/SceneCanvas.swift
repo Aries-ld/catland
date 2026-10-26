@@ -22,7 +22,7 @@ struct SceneCanvas {
 
     /// 物理刘海在画布里占的列与行（看不见的区域）。
     var notchCols: ClosedRange<Int> {
-        let w = Int((notch.notchSize.width / p).rounded())
+        let w = max(1, Int((notch.notchSize.width / p).rounded())) // 宽度为 0（无刘海 / 离屏渲染）时也要是合法区间
         let left = (cols - w) / 2
         return left...(left + w - 1)
     }

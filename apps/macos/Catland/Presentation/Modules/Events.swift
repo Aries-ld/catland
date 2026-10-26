@@ -181,20 +181,51 @@ struct MeteorShower: SceneEvent {
         return nil
     }
     func canRun(condition: String, intensity: Double) -> Bool { ["clear", "partly"].contains(condition) }
+    /// 天色压暗、星星变亮；每 0.22 秒新增一颗长拖尾流星（同时 4–6 颗在天上），每 6 秒一颗彩色大火流星。
     func draw(_ c: SceneCanvas, stage: SceneStage, progress: Double) {
         let a = envelope(progress)
-        let slot = 0.18
+        let skyH = max(8, c.cityBase - c.skyTop)
+        c.fill(0, c.skyTop, c.cols, skyH, Color(red: 0.02, green: 0.03, blue: 0.1).opacity(0.25 * a))
+        var srng = SeededRandom(seed: 909)
+        for _ in 0..<30 {
+            let x = Int(srng.next() % UInt64(max(1, c.cols))), y = c.skyTop + Int(srng.next() % UInt64(skyH))
+            let tw = 0.5 + 0.5 * sin(c.t * 2 + Double(x))
+            c.fill(x, y, 1, 1, Color.white.opacity(0.7 * tw * a))
+        }
+        let slot = 0.22, life = 0.9
         for k in 0..<5 {
             let n = Int(c.t / slot) - k
             let age = c.t - Double(n) * slot
-            var rng = SeededRandom(seed: UInt64(truncatingIfNeeded: n &* 7919))
-            let x0 = Int(rng.next() % UInt64(max(1, c.cols))) + 8, y0 = c.skyTop + Int(rng.next() % UInt64(max(1, (c.cityBase - c.skyTop) / 2)))
-            let life = 0.8
             guard age < life else { continue }
-            let travel = Int(age / life * 16)
-            Meteor.draw(c, x: x0 - travel, y: y0 + travel / 2, length: 8, alpha: a * (1 - age / life * 0.7))
+            var rng = SeededRandom(seed: UInt64(truncatingIfNeeded: n &* 7919))
+            let x0 = Int(rng.next() % UInt64(max(1, c.cols + 20))), y0 = c.skyTop + Int(rng.next() % UInt64(max(1, skyH / 2)))
+            let len = 10 + Int(rng.next() % 8)
+            let k01 = age / life
+            let hx = x0 - Int(k01 * 26), hy = y0 + Int(k01 * 13)
+            streak(c, headX: hx, headY: hy, length: len, color: Color.white, alpha: a * (1 - k01 * 0.6), thick: false)
+        }
+        // 大火流星：更粗、带颜色、头部发光
+        let big = c.t.truncatingRemainder(dividingBy: 6)
+        if big < 1.2 {
+            var rng = SeededRandom(seed: UInt64(Int(c.t / 6)) &+ 77)
+            let x0 = c.cols / 3 + Int(rng.next() % UInt64(max(1, c.cols / 2))), y0 = c.skyTop + 1
+            let k01 = big / 1.2
+            let colors: [Color] = [Color(red: 0.55, green: 0.95, blue: 1), Color(red: 1, green: 0.85, blue: 0.4), Color(red: 0.75, green: 1, blue: 0.6)]
+            streak(c, headX: x0 - Int(k01 * 40), headY: y0 + Int(k01 * 20), length: 22, color: colors[Int(c.t / 6) % 3], alpha: a, thick: true)
         }
     }
+
+    /// 斜向 2:1 的流星：头亮、尾巴渐隐；thick 时 2 像素粗并带光晕。
+    private func streak(_ c: SceneCanvas, headX: Int, headY: Int, length: Int, color: Color, alpha: Double, thick: Bool) {
+        if thick { c.fill(headX - 2, headY - 2, 5, 5, color.opacity(0.25 * alpha)) }
+        c.fill(headX - 1, headY, 2, 1, Color.white.opacity(alpha))
+        for j in 0..<length {
+            let fade = pow(1 - Double(j) / Double(length), 0.6)
+            let x = headX + j, y = headY - j / 2
+            c.fill(x, y, 1, thick ? 2 : 1, (j < 2 ? Color.white : color).opacity(alpha * fade))
+        }
+    }
+
     let teasers = ["{time} 有流星雨，记得来看哦", "{time} 流星雨！愿望清单准备好了吗", "{time} 流星雨，许个愿：准时下班"]
     let lives = ["流星雨来啦！快许愿", "许个愿：明天不加班", "一颗、两颗…数不过来了", "愿望很简单：发财、不加班"]
     let cancelLine = "天公不作美，流星雨看不成了 T_T"
@@ -203,14 +234,14 @@ struct MeteorShower: SceneEvent {
 /// 花火大会：夏天周六 30% 概率 20:00；中国国庆、新加坡国庆日当晚 20:00 必有。
 struct FireworksFestival: SceneEvent {
     let id = "fireworks", name = "花火大会"
-    let stages: Set<SceneStage> = [.skyEvents, .shoreEvents]
+    let stages: Set<SceneStage> = [.shoreEvents] // 画在楼群前面：楼高起来后，画在后面会被挡住
     func start(on d: EventDay) -> Date? {
         if d.isHoliday("nationalDayCN") || d.isHoliday("nationalDaySG") { return d.at(20) }
         if [.summer, .tropical].contains(d.season), d.weekday == 7, d.roll(id) < 0.3 { return d.at(20) }
         return nil
     }
     func canRun(condition: String, intensity: Double) -> Bool { dry(condition) }
-    func draw(_ c: SceneCanvas, stage: SceneStage, progress: Double) { Fireworks.draw(c, stage: stage, bursts: 4, alpha: envelope(progress)) }
+    func draw(_ c: SceneCanvas, stage: SceneStage, progress: Double) { Fireworks.draw(c, stage: stage, bursts: 5, alpha: envelope(progress)) }
     let teasers = ["{time} 有花火大会！占个好位置", "{time} 放烟花，下班别磨蹭", "{time} 花火大会，今晚的快乐有着落了"]
     let lives = ["花火大会开始啦！", "砰——好好看！", "这一刻，班味全无", "烟花很短，快乐很长"]
     let cancelLine = "下雨了，花火大会取消了，猫猫好失落"
@@ -219,7 +250,7 @@ struct FireworksFestival: SceneEvent {
 /// 跨年烟花：12 月 31 日 23:55 开始，跨过零点。
 struct NewYearFireworks: SceneEvent {
     let id = "newYearFireworks", name = "跨年烟花"
-    let stages: Set<SceneStage> = [.skyEvents, .shoreEvents]
+    let stages: Set<SceneStage> = [.shoreEvents]
     func start(on d: EventDay) -> Date? { d.month == 12 && d.dayOfMonth == 31 ? d.at(23, 55) : nil }
     func canRun(condition: String, intensity: Double) -> Bool { !["thunder", "hail"].contains(condition) }
     func draw(_ c: SceneCanvas, stage: SceneStage, progress: Double) { Fireworks.draw(c, stage: stage, bursts: progress > 0.5 ? 6 : 3, alpha: envelope(progress)) }
@@ -229,25 +260,52 @@ struct NewYearFireworks: SceneEvent {
 }
 
 enum Fireworks {
+    /// 每朵烟花 2.6 秒一个周期：0–0.6 秒升空（拖着火星），0.6–2.0 秒绽放——24 道带拖尾的光线向外炸开并下坠，
+    /// 内圈换一种颜色，中心一闪白光，末尾闪烁碎金；绽放时海湾泛起同色倒影。
     static func draw(_ c: SceneCanvas, stage: SceneStage, bursts: Int, alpha: Double) {
         let colors: [UInt32] = [0xFF5D7A, 0xFFD84A, 0x6DD3FF, 0xB98CFF, 0x7CF29A, 0xFF9A55]
+        let skyH = max(8, c.cityBase - c.skyTop)
         for k in 0..<bursts {
             let cycle = 2.6, offset = Double(k) * cycle / Double(bursts)
             let local = (c.t + offset).truncatingRemainder(dividingBy: cycle)
             let n = Int((c.t + offset) / cycle)
             var rng = SeededRandom(seed: UInt64(truncatingIfNeeded: n &* 31 &+ k))
-            let cx = 6 + Int(rng.next() % UInt64(max(1, c.cols - 12))), cy = c.skyTop + 3 + Int(rng.next() % UInt64(max(1, (c.cityBase - c.skyTop) / 3)))
+            let cx = 8 + Int(rng.next() % UInt64(max(1, c.cols - 16))), cy = c.skyTop + 6 + Int(rng.next() % UInt64(max(1, skyH / 3)))
             let col = c.rgb(colors[Int(rng.next() % UInt64(colors.count))]).color
-            if stage == .shoreEvents {
-                // 水面倒影：爆开时海湾泛起同色的光。
-                if local > 0.6 && local < 1.8 { c.fill(cx - 4, c.cityBase, 9, c.floorTop - c.cityBase, col.opacity(0.18 * alpha)) }
+            let inner = c.rgb(colors[Int(rng.next() % UInt64(colors.count))]).color
+            if local < 0.6 {
+                let y = c.cityBase - Int(Double(c.cityBase - cy) * local / 0.6)
+                c.fill(cx, y, 1, 2, Color.white.opacity(alpha))
+                c.fill(cx, y + 2, 1, 3, col.opacity(0.5 * alpha))
                 continue
             }
-            if local < 0.6 { c.fill(cx, c.cityBase - Int(Double(c.cityBase - cy) * local / 0.6), 1, 1, col.opacity(alpha)) }
-            else if local < 2.0 {
-                let r = Int((local - 0.6) * 5) + 1, a = (1 - (local - 0.6) / 1.4) * alpha
-                for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1)] { c.fill(cx + dx * r, cy + dy * r, 1, 1, col.opacity(a)) }
-                if r > 2 { for (dx, dy) in [(2, 1), (-2, 1), (1, 2), (-1, 2)] { c.fill(cx + dx * r / 2, cy + dy * r / 2 + 1, 1, 1, col.opacity(a * 0.6)) } }
+            guard local < 2.0 else { continue }
+            let k01 = (local - 0.6) / 1.4
+            let r = 2 + k01 * 13, a = (1 - k01 * k01) * alpha, drop = k01 * k01 * 5
+            c.fill(cx - 7, c.cityBase, 15, c.floorTop - c.cityBase, col.opacity(0.22 * a))
+            if k01 < 0.12 {
+                c.fill(cx - 2, cy - 2, 5, 5, Color.white.opacity(alpha))
+                c.fill(cx - 6, cy - 6, 13, 13, col.opacity(0.18 * alpha))
+            }
+            for i in 0..<24 {
+                let ang = Double(i) / 24 * 2 * .pi
+                for tail in 0..<4 {
+                    let rr = r - Double(tail) * 1.5
+                    guard rr > 0 else { continue }
+                    let x = cx + Int((cos(ang) * rr).rounded()), y = cy + Int((sin(ang) * rr * 0.85 + drop).rounded())
+                    c.fill(x, y, 1, 1, (tail == 0 ? Color.white : col).opacity(a * (1 - Double(tail) * 0.22)))
+                }
+                if i % 2 == 0 {
+                    let x = cx + Int((cos(ang) * r * 0.5).rounded()), y = cy + Int((sin(ang) * r * 0.45 + drop * 0.6).rounded())
+                    c.fill(x, y, 1, 1, inner.opacity(a))
+                }
+            }
+            if k01 > 0.55 {
+                var g = SeededRandom(seed: UInt64(truncatingIfNeeded: n &* 131 &+ k))
+                for _ in 0..<14 {
+                    let gx = cx + Int(g.next() % 29) - 14, gy = cy + Int(g.next() % 19) - 6 + Int(drop)
+                    if (Int(c.t * 14) + gx) % 3 == 0 { c.fill(gx, gy, 1, 1, Color(red: 1, green: 0.92, blue: 0.6).opacity(a)) }
+                }
             }
         }
     }
@@ -265,25 +323,49 @@ struct LightShow: SceneEvent {
         }
     }
     func canRun(condition: String, intensity: Double) -> Bool { !["thunder", "hail"].contains(condition) }
+    /// 地标楼顶射出扇形激光、同步来回扫；海湾升起一排被彩色灯光照亮的水幕；楼体泛起同色光晕。
     func draw(_ c: SceneCanvas, stage: SceneStage, progress: Double) {
         let a = envelope(progress)
-        let colors: [UInt32] = [0x6DD3FF, 0xFF6FB5, 0xB98CFF, 0x7CF29A]
-        let col = c.rgb(colors[Int(c.t / 2.5) % colors.count]).color
+        let palette: [Color] = [Color(red: 0.3, green: 1, blue: 0.6), Color(red: 0.3, green: 0.85, blue: 1), Color(red: 1, green: 0.35, blue: 0.85), Color(red: 1, green: 0.85, blue: 0.3)]
+        let phase = Int(c.t / 3)
+        let main = palette[phase % palette.count], second = palette[(phase + 1) % palette.count]
         if stage == .shoreEvents {
-            c.fill(0, c.cityBase, c.cols, c.floorTop - c.cityBase, col.opacity(0.14 * a))
+            // 水幕：一排高低起伏的水柱，被彩色灯光照亮，水面倒影泛色。
+            let base = c.cityBase + 1
+            c.fill(0, c.cityBase, c.cols, c.floorTop - c.cityBase, main.opacity(0.16 * a))
+            for x in stride(from: 2, to: c.cols - 2, by: 3) {
+                let h = Int((3 + 3 * sin(c.t * 2.2 + Double(x) * 0.35)) * a)
+                guard h > 0 else { continue }
+                for k in 0..<h { c.fill(x, base - k, 1, 1, (x / 3 % 2 == 0 ? main : second).opacity((0.55 - Double(k) * 0.05) * a)) }
+                c.fill(x, base - h, 1, 1, Color.white.opacity(0.7 * a))
+            }
             return
         }
-        for (i, ox) in [c.landmarkLeft + 6, c.landmarkRight].enumerated() {
-            let base = c.cityBase - c.tall(12)
-            for beam in 0..<3 {
-                let angle = sin(c.t * 0.7 + Double(beam) * 1.3 + Double(i)) * 0.9
-                for k in 0..<max(1, base - c.skyTop) {
-                    let x = ox + Int((Double(k) * angle).rounded())
-                    c.fill(x, base - k, 1, 1, col.opacity(a * 0.5 * (1 - Double(k) / Double(max(1, base - c.skyTop)))))
+        // 楼体泛光
+        c.fill(0, c.cityBase - c.tall(12), c.cols, c.tall(12), main.opacity(0.08 * a))
+        // 扇形激光：每个光源 6 束，同步摆动
+        let sources = [c.landmarkLeft + 6, c.landmarkRight]
+        let top = c.skyTop
+        for (si, ox) in sources.enumerated() {
+            let oy = c.cityBase - c.tall(14) - 2
+            let sweep = sin(c.t * 0.9 + Double(si) * 0.8) * 0.35
+            for beam in 0..<6 {
+                let angle = -0.95 + Double(beam) * 0.38 + sweep // 弧度，0 = 竖直向上
+                let color = beam % 2 == 0 ? main : second
+                let length = Double(oy - top)
+                guard length > 2 else { continue }
+                for k in stride(from: 0.0, to: length, by: 1) {
+                    let x = ox + Int((sin(angle) * k).rounded()), y = oy - Int((cos(angle) * k).rounded())
+                    guard y >= top else { break }
+                    let fade = 1 - k / length
+                    c.fill(x, y, 1, 1, color.opacity(0.75 * fade * a))
+                    if Int(k) % 2 == 0 { c.fill(x + 1, y, 1, 1, color.opacity(0.18 * fade * a)) }
                 }
             }
+            c.fill(ox - 1, oy - 1, 3, 3, Color.white.opacity(0.85 * a))
         }
     }
+
     let teasers = ["{time} 有灯光秀，城市要发光啦", "{time} 灯光秀，下班路上抬头看看"]
     let lives = ["灯光秀开始啦，城市在为你发光", "打工人也值得被照亮", "今天的城市，格外温柔"]
     let cancelLine = "雷雨太大，灯光秀暂停了"
@@ -299,9 +381,38 @@ struct SakuraRain: SceneEvent {
         return d.roll(id) < 0.1 ? d.at(16) : nil
     }
     func canRun(condition: String, intensity: Double) -> Bool { dry(condition) }
+    /// 岸边的树开满樱花；空气泛一层淡粉；大片花瓣翻飞（两种朝向交替，看起来在翻转）；窗台上落满花瓣。
     func draw(_ c: SceneCanvas, stage: SceneStage, progress: Double) {
-        SeasonParticlesLayer().drift(c, colors: [0xF7A8C4, 0xFFD1E0, 0xFFFFFF, 0xF48FB1], count: Int(60 * envelope(progress)), seed: 3131)
+        let a = envelope(progress)
+        let pinks: [Color] = [Color(red: 1, green: 0.72, blue: 0.82), Color(red: 1, green: 0.84, blue: 0.9), Color(red: 0.98, green: 0.6, blue: 0.75), .white]
+        c.fill(0, c.skyTop, c.cols, c.floorTop - c.skyTop, Color(red: 1, green: 0.75, blue: 0.85).opacity(0.1 * a))
+        // 满树樱花
+        for (x, w) in TreesLayer.positions(c) {
+            let y = c.cityBase
+            c.fill(x - 1, y - 4, w + 2, 2, pinks[0].opacity(a))
+            c.fill(x, y - 5, w, 1, pinks[1].opacity(a))
+            c.fill(x + 1, y - 6, max(1, w - 2), 1, pinks[0].opacity(a))
+            c.fill(x + w / 2, y - 5, 1, 1, Color.white.opacity(0.8 * a))
+        }
+        // 翻飞的花瓣
+        var rng = SeededRandom(seed: 3131)
+        for _ in 0..<Int(80 * a) {
+            let speed = 0.05 + Double(rng.next() % 60) / 1000
+            let ph = Double(rng.next() % 1000) / 1000
+            let k = (ph + c.t * speed).truncatingRemainder(dividingBy: 1)
+            let x0 = Int(rng.next() % UInt64(c.cols + 40))
+            let x = x0 - Int(k * 40) + Int((sin(c.t * 2 + Double(x0)) * 2).rounded())
+            let y = c.skyTop + Int(k * Double(c.floorTop - c.skyTop))
+            let col = pinks[Int(rng.next() % 4)].opacity(0.95 * a)
+            if (Int(c.t * 4) + x0) % 2 == 0 { c.fill(x, y, 2, 1, col) } else { c.fill(x, y, 1, 2, col) }
+        }
+        // 窗台上的落花
+        var frng = SeededRandom(seed: 47)
+        for _ in 0..<Int(Double(c.cols / 3) * min(1, progress * 4)) {
+            c.fill(Int(frng.next() % UInt64(max(1, c.cols))), c.floorTop - 1 + Int(frng.next() % 2), 1, 1, pinks[Int(frng.next() % 3)].opacity(0.9))
+        }
     }
+
     let teasers = ["{time} 会下一场樱花雨哦", "{time} 樱花雨，记得来窗边"]
     let lives = ["樱花雨！浪漫值拉满", "风一吹，满屏都是粉色", "春天在给你发糖"]
     let cancelLine = "下雨了，花瓣都被打湿了"
