@@ -1,4 +1,4 @@
-// RestDays：离最近的休息日 / 节日还有几天，给打工人一句鼓励。悬停时小猫的气泡轮播这些话。
+// RestDays：节假日表与「下一个节日」的计算，供气泡语料（BubbleCopy）使用。
 // 节日按所在地区：中国大陆用法定节假日（按节日当天计，不含调休安排），新加坡用公共假期；其他地区只算周末和通用节日。
 // 农历节日写死近几年的公历日期。
 import Foundation
@@ -69,31 +69,4 @@ enum RestDays {
             .min { $0.1 < $1.1 }
     }
 
-    /// 气泡轮播的几句话：开刷提示 + 天气、周末、节日（按距离给出不同语气的鼓励）。
-    static func messages(now: Date, region: Region, weather: String?, connected: Bool, calendar cal: Calendar = .current) -> [String] {
-        var out = [connected ? "点我开刷" + (weather.map { " · \($0)" } ?? "") : "点我连接平台"]
-        let hour = cal.component(.hour, from: now)
-        let weekday = cal.component(.weekday, from: now) // 1 = 周日 … 7 = 周六
-        if hour >= 23 || hour < 5 {
-            out.append("夜深了，刷完这条就睡吧")
-        } else {
-            switch weekday {
-            case 7, 1: out.append(["周末愉快，好好休息～", "周末就该躺平刷刷刷"][(hour / 6) % 2])
-            case 6: out.append(hour >= 17 ? "下班就是周末！冲！" : "明天周末！再撑一下")
-            case 2: out.append("周一而已，摸会儿鱼回回血")
-            default: out.append("距周末还有 \(7 - weekday) 天，加油打工人")
-            }
-        }
-        if let (h, days) = nextHoliday(from: now, region: region, calendar: cal) {
-            let name = h.name
-            switch days {
-            case 0: out.append("今天是\(name)，节日快乐！")
-            case 1: out.append(h.off ? "明天就放\(name)假啦！" : "明天就是\(name)啦")
-            case 2...3: out.append("还有 \(days) 天就\(name)啦，冲！")
-            case 4...14: out.append("距\(name)还有 \(days) 天")
-            default: out.append("距\(name)还有 \(days) 天，先摸会儿鱼")
-            }
-        }
-        return out
-    }
 }

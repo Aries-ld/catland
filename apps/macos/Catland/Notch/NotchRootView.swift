@@ -73,13 +73,15 @@ struct CollapsedView: View {
         return CatDen(minX: left, maxX: left + n.notchSize.width, bottom: n.notchSize.height)
     }
 
-    /// 悬停时轮播的几句话：开刷 + 天气、距周末、距节日的鼓励。
+    /// 悬停时轮播的语料（闲聊 / 时间 / 戳我三类交错）；每次悬停换一个随机顺序。
     private var bubbles: [String] {
         guard state.hovering else { return [] }
         let env = state.sceneEnv(now: Date())
-        let weather = state.weather.map { w in (w.temperature.map { "\(Int($0.rounded()))°" } ?? "") + IslandScene.weatherName(w.condition) }
-        return RestDays.messages(now: env.date, region: RestDays.region(for: state.location), weather: weather,
-                                 connected: !state.connectedContentPlatforms.isEmpty)
+        let ctx = BubbleCopy.Context(now: env.date, region: RestDays.region(for: state.location), city: state.location.name,
+                                     condition: state.weather?.condition, temperature: state.weather?.temperature,
+                                     season: SceneSeason.of(env.date, latitude: state.location.latitude),
+                                     connected: !state.connectedContentPlatforms.isEmpty)
+        return BubbleCopy.rotation(ctx, seed: state.hoverSession)
     }
 
     var body: some View {

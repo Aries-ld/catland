@@ -141,17 +141,35 @@ final class RestDaysTests: XCTestCase {
         XCTAssertEqual(d2, 5)
     }
 
-    func testWeekendMessages() {
-        let mon = RestDays.messages(now: day("2026-10-26 15:00"), region: .china, weather: "21°晴", connected: true)
-        XCTAssertEqual(mon.first, "点我开刷 · 21°晴")
-        XCTAssertTrue(mon.contains("周一而已，摸会儿鱼回回血"))
-        XCTAssertTrue(mon.contains { $0.contains("万圣节") })
-        let wed = RestDays.messages(now: day("2026-10-28 15:00"), region: .china, weather: nil, connected: true)
-        XCTAssertTrue(wed.contains("距周末还有 3 天，加油打工人"))
-        let fri = RestDays.messages(now: day("2026-10-30 18:30"), region: .china, weather: nil, connected: false)
-        XCTAssertEqual(fri.first, "点我连接平台")
-        XCTAssertTrue(fri.contains("下班就是周末！冲！"))
-        let late = RestDays.messages(now: day("2026-10-28 23:40"), region: .other, weather: nil, connected: true)
-        XCTAssertTrue(late.contains("夜深了，刷完这条就睡吧"))
+    func testBubbleCopyCategoriesAndContext() {
+        let base = BubbleCopy.Context(now: day("2026-10-26 15:00"), region: .china, city: "上海", condition: "rain", temperature: 19,
+                                      season: .autumn, connected: true)
+        let chat = BubbleCopy.chat(base)
+        XCTAssertTrue(chat.contains("上海 19°，雨"))
+        XCTAssertTrue(chat.contains("下雨啦，记得早点下班"))
+        XCTAssertTrue(chat.contains("周一啦，摸摸鱼恢复元气"))
+        XCTAssertTrue(chat.contains("秋天的第一杯奶茶喝了吗"))
+        let time = BubbleCopy.time(base)
+        XCTAssertTrue(time.contains("距周末还有 5 天，稳住我们能赢"))
+        XCTAssertTrue(time.contains("距下班还有 3 小时 0 分"))
+        XCTAssertTrue(time.contains { $0.contains("万圣节") })
+        var fri = base; fri.now = day("2026-10-30 18:30")
+        XCTAssertTrue(BubbleCopy.time(fri).contains("下班就是周末，冲鸭！"))
+        XCTAssertTrue(BubbleCopy.time(fri).contains("下班时间到！快跑！"))
+        var late = base; late.now = day("2026-10-28 23:40")
+        XCTAssertTrue(BubbleCopy.chat(late).contains("夜深了，刷完这条就睡吧"))
+    }
+
+    func testRotationInterleavesWithoutRepeats() {
+        let ctx = BubbleCopy.Context(now: day("2026-10-28 10:00"), region: .china, city: "上海", condition: "clear", temperature: 21,
+                                     season: .autumn, connected: true)
+        let a = BubbleCopy.rotation(ctx, seed: 1), b = BubbleCopy.rotation(ctx, seed: 2)
+        XCTAssertEqual(a.count, 12)
+        XCTAssertEqual(Set(a).count, a.count)
+        XCTAssertTrue(BubbleCopy.tap.contains(a[0]))
+        XCTAssertNotEqual(a, b)
+        XCTAssertTrue(a.allSatisfy { $0.count <= 22 }, "气泡文案太长：\(a.filter { $0.count > 22 })")
+        let offline = BubbleCopy.rotation(BubbleCopy.Context(now: day("2026-10-28 10:00"), region: .other, city: "x", condition: nil, temperature: nil, season: .tropical, connected: false), seed: 3)
+        XCTAssertFalse(offline.isEmpty)
     }
 }

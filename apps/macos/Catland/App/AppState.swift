@@ -21,7 +21,9 @@ final class AppState {
     var section: Section = .content
     var overlay: Overlay = .none
     var expanded = false
-    var hovering = false
+    var hovering = false { didSet { if hovering && !oldValue { hoverSession = UInt64.random(in: 1...UInt64.max / 2) } } }
+    /// 每次悬停一个新种子：气泡语料的轮播顺序随之变化。
+    private(set) var hoverSession: UInt64 = 1
     var commentsOpen = false
     /// 内嵌网页登录窗口打开时，点击面板外不收起。
     var webLoginActive = false

@@ -303,6 +303,10 @@ struct VideoLayer: NSViewRepresentable {
 
         required init?(coder: NSCoder) { fatalError() }
 
+        /// 视频层只负责显示，不参与点击：AppKit 子视图会抢在其上方的 SwiftUI 按钮之前接到点击，
+        /// 导致刷到视频后点赞 / 收藏「点不动」。
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
         override func layout() {
             super.layout()
             CATransaction.begin()

@@ -102,6 +102,7 @@ final class FeedController {
     }
 
     func setInteract(_ card: FeedCard, kind: String, on: Bool) async {
+        AppLog.info("interact", ["key": card.key, "kind": kind, "on": on, "video": card.isVideo])
         guard let i = cards.firstIndex(where: { $0.key == card.key }) else { return }
         if kind == "like" { cards[i].liked = on } else { cards[i].collected = on }
         do {
