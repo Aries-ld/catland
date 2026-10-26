@@ -13,7 +13,9 @@
     "test": "vitest run",
     "smoke": "node scripts/smoke.ts",
     "smoke:accounts": "node scripts/smoke-accounts.ts",
-    "smoke:feed": "node scripts/smoke-feed.ts"
+    "smoke:feed": "node scripts/smoke-feed.ts",
+    "smoke:rpc": "node scripts/smoke-rpc.ts",
+    "start": "node src/main.ts"
   },
   "dependencies": {
     "catbus-cli": "0.2.1"

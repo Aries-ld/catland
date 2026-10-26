@@ -50,6 +50,7 @@ cd apps/sidecar && npm run typecheck && npm test   # 每次改动后必跑
 npm run smoke                                       # 真机只读冒烟，日志在 ~/Library/Logs/catland/sidecar.log
 npm run smoke:accounts [platform]                   # 账号面板 + 体检 + 扫码取到二维码后立即取消
 npm run smoke:feed [条数] [停留ms]                   # 混排刷 N 条：首屏、划动等待、媒体可达性
+npm run smoke:rpc                                   # 以子进程启动 sidecar，经 stdio RPC 走全流程（临时数据目录）
 
 
 catbus auth list                                  # 已登录的平台
