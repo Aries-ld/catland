@@ -20,6 +20,13 @@ struct FeedView: View {
                         .offset(y: CGFloat(entry.offset) * geo.size.height)
                         .zIndex(entry.offset == 0 ? 1 : 0)
                 }
+                if state.commentsOpen {
+                    // 点评论区以外的地方收起评论（抖音式），不必非点关闭按钮。
+                    Color.black.opacity(0.001)
+                        .contentShape(Rectangle())
+                        .onTapGesture { withAnimation(.spring(response: 0.35, dampingFraction: 0.88)) { state.commentsOpen = false } }
+                        .zIndex(1.5)
+                }
                 if state.commentsOpen, let c = feed.current {
                     CommentsSheet(state: state, card: c)
                         .frame(height: geo.size.height * 0.68)
