@@ -21,6 +21,7 @@ struct CommentsSheet: View {
                 Spacer()
                 Button { withAnimation(.spring(response: 0.35, dampingFraction: 0.88)) { state.commentsOpen = false } } label: {
                     Image(systemName: "xmark").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+                        .frame(width: 28, height: 28).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }

@@ -73,12 +73,13 @@ struct CollapsedView: View {
         return CatDen(minX: left, maxX: left + n.notchSize.width, bottom: n.notchSize.height)
     }
 
-    private var bubble: String? {
-        guard state.hovering else { return nil }
-        let action = state.connectedContentPlatforms.isEmpty ? "点我连接平台" : "点我开刷"
-        guard let w = state.weather else { return action }
-        let temp = w.temperature.map { "\(Int($0.rounded()))°" } ?? ""
-        return "\(action) · \(temp)\(IslandScene.weatherName(w.condition))"
+    /// 悬停时轮播的几句话：开刷 + 天气、距周末、距节日的鼓励。
+    private var bubbles: [String] {
+        guard state.hovering else { return [] }
+        let env = state.sceneEnv(now: Date())
+        let weather = state.weather.map { w in (w.temperature.map { "\(Int($0.rounded()))°" } ?? "") + IslandScene.weatherName(w.condition) }
+        return RestDays.messages(now: env.date, region: RestDays.region(for: state.location), weather: weather,
+                                 connected: !state.connectedContentPlatforms.isEmpty)
     }
 
     var body: some View {
@@ -88,7 +89,7 @@ struct CollapsedView: View {
                      hiddenWidth: state.notch.hasNotch && state.notch.shelf == 0 ? state.notch.notchSize.width : 0,
                      excited: state.hovering,
                      den: denRect,
-                     bubble: bubble)
+                     bubbles: bubbles)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

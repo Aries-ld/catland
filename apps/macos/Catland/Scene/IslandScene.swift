@@ -44,9 +44,16 @@ struct IslandRenderer {
     var cols: Int { Int(size.width / p) }
     var rows: Int { Int(size.height / p) }
     var floorTop: Int { rows - IslandScene.floorRows }
-    /// 城市地平线固定在收起态的位置：悬停变高时，多出来的部分露出海湾和岸边的树，而不是一圈黑边。
+    /// 城市地平线贴着地面（中间隔一条 3 行的海湾）；悬停变高时，楼群按比例长高，
+    /// 看起来是「窗变大、看到更多天际线」，而不是露出一大片空水面。
     var collapsedRows: Int { Int((notch.collapsedSize.height / p).rounded(.down)) }
-    var cityBase: Int { min(floorTop - 2, collapsedRows - IslandScene.floorRows - 2) }
+    var cityBase: Int { floorTop - 3 }
+    /// 楼高缩放：当前可用高度 / 收起态可用高度。
+    var heightScale: Double {
+        let collapsedSpan = collapsedRows - IslandScene.floorRows - 3 - skyTop
+        return min(2.4, max(1, Double(cityBase - skyTop) / Double(max(1, collapsedSpan))))
+    }
+    private func tall(_ h: Int) -> Int { Int((Double(h) * heightScale).rounded()) }
     /// 物理刘海在画布里占的列与行（看不见的区域）。
     var notchCols: ClosedRange<Int> {
         let w = Int((notch.notchSize.width / p).rounded())
@@ -95,15 +102,137 @@ struct IslandRenderer {
         drawFarCity(sky)
         drawNearCity()
         drawWater(sky)
+        drawOutdoorEggs()
         drawTrees()
+        drawStreetLamps()
         drawMetro()
         drawSeasonParticles()
         drawWeather()
         drawFrame()
         drawFrost()
+        drawSeasonOrnament()
         drawCeiling()
         drawHolidayDecor()
         drawFloor()
+        drawIndoorEggs()
+    }
+
+    // MARK: - 随机彩蛋
+
+    /// 每天按日期「抽签」：工作日约 45% 的天有一个彩蛋，周末约 80% 的天有一到两个；只在符合季节的池子里抽，
+    /// 真正出现还要看当下的天气和时间（比如纸船只在下雨时漂、流星只在晴朗的夜里划过）。
+    enum Egg: String, CaseIterable {
+        case paperBoat, rainbow, kite, balloon, shootingStar, snowman, coffee, watermelon, leafPile, ufo
+
+        func fits(_ s: SceneSeason, weekend: Bool) -> Bool {
+            switch self {
+            case .rainbow: return [.spring, .summer, .tropical].contains(s)
+            case .kite: return [.spring, .autumn].contains(s)
+            case .balloon: return weekend && s != .winter
+            case .snowman: return s == .winter
+            case .coffee: return !weekend
+            case .watermelon: return [.summer, .tropical].contains(s)
+            case .leafPile: return s == .autumn
+            case .paperBoat, .shootingStar, .ufo: return true
+            }
+        }
+    }
+
+    nonisolated(unsafe) static var forcedEgg: Egg?
+
+    private var todaysEggs: [Egg] {
+        if let e = Self.forcedEgg { return [e] }
+        let cal = Calendar.current
+        let day = cal.ordinality(of: .day, in: .era, for: env.date) ?? 0
+        let weekday = cal.component(.weekday, from: env.date)
+        let weekend = weekday == 1 || weekday == 7
+        var rng = SeededRandom(seed: UInt64(day) &* 2654435761)
+        guard Double(rng.next() % 1000) / 1000 < (weekend ? 0.8 : 0.45) else { return [] }
+        var pool = Egg.allCases.filter { $0.fits(season, weekend: weekend) }
+        if Double(rng.next() % 1000) / 1000 > 0.08 { pool.removeAll { $0 == .ufo } } // UFO 很稀有
+        var out: [Egg] = []
+        for _ in 0..<(weekend ? 2 : 1) where !pool.isEmpty {
+            out.append(pool.remove(at: Int(rng.next() % UInt64(pool.count))))
+        }
+        return out
+    }
+
+    private var hour: Double {
+        let c = Calendar.current
+        return Double(c.component(.hour, from: env.date)) + Double(c.component(.minute, from: env.date)) / 60
+    }
+
+    /// 窗外的彩蛋：纸船、彩虹、风筝、热气球、流星、UFO。
+    private func drawOutdoorEggs() {
+        let wingL = notchRows > 0 ? max(4, notchCols.lowerBound / 2) : cols / 4
+        let wingR = notchRows > 0 ? min(cols - 4, notchCols.upperBound + (cols - notchCols.upperBound) / 2) : cols * 3 / 4
+        for egg in todaysEggs {
+            switch egg {
+            case .paperBoat where raining:
+                let x = Int((t * 1.2).truncatingRemainder(dividingBy: Double(cols + 10))) - 5, y = cityBase + 1
+                let bob = Int(t * 2) % 2
+                fill(x, y + bob, 5, 1, Color.white.opacity(0.9)); fill(x + 1, y + 1 + bob, 3, 1, Color(white: 0.8)); fill(x + 2, y - 1 + bob, 1, 1, Color.white)
+            case .rainbow where dark < 0.3 && ["clear", "partly"].contains(cond) && hour >= 14 && hour <= 18.5:
+                let colors: [UInt32] = [0xFF5D5D, 0xFFA24B, 0xFFE15B, 0x6FD16F, 0x5DA9FF, 0x9B7BFF]
+                let cx = wingL, cy = cityBase, r0 = min(12, cityBase - skyTop - 2)
+                for (i, hex) in colors.enumerated() {
+                    let r = Double(r0 - i)
+                    for a in stride(from: 0.0, through: Double.pi, by: 0.06) {
+                        fill(cx + Int((cos(a) * r).rounded()), cy - Int((sin(a) * r).rounded()), 1, 1, rgb(hex).color.opacity(0.45))
+                    }
+                }
+            case .kite where dark < 0.5 && !raining:
+                let kx = wingR + Int((sin(t * 0.8) * 2).rounded()), ky = skyTop + 3 + Int((sin(t * 1.3) * 1).rounded())
+                fill(kx, ky - 1, 1, 1, rgb(0xFF5D5D).color); fill(kx - 1, ky, 3, 1, rgb(0xFFE15B).color); fill(kx, ky + 1, 1, 1, rgb(0xFF5D5D).color)
+                for k in 1...4 { fill(kx + Int((sin(t * 3 + Double(k)) * 1).rounded()), ky + 1 + k, 1, 1, rgb(0x5DA9FF).color.opacity(0.8)) }
+                for k in 1..<min(10, cityBase - ky) { fill(kx - k / 2, ky + 2 + k, 1, 1, Color.white.opacity(0.25)) }
+            case .balloon where dark < 0.5 && ["clear", "partly"].contains(cond):
+                let bx = Int((t * 0.5).truncatingRemainder(dividingBy: Double(cols + 12))) - 6, by = skyTop + 3
+                let stripes: [UInt32] = [0xFF6B6B, 0xFFD84A, 0x5DA9FF]
+                for (i, hex) in stripes.enumerated() { fill(bx + i * 2 - 1, by, 2, 4, rgb(hex).color) }
+                fill(bx, by - 1, 3, 1, rgb(0xFF6B6B).color); fill(bx + 1, by + 4, 1, 1, Color(white: 0.4)); fill(bx, by + 5, 3, 1, rgb(0x8A5A2B).color)
+            case .shootingStar where dark > 0.7 && ["clear", "partly"].contains(cond):
+                let c = t.truncatingRemainder(dividingBy: 25)
+                if c < 0.8 {
+                    let k = c / 0.8
+                    let sx = wingR + 6 - Int(k * 14), sy = skyTop + 1 + Int(k * 6)
+                    for j in 0..<4 { fill(sx + j, sy - j / 2, 1, 1, Color.white.opacity(1 - Double(j) * 0.22)) }
+                }
+            case .ufo where dark > 0.6:
+                let ux = wingL + Int((sin(t * 0.6) * 3).rounded()), uy = skyTop + 3
+                fill(ux - 3, uy, 7, 1, Color(white: 0.7)); fill(ux - 1, uy - 1, 3, 1, Color(red: 0.6, green: 0.9, blue: 1))
+                for (i, dx) in [-2, 0, 2].enumerated() { fill(ux + dx, uy + 1, 1, 1, (Int(t * 3) + i) % 2 == 0 ? Color.yellow : Color.red) }
+                if Int(t / 6) % 2 == 0 { fill(ux - 1, uy + 2, 3, max(0, cityBase - uy - 2), Color(red: 0.7, green: 1, blue: 0.8).opacity(0.18)) }
+            default: break
+            }
+        }
+    }
+
+    /// 室内地面上的彩蛋：冒热气的咖啡（工作日上午）、西瓜（夏天午后）、雪人（下雪）、落叶堆（秋天）。
+    private func drawIndoorEggs() {
+        let y = floorTop
+        let leftX = 3, rightX = cols - 10
+        for egg in todaysEggs {
+            switch egg {
+            case .coffee where hour >= 8 && hour < 11.5:
+                fill(leftX, y - 3, 3, 3, Color.white); fill(leftX + 3, y - 2, 1, 1, Color.white); fill(leftX, y - 3, 3, 1, rgb(0x6B4226).color)
+                for k in 0..<3 {
+                    let ph = (t * 0.8 + Double(k) * 0.33).truncatingRemainder(dividingBy: 1)
+                    fill(leftX + 1 + Int((sin(t * 2 + Double(k)) * 1).rounded()), y - 4 - Int(ph * 4), 1, 1, Color.white.opacity(0.5 * (1 - ph)))
+                }
+            case .watermelon where hour >= 12 && hour < 19:
+                fill(rightX, y - 1, 6, 1, rgb(0x3F9B4A).color); fill(rightX + 1, y - 2, 4, 1, rgb(0xFF5D6C).color); fill(rightX + 2, y - 3, 2, 1, rgb(0xFF5D6C).color)
+                fill(rightX + 2, y - 2, 1, 1, .black); fill(rightX + 4, y - 2, 1, 1, .black)
+            case .snowman where cond == "snow" || cond == "sleet":
+                fill(rightX, y - 3, 4, 3, Color.white); fill(rightX + 1, y - 5, 2, 2, Color.white)
+                fill(rightX + 1, y - 5, 1, 1, .black); fill(rightX + 3, y - 4, 1, 1, rgb(0xFF8A2A).color); fill(rightX, y - 6, 4, 1, rgb(0xC93A2E).color)
+            case .leafPile:
+                let colors: [UInt32] = [0xE38A2F, 0xC9472E, 0xE8B83A]
+                for i in 0..<9 { fill(rightX - 2 + i, y - 1 - (i > 1 && i < 7 ? 1 : 0), 1, 1, rgb(colors[i % 3]).color) }
+                fill(rightX + 1, y - 3, 3, 1, rgb(0xE38A2F).color)
+            default: break
+            }
+        }
     }
 
     /// 季节给天色加一点倾向：冬天偏冷偏淡、秋天偏暖金、春天带一丝粉。
@@ -232,7 +361,7 @@ struct IslandRenderer {
         var rng = SeededRandom(seed: 2026)
         var x = -4 + parallax(1)
         while x < cols + 4 {
-            let w = 3 + Int(rng.next() % 5), h = 5 + Int(rng.next() % 9)
+            let w = 3 + Int(rng.next() % 5), h = tall(5 + Int(rng.next() % 9))
             fill(x, base - h, w, h, tone.color)
             if dark > 0.5 {
                 for wy in stride(from: base - h + 1, to: base - 1, by: 2) {
@@ -260,7 +389,7 @@ struct IslandRenderer {
         let flyerX = rightWing.lowerBound + rightWing.count / 2 + off
         let reserved: [ClosedRange<Int>] = skyline == .generic ? [] : [(mbsX - 1)...(mbsX + 13), (flyerX - 9)...(flyerX + 9)]
         while x < cols + 2 {
-            let w = 3 + Int(rng.next() % 4), h = 4 + Int(rng.next() % 8)
+            let w = 3 + Int(rng.next() % 4), h = tall(4 + Int(rng.next() % 8))
             let skip = reserved.contains { $0.overlaps(x...(x + w)) }
             if !skip { building(x: x, w: w, h: h, base: base, body: body, shade: shade, windowDay: windowDay, rng: &rng) }
             x += w + Int(rng.next() % 3)
@@ -272,7 +401,7 @@ struct IslandRenderer {
         guard skyline == .singapore else { return }
 
         // 金沙酒店（左翼）：三栋塔楼 + 顶上的「船」。
-        let mbsH = min(14, base - skyTop - 3)
+        let mbsH = min(tall(14), base - skyTop - 3)
         for i in 0..<3 {
             let tx = mbsX + i * 4
             fill(tx, base - mbsH, 3, mbsH, body.color); fill(tx + 2, base - mbsH, 1, mbsH, shade.color)
@@ -283,7 +412,7 @@ struct IslandRenderer {
         if dark > 0.5 { fill(mbsX, base - mbsH - 1, 12, 1, Color(red: 0.6, green: 0.8, blue: 1).opacity(0.6 * dark)) }
 
         // 摩天轮（右翼）：像素圆环 + 辐条 + 支架；夜里灯光沿圆环流动变色。
-        let r = min(6, max(3, (base - skyTop - 4) / 3))
+        let r = min(tall(6), max(3, (base - skyTop - 4) / 3))
         let cy = base - r - 3
         let ring = rgb(0xE8EDF2).mix(rgb(0x6A7798), dark * 0.6).color
         let points = ringPoints(r)
@@ -305,7 +434,7 @@ struct IslandRenderer {
     private func drawShanghai(left: Int, right: Int, base: Int, body: SkyPalette.RGB, shade: SkyPalette.RGB, windowDay: SkyPalette.RGB) {
         let pink = rgb(0xE0607E).mix(rgb(0x7A2E52), dark * 0.5)
         let glow = Color(red: 1, green: 0.45, blue: 0.7).opacity(0.85)
-        let h = min(18, base - skyTop - 2)
+        let h = min(tall(18), base - skyTop - 2)
         // 东方明珠
         let cx = left + 6
         fill(cx - 2, base - 3, 1, 3, shade.color); fill(cx + 2, base - 3, 1, 3, shade.color)  // 底座斜撑
@@ -322,7 +451,7 @@ struct IslandRenderer {
         if dark > 0.5, Int(t * 2) % 2 == 0 { fill(cx, base - h - 2, 1, 1, .red) }
         // 上海中心：越往上越细，侧面一道扭转的亮边
         let sx = right - 3
-        let th = min(20, base - skyTop - 1)
+        let th = min(tall(20), base - skyTop - 1)
         for k in 0..<th {
             let w = k < th / 3 ? 5 : (k < th * 2 / 3 ? 4 : 3)
             let y = base - 1 - k
@@ -394,7 +523,8 @@ struct IslandRenderer {
         let y = cityBase
         var rng = SeededRandom(seed: 404)
         var x = 2 + parallax(4)
-        let night = dark * 0.65
+        // 夜里不压太暗：岸边有路灯照着，季节颜色依然看得出来。
+        let night = dark * 0.3
         let windSway = cond == "windy" ? Int((sin(t * 3) * 1).rounded()) : 0
         while x < cols {
             let w = 3 + Int(rng.next() % 2)
@@ -421,6 +551,67 @@ struct IslandRenderer {
         }
     }
 
+    /// 岸边路灯：夜里亮起暖光，照亮附近的树。
+    private func drawStreetLamps() {
+        let y = cityBase
+        var x = 9 + parallax(4)
+        while x < cols {
+            fill(x, y - 3, 1, 3, Color(red: 0.25, green: 0.26, blue: 0.3))
+            fill(x - 1, y - 4, 3, 1, Color(red: 0.3, green: 0.3, blue: 0.34))
+            if dark > 0.35 {
+                fill(x, y - 4, 1, 1, Color(red: 1, green: 0.88, blue: 0.6))
+                fill(x - 3, y - 6, 7, 6, Color(red: 1, green: 0.8, blue: 0.45).opacity(0.16 * dark))
+                fill(x - 1, y - 5, 3, 4, Color(red: 1, green: 0.8, blue: 0.45).opacity(0.14 * dark))
+            }
+            x += 18
+        }
+    }
+
+    /// 窗角的季节装饰（室内，白天夜里都看得见）：春樱枝、夏常春藤 + 风铃、秋枫枝、冬冰凌、热带龟背竹叶。
+    private func drawSeasonOrnament() {
+        let lit = 1 - dark * 0.25
+        func c(_ hex: UInt32) -> Color { rgb(hex).mix(rgb(0x1A1A24), 1 - lit).color }
+        let right = cols - 1
+        // 镜像绘制：左上角 (x) 与右上角 (right - x)
+        func both(_ x: Int, _ y: Int, _ w: Int = 1, _ h: Int = 1, _ col: Color) { fill(x, y, w, h, col); fill(right - x - w + 1, y, w, h, col) }
+        let sway = Int((sin(t * 1.2) * 0.6).rounded())
+        switch season {
+        case .spring, .autumn:
+            let branch = c(0x6B4A36)
+            for k in 0..<10 { both(k, k / 2, 1, 1, branch) }
+            both(4, 3, 1, 2, branch); both(7, 4, 1, 2, branch)
+            let blooms: [(Int, Int)] = [(2, 2), (5, 1), (8, 3), (4, 5), (7, 6), (10, 5), (1, 0)]
+            let palette: [UInt32] = season == .spring ? [0xF7A8C4, 0xFFD1E0, 0xF48FB1] : [0xD9452B, 0xE8862F, 0xC93A2E]
+            for (i, b) in blooms.enumerated() {
+                let col = c(palette[i % palette.count])
+                both(b.0 + (i % 2 == 0 ? sway : 0), b.1, 2, 2, col)
+                if season == .spring { both(b.0 + 1, b.1, 1, 1, c(0xFFF2F6)) }
+            }
+        case .summer:
+            let vine = c(0x4FA057), dark2 = c(0x2F7A3A)
+            for k in 0..<9 { both((k % 2) + (k > 4 ? sway : 0), 1 + k, 2, 1, k % 3 == 0 ? dark2 : vine) }
+            both(0, 0, 6, 1, vine)
+            // 右上角的风铃
+            let bx = right - 8 + sway
+            fill(right - 8, 1, 1, 3, c(0xBFC7D5))
+            fill(bx - 1, 4, 3, 2, Color(red: 0.6, green: 0.85, blue: 1).opacity(0.9))
+            fill(bx, 6, 1, 2, c(0xE04B5A))
+        case .winter:
+            both(0, 0, 14, 1, Color.white.opacity(0.85))
+            for (i, x) in stride(from: 1, to: 14, by: 3).enumerated() {
+                let len = 1 + (i * 7 + 3) % 3
+                both(x, 1, 1, len, Color(red: 0.85, green: 0.94, blue: 1).opacity(0.85))
+                let drip = (Int(t * 0.7) + i) % 9 == 0
+                if drip { both(x, 1 + len + 1, 1, 1, Color(red: 0.8, green: 0.92, blue: 1).opacity(0.7)) }
+            }
+        case .tropical:
+            let leaf = c(0x2E8B57), vein = c(0x1F6B40)
+            for k in 0..<7 { both(0, k, 7 - k, 1, leaf) }
+            for k in 0..<6 { both(k, k, 1, 1, vein) }
+            both(2, 1, 1, 1, .clear); both(4, 2, 1, 1, c(0x4FB37A))
+        }
+    }
+
     /// 季节粒子：春天飘樱花瓣、秋天落叶（有风时更多更斜）、夏夜萤火虫。
     private func drawSeasonParticles() {
         let windy = cond == "windy"
@@ -437,7 +628,7 @@ struct IslandRenderer {
                 let x0 = Int(rng.next() % UInt64(cols + 20))
                 let x = x0 - Int(k * (windy ? 60 : 18)) + Int((sin(t * 2 + Double(x0)) * 1.5).rounded())
                 let y = skyTop + Int(k * Double(floorTop - skyTop))
-                fill(x, y, 1, 1, rgb(colors[Int(rng.next() % UInt64(colors.count))]).mix(rgb(0x1A1A24), dark * 0.5).color)
+                fill(x, y, 1, 1, rgb(colors[Int(rng.next() % UInt64(colors.count))]).mix(rgb(0x1A1A24), dark * 0.2).color)
             }
         case .summer, .tropical:
             guard dark > 0.6, !raining else { return }

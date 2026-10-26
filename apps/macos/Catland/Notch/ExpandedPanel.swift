@@ -36,6 +36,8 @@ struct ExpandedPanel: View {
                             .foregroundStyle(s == .commerce ? .white.opacity(0.3) : (state.section == s ? .white : .white.opacity(0.55)))
                         Capsule().fill(state.section == s ? Color.white : .clear).frame(width: 14, height: 2)
                     }
+                    .padding(.horizontal, 4)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
@@ -67,8 +69,9 @@ struct ExpandedPanel: View {
             Image(systemName: name)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(active ? .white : .white.opacity(0.6))
-                .frame(width: 26, height: 26)
+                .frame(width: 28, height: 28)
                 .background(Circle().fill(.white.opacity(active ? 0.16 : 0)))
+                .contentShape(Circle())
                 .overlay(alignment: .topTrailing) {
                     if badge > 0 {
                         Text("\(badge)").font(.system(size: 8, weight: .bold)).padding(2).background(Circle().fill(.green)).offset(x: 3, y: -3)

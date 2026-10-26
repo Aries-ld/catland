@@ -83,6 +83,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     UserDefaults.standard.set(m == "den" || m == "both", forKey: NotchGeometry.denKey)
                     self.screenChanged()
                 case "den": CatDirector.shared.forceDen = true
+                case let c where c.hasPrefix("egg:"):
+                    IslandRenderer.forcedEgg = IslandRenderer.Egg(rawValue: String(c.dropFirst(4)))
                 case let c where c.hasPrefix("date:"):
                     // date:2026-12-24T21:00 覆盖日期与时间（看季节 / 节日）；date:off 恢复
                     let f = ISO8601DateFormatter(); f.formatOptions = [.withFullDate, .withTime, .withColonSeparatorInTime]; f.timeZone = .current

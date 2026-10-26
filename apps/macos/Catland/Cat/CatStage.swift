@@ -24,8 +24,8 @@ struct CatStage: View {
     /// 悬停 / 点开时让猫开心地蹦一下。
     var excited = false
     var den: CatDen? = nil
-    /// 悬停时某只猫头顶冒出的像素对话气泡（如「点我开刷 · 21°晴」）。
-    var bubble: String? = nil
+    /// 悬停时某只猫头顶冒出的像素对话气泡，多句时每 3.5 秒轮换一句（第一句通常是「点我开刷 · 21°晴」）。
+    var bubbles: [String] = []
 
     @Environment(\.displayScale) private var displayScale
 
@@ -46,7 +46,10 @@ struct CatStage: View {
                     let hidden = den.map { snap.x > $0.minX && snap.x < $0.maxX && catTop - 14 * px < $0.bottom } ?? false
                     if speaker == nil, snap.opacity > 0.9, snap.lift == 0, !hidden { speaker = snap }
                 }
-                if let text = bubble, let s = speaker { drawBubble(text, above: s, in: &ctx, size: size, px: px) }
+                if !bubbles.isEmpty, let s = speaker {
+                    let text = bubbles[Int(t / 3.5) % bubbles.count]
+                    drawBubble(text, above: s, in: &ctx, size: size, px: px)
+                }
             }
         }
         .allowsHitTesting(false)

@@ -125,3 +125,33 @@ final class CatDenTests: XCTestCase {
         XCTAssertLessThanOrEqual(snap.x, den.maxX)
     }
 }
+
+final class RestDaysTests: XCTestCase {
+    private func day(_ s: String) -> Date {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd HH:mm"; f.timeZone = .current
+        return f.date(from: s)!
+    }
+
+    func testNextHolidayChina() {
+        let (h, days) = RestDays.nextHoliday(from: day("2026-10-26 15:00"), region: .china)!
+        XCTAssertEqual(h.name, "万圣节")
+        XCTAssertEqual(days, 5)
+        let (h2, d2) = RestDays.nextHoliday(from: day("2026-09-20 10:00"), region: .china)!
+        XCTAssertEqual(h2.name, "中秋")
+        XCTAssertEqual(d2, 5)
+    }
+
+    func testWeekendMessages() {
+        let mon = RestDays.messages(now: day("2026-10-26 15:00"), region: .china, weather: "21°晴", connected: true)
+        XCTAssertEqual(mon.first, "点我开刷 · 21°晴")
+        XCTAssertTrue(mon.contains("周一而已，摸会儿鱼回回血"))
+        XCTAssertTrue(mon.contains { $0.contains("万圣节") })
+        let wed = RestDays.messages(now: day("2026-10-28 15:00"), region: .china, weather: nil, connected: true)
+        XCTAssertTrue(wed.contains("距周末还有 3 天，加油打工人"))
+        let fri = RestDays.messages(now: day("2026-10-30 18:30"), region: .china, weather: nil, connected: false)
+        XCTAssertEqual(fri.first, "点我连接平台")
+        XCTAssertTrue(fri.contains("下班就是周末！冲！"))
+        let late = RestDays.messages(now: day("2026-10-28 23:40"), region: .other, weather: nil, connected: true)
+        XCTAssertTrue(late.contains("夜深了，刷完这条就睡吧"))
+    }
+}

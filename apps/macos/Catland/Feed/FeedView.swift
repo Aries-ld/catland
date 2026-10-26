@@ -70,6 +70,11 @@ struct CardView: View {
                     .clipped()
             }
             media
+            // 点击层只覆盖画面：双击点赞、单击暂停。放在信息层下面，不会挡住右侧按钮的点击。
+            Color.clear
+                .contentShape(Rectangle())
+                .gesture(TapGesture(count: 2).onEnded { doubleTapLike() }
+                    .exclusively(before: TapGesture().onEnded { if card.isVideo && isCurrent { feed.togglePause() } }))
             if heartBurst {
                 Image(systemName: "heart.fill").font(.system(size: 90)).foregroundStyle(.red).shadow(radius: 10)
                     .transition(.scale(scale: 0.4).combined(with: .opacity))
@@ -79,9 +84,6 @@ struct CardView: View {
             }
             overlayInfo
         }
-        .contentShape(Rectangle())
-        .onTapGesture(count: 2) { doubleTapLike() }
-        .onTapGesture { if card.isVideo && isCurrent { feed.togglePause() } }
     }
 
     @ViewBuilder private var media: some View {
@@ -162,10 +164,14 @@ struct ActionButton: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 3) {
-                Image(systemName: icon).font(.system(size: 20, weight: .medium)).foregroundStyle(tint).shadow(color: .black.opacity(0.55), radius: 4).shadow(color: .black.opacity(0.25), radius: 1)
+                Image(systemName: icon).font(.system(size: 20, weight: .medium)).foregroundStyle(tint)
+                    .symbolEffect(.bounce, value: icon)
+                    .shadow(color: .black.opacity(0.55), radius: 4).shadow(color: .black.opacity(0.25), radius: 1)
                 if let c = count { Text(Format.count(c)).font(.system(size: 10, weight: .medium)).foregroundStyle(.white.opacity(0.9)) }
             }
-            .frame(width: 40)
+            .frame(width: 44, height: 44)
+            // 整块区域都可点：否则只有图标的实色像素响应，点到空隙会「没反应」。
+            .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
     }
