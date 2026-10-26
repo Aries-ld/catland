@@ -124,6 +124,28 @@ describe('FeedMixer', () => {
     m.stop()
   })
 
+  it('均匀混排：快慢不同的三个平台长期占比接近均分，且不连续出现同一平台', async () => {
+    const fast = new FakeAdapter('bilibili', 10)
+    const mid = new FakeAdapter('xhs', 10)
+    mid.resolveDelayMs = 4
+    const slow = new FakeAdapter('x', 10)
+    slow.resolveDelayMs = 10
+    const m = mixer()
+    m.setSources([fast, mid, slow])
+    const seq: string[] = []
+    for (let i = 0; i < 30; i++) {
+      await sleep(15)
+      seq.push(...(await m.next(1)).map((c) => c.platform))
+    }
+    const counts = seq.reduce<Record<string, number>>((acc, p) => ({ ...acc, [p]: (acc[p] ?? 0) + 1 }), {})
+    for (const p of ['bilibili', 'xhs', 'x']) {
+      expect(counts[p]).toBeGreaterThanOrEqual(8)
+      expect(counts[p]).toBeLessThanOrEqual(12)
+    }
+    for (let i = 1; i < seq.length; i++) expect(seq[i]).not.toBe(seq[i - 1])
+    m.stop()
+  })
+
   it('去重：跨页重复、已看过的内容不再出现；纯文字被过滤', async () => {
     const a = new FakeAdapter('x')
     a.pageIds = (p) => (p === 0 ? ['1', '2', 't1', '3'] : ['2', '3', '4', 'seen', `${p}0`])

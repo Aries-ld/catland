@@ -70,8 +70,8 @@ interface Source {
 }
 
 const ITEM_MEMORY = 300
-/** 计算平台均衡时回看的最近下发条数。 */
-const RECENT_WINDOW = 6
+/** 计算平台均衡时回看的最近下发条数：窗口越长，各平台长期占比越接近均分。 */
+const RECENT_WINDOW = 24
 
 export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }> {
   private readonly log: Logger
@@ -95,11 +95,11 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
     this.now = opts.now ?? Date.now
     this.o = {
       readyAhead: opts.readyAhead ?? 6,
-      readyPerSource: opts.readyPerSource ?? 3,
+      readyPerSource: opts.readyPerSource ?? 4,
       resolveConcurrency: opts.resolveConcurrency ?? 3,
       feedMinIntervalMs: opts.feedMinIntervalMs ?? 2_000,
       resolveMinIntervalMs: opts.resolveMinIntervalMs ?? 250,
-      maxConsecutive: opts.maxConsecutive ?? 2,
+      maxConsecutive: opts.maxConsecutive ?? 1,
       riskCooldownMs: opts.riskCooldownMs ?? 10 * 60_000,
       backoffBaseMs: opts.backoffBaseMs ?? 5_000,
       backoffMaxMs: opts.backoffMaxMs ?? 2 * 60_000,
@@ -313,28 +313,32 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
     return n
   }
 
-  /** 优先最近出现最少的平台（同分取先就绪的），且同一平台不连续超过 maxConsecutive 次。 */
+  /**
+   * 均匀混排：在最近 RECENT_WINDOW 条里出现次数最少的平台优先（同分取最久没出现的，再同分取先就绪的），
+   * 且同一平台不连续超过 maxConsecutive 次（只剩一个平台有货时例外）。长期下来各平台占比接近均分。
+   */
   private pickDiverse(): number {
     const tail = this.recent.slice(-this.o.maxConsecutive)
     const blocked = tail.length === this.o.maxConsecutive && tail.every((p) => p === tail[0]) ? tail[0] : null
     const window = this.recent.slice(-RECENT_WINDOW)
     const seenCount = (p: string) => window.filter((x) => x === p).length
+    const lastSeen = (p: string) => window.lastIndexOf(p) // -1 = 窗口内没出现过
     let best = -1
-    let bestScore = Infinity
+    let bestScore: [number, number] = [Infinity, Infinity]
     const visited = new Set<string>()
     for (let i = 0; i < this.ready.length; i++) {
       const p = this.ready[i]!.platform
       if (p === blocked || visited.has(p)) continue
       visited.add(p)
-      const score = seenCount(p)
-      if (score < bestScore) [best, bestScore] = [i, score]
+      const score: [number, number] = [seenCount(p), lastSeen(p)]
+      if (score[0] < bestScore[0] || (score[0] === bestScore[0] && score[1] < bestScore[1])) [best, bestScore] = [i, score]
     }
     return best < 0 ? 0 : best
   }
 
   private markDelivered(card: FeedCard): void {
     this.seen.add(card.key)
-    this.recent = [...this.recent, card.platform].slice(-10)
+    this.recent = [...this.recent, card.platform].slice(-RECENT_WINDOW)
     if (this.items.size > ITEM_MEMORY) this.items.delete(this.items.keys().next().value!)
   }
 

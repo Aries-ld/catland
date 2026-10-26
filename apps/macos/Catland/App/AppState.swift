@@ -152,7 +152,7 @@ final class AppState {
         switch method {
         case "app.ready", "accounts.changed":
             struct P: Decodable { let platforms: [PlatformState] }
-            if let p = try? dec.decode(P.self, from: params) { platforms = p.platforms }
+            if let p = try? dec.decode(P.self, from: params) { setPlatforms(p.platforms) }
             if method == "app.ready" { Task { await feed.prime() } }
         case "accounts.login":
             if let e = try? dec.decode(LoginEvent.self, from: params), qrLogin?.platform == e.platform {
@@ -171,8 +171,19 @@ final class AppState {
 
     // MARK: - 账号
 
+    /// 更新平台列表；新连上内容平台而刷刷页还空着时（比如第一次连接），立刻拉首屏，不用等用户手动划。
+    private func setPlatforms(_ list: [PlatformState]) {
+        let before = Set(connectedContentPlatforms.map(\.id))
+        platforms = list
+        let added = Set(connectedContentPlatforms.map(\.id)).subtracting(before)
+        if !added.isEmpty, feed.cards.isEmpty {
+            AppLog.info("first content source connected, priming feed", ["added": added.sorted().joined(separator: ",")])
+            Task { await feed.prime() }
+        }
+    }
+
     func refreshAccounts() async {
-        if let list: [PlatformState] = try? await sidecar.call("accounts.list") { platforms = list }
+        if let list: [PlatformState] = try? await sidecar.call("accounts.list") { setPlatforms(list) }
     }
 
     func loginQrcode(_ platform: String) async {
@@ -203,7 +214,7 @@ final class AppState {
 
     func logout(_ platform: String) async {
         do {
-            platforms = try await sidecar.call("accounts.logout", ["platform": platform])
+            setPlatforms(try await sidecar.call("accounts.logout", ["platform": platform]))
         } catch {
             showToast("退出失败：\(error.localizedDescription)")
         }

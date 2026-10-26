@@ -32,12 +32,15 @@ struct NotchRootView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .overlay(alignment: .top) {
             if let t = state.toast {
+                // 展开时浮在顶栏下方、收起时贴在刘海下方；原地淡入 + 轻微缩放，不从屏幕顶上「飞」下来。
                 Text(t)
                     .font(.system(size: 12, weight: .medium))
                     .padding(.horizontal, 12).padding(.vertical, 7)
                     .background(.ultraThinMaterial, in: Capsule())
-                    .padding(.top, size.height + 8)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .overlay(Capsule().stroke(.white.opacity(0.12), lineWidth: 0.5))
+                    .shadow(color: .black.opacity(0.35), radius: 8, y: 3)
+                    .padding(.top, state.expanded ? 58 : size.height + 8)
+                    .transition(.opacity.combined(with: .scale(scale: 0.92)))
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: state.toast)

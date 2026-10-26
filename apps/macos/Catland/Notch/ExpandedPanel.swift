@@ -89,7 +89,7 @@ struct ExpandedPanel: View {
             StatusView(text: "本地服务启动失败", detail: msg)
         case .ready:
             if state.connectedContentPlatforms.isEmpty && !state.platforms.isEmpty {
-                StatusView(text: "还没有连接任何平台", detail: "连接小红书、B 站、X 等账号后就能开刷", action: ("去连接", { state.overlay = .connections }))
+                StatusView(text: "还没有连接任何平台", detail: "连接小红书、B 站、X 等账号后就能开刷", action: ("连接平台", { state.overlay = .connections }))
             } else {
                 FeedView(state: state)
             }
@@ -108,7 +108,21 @@ struct StatusView: View {
             Text(text).font(.system(size: 14, weight: .semibold))
             if let d = detail { Text(d).font(.system(size: 12)).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal, 30) }
             if let a = action {
-                Button(a.0, action: a.1).buttonStyle(.borderedProminent).controlSize(.small)
+                Button(action: a.1) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus.circle.fill").font(.system(size: 14, weight: .semibold))
+                        Text(a.0).font(.system(size: 14, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 26).frame(height: 38)
+                    .background(Capsule().fill(LinearGradient(colors: [Color(red: 1, green: 0.48, blue: 0.35), Color(red: 1, green: 0.3, blue: 0.55)],
+                                                              startPoint: .leading, endPoint: .trailing)))
+                    .overlay(Capsule().stroke(.white.opacity(0.18), lineWidth: 0.5))
+                    .shadow(color: Color(red: 1, green: 0.35, blue: 0.45).opacity(0.45), radius: 10, y: 4)
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(PressStyle())
+                .padding(.top, 6)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

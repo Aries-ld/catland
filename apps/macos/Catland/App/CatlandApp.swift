@@ -83,6 +83,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     UserDefaults.standard.set(m == "den" || m == "both", forKey: NotchGeometry.denKey)
                     self.screenChanged()
                 case "den": CatDirector.shared.forceDen = true
+                case let c where c.hasPrefix("weblogin:"):
+                    if let p = self.state.platforms.first(where: { $0.id == String(c.dropFirst(9)) }) { WebLoginController.shared.open(state: self.state, platform: p) }
                 case let c where c.hasPrefix("egg:"):
                     let id = String(c.dropFirst(4)); Eggs.forced = id == "none" ? nil : id
                 case let c where c.hasPrefix("event:"):
