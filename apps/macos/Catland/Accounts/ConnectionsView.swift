@@ -100,18 +100,32 @@ struct QRLoginView: View {
                         ProgressView().controlSize(.small).tint(.black)
                     }
                 }
-                Text(message ?? "").font(.system(size: 11)).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(height: 30)
-                if platform == "xhs" {
-                    Button("扫码被风控？改用网页登录") {
-                        state.cancelQrLogin()
-                        if let p = state.platforms.first(where: { $0.id == "xhs" }) { WebLoginController.shared.open(state: state, platform: p) }
+                Text(message ?? "").font(.system(size: 11)).foregroundStyle(state.qrRiskBlocked ? .orange : .secondary)
+                    .multilineTextAlignment(.center).frame(width: 240).fixedSize(horizontal: false, vertical: true)
+                if state.qrRiskBlocked {
+                    // 被风控时把浏览器登录作为主操作：真实浏览器里扫码几乎不会被拦，登录后把登录态导入即可。
+                    Button { useBrowser() } label: {
+                        Label("改用浏览器登录（推荐）", systemImage: "safari")
+                            .font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
+                            .padding(.horizontal, 16).frame(height: 30)
+                            .background(Capsule().fill(Color.accentColor)).contentShape(Capsule())
                     }
-                    .buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(.blue)
+                    .buttonStyle(PressStyle())
+                } else {
+                    Button("扫不了或被拦？改用浏览器登录", action: useBrowser)
+                        .buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(.blue)
                 }
                 Button("取消") { state.cancelQrLogin() }.controlSize(.small)
             }
             .padding(22)
             .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color(white: 0.12)))
         }
+    }
+
+    private func useBrowser() {
+        state.cancelQrLogin()
+        guard let p = state.platforms.first(where: { $0.id == platform }) else { return }
+        WebLoginController.shared.open(state: state, platform: p, browserImport: true,
+                                       reason: state.qrRiskBlocked ? "\(PlatformBrand.shortName(platform))拦下了扫码登录。在浏览器里登录（真实浏览器几乎不会被拦），再把登录态导入进来。" : nil)
     }
 }

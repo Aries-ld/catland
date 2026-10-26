@@ -36,7 +36,8 @@ final class WebLoginController: NSObject, NSWindowDelegate, WKUIDelegate, WKNavi
     private let model = WebLoginModel()
     private var importHost: NSView?
 
-    func open(state: AppState, platform: PlatformState) {
+    /// browserImport：直接进入「在浏览器里登录后导入」并打开默认浏览器（扫码被风控时用）。
+    func open(state: AppState, platform: PlatformState, browserImport: Bool = false, reason: String? = nil) {
         close()
         self.state = state
         self.platform = platform
@@ -91,6 +92,10 @@ final class WebLoginController: NSObject, NSWindowDelegate, WKUIDelegate, WKNavi
 
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.submit(force: false) }
+        }
+        if browserImport {
+            switchToBrowser(reason: reason)
+            openInBrowser()
         }
     }
 

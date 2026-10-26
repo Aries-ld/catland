@@ -114,6 +114,8 @@ final class AppState {
     var notch = NotchGeometry(screenFrame: .zero, notchSize: CGSize(width: 180, height: 32), hasNotch: false)
     /// 扫码登录进行中：平台 → 二维码 PNG 与最新进度。
     var qrLogin: (platform: String, png: Data?, message: String?)?
+    /// 扫码登录被平台风控拦下（如抖音 2046「请前往 App 完成验证」）：引导改用浏览器登录后导入。
+    var qrRiskBlocked = false
     var toast: String?
     private var toastTask: Task<Void, Never>?
 
@@ -188,12 +190,17 @@ final class AppState {
 
     func loginQrcode(_ platform: String) async {
         qrLogin = (platform, nil, "正在获取二维码…")
+        qrRiskBlocked = false
         do {
             let _: Account = try await sidecar.call("accounts.loginQrcode", ["platform": platform])
             showToast("已连接 \(PlatformBrand.shortName(platform))")
             qrLogin = nil
         } catch let e as RPCError where e.appCode == "ABORTED" {
             qrLogin = nil
+        } catch let e as RPCError where e.appCode == "RISK_CONTROL" {
+            AppLog.warn("qr login blocked by risk control", ["platform": platform, "err": e.localizedDescription])
+            qrRiskBlocked = true
+            qrLogin?.message = "\(PlatformBrand.shortName(platform))这次拦下了扫码登录（平台风控）。别连续重试，改用浏览器登录更稳。"
         } catch {
             qrLogin?.message = "登录失败：\(error.localizedDescription)"
         }
