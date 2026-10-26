@@ -39,6 +39,8 @@
 - 设计决策记录在 `docs/decisions/`（ADR）。
 - sidecar 调 catbus 只经 `CatbusRunner`（`apps/sidecar/src/catbus/runner.ts`）：用随包的 `catbus-cli`（版本锁定），凭证经 stdin 传、不进 argv 和日志；stdout 只留给 RPC，日志只写文件。
 - 新依赖锁精确版本，且选发布满 7 天的版本。
+- 内容体验对标抖音 / 小红书（手感、布局、时延），指标与预加载策略见 `docs/decisions/0002-content-pipeline-and-preloading.md`；改动内容管线后跑 `npm run smoke:feed` 对照指标。
+- 媒体请求头按平台给（`MEDIA_HEADERS`），不要统一加 Referer：X 带错 Referer 会 403。
 
 ## 4. 常用命令
 
@@ -47,6 +49,7 @@
 cd apps/sidecar && npm run typecheck && npm test   # 每次改动后必跑
 npm run smoke                                       # 真机只读冒烟，日志在 ~/Library/Logs/catland/sidecar.log
 npm run smoke:accounts [platform]                   # 账号面板 + 体检 + 扫码取到二维码后立即取消
+npm run smoke:feed [条数] [停留ms]                   # 混排刷 N 条：首屏、划动等待、媒体可达性
 
 
 catbus auth list                                  # 已登录的平台
