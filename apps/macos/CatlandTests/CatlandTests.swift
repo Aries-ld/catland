@@ -85,3 +85,19 @@ final class PixelCatArtTests: XCTestCase {
         XCTAssertEqual(g.collapsedSize.height, h0 + NotchGeometry.shelfHeight)
     }
 }
+
+final class SceneClockTests: XCTestCase {
+    private func date(_ s: String) -> Date { ISO8601DateFormatter().date(from: s)! }
+
+    func testSingaporeSunAltitude() {
+        let noon = SceneClock.sun(at: date("2026-10-26T13:00:00+08:00"))   // 新加坡太阳正午约 12:50
+        let midnight = SceneClock.sun(at: date("2026-10-26T00:30:00+08:00"))
+        let sunrise = SceneClock.sun(at: date("2026-10-26T06:50:00+08:00"))
+        XCTAssertGreaterThan(noon.altitude, 70)
+        XCTAssertLessThan(midnight.altitude, -60)
+        XCTAssertEqual(sunrise.altitude, 0, accuracy: 4)
+        XCTAssertLessThan(sunrise.azimuth, 120) // 早上在东边
+        XCTAssertEqual(SceneClock.darkness(noon), 0)
+        XCTAssertEqual(SceneClock.darkness(midnight), 1)
+    }
+}

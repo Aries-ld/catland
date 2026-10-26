@@ -26,6 +26,9 @@ struct NotchGeometry: Equatable {
         return NotchGeometry(screenFrame: f, notchSize: CGSize(width: 180, height: 28), hasNotch: false, shelf: catwalkEnabled ? shelfHeight : 0)
     }
 
+    /// 悬停时面板下探的尺寸（与 NotchRootView 一致）。
+    static let hoverGrow = CGSize(width: 24, height: 28)
+
     /// 刘海两侧各留一小段「翅膀」给小猫散步；太宽会压住菜单栏项目。
     static let wing: CGFloat = 36
     var collapsedSize: CGSize { CGSize(width: notchSize.width + Self.wing * 2, height: notchSize.height + shelf) }
@@ -42,8 +45,6 @@ struct NotchGeometry: Equatable {
         return CGRect(x: screenFrame.midX - s.width / 2, y: screenFrame.maxY - s.height, width: s.width, height: s.height + 4)
     }
 
-    /// 悬停时面板下探的尺寸（与 NotchRootView 一致）。
-    static let hoverGrow = CGSize(width: 24, height: 28)
 }
 
 final class NotchPanel: NSPanel {

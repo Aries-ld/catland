@@ -12,7 +12,7 @@
 
 ### 1.1 已定决策（详见 `docs/decisions/0001-architecture-and-mvp-scope.md`）
 
-- **纯本地（红线）**：无自有服务器、无账号体系、无遥测；网络请求只发往用户连接的平台。sidecar 与 App 走 stdio，不监听端口；新增密钥存钥匙串。
+- **纯本地（红线）**：无自有服务器、无账号体系、无遥测；网络请求只发往用户连接的平台。唯一例外：猫咪场景的天气联动请求新加坡 NEA 开放数据（data.gov.sg，匿名 GET、不带用户信息、30 分钟缓存，设置里可关）。sidecar 与 App 走 stdio，不监听端口；新增密钥存钥匙串。
 - 技术栈：Swift 原生客户端（刘海 NSPanel + AVPlayer）+ Node sidecar 包装 catbus。
 - MVP：连接面板 + 登录、灵动岛 + 小猫动画、视频/内容板块；电商延后到 v2。
 - 点赞 / 收藏 / 历史只存本地，不回写原平台。
@@ -29,7 +29,7 @@
 | 美术（Meowa game-assets skill） | `~/.agents/skills/game-assets/meowart_api.py`，用 conda env `catlands` 运行，key 从项目根 `.env` 的 `MEOWART_API_KEY` 读取 |
 | Python 环境 | conda env `catlands`（Python 3.12）：`~/miniconda3/envs/catlands/bin/python` |
 
-| 小猫美术 | **手绘像素（代码生成）**：`apps/macos/Catland/Cat/PixelCatArt.swift`。Meowa 版（`assets/art/cats/`，`scripts/gen_cats.py` / `pack_cats.py`）用户觉得不如手绘可爱，已不打包进 App，仅留档 |
+| 小猫美术 | **手绘像素（代码生成，用户确认保持此风格）**：`apps/macos/Catland/Cat/PixelCatArt.swift`。Meowa 版（`assets/art/cats/`，`scripts/gen_cats.py` / `pack_cats.py`）用户觉得不如手绘可爱，已不打包进 App，仅留档 |
 
 后续新资源统一补充到本表。
 
@@ -40,6 +40,8 @@
 - 现有 10 种花色 × 12 个动作：idle walk look sit groom yawn nap loaf stretch hop play roll。动作带 intro / 循环段 / outro 与权重，由 `CatDirector`（`CatStage.swift`）随机编排。
 - 新增动作：在 `PixelCatArt.actions` 里加一组 Frame；跑 Swift 测试（尺寸、可渲染）并生成预览图人工把关后再提交。
 - 刘海下方「小猫步道」（默认开，设置里可关）：物理刘海没有像素，步道让小猫能从刘海下方走过。
+- **刘海场景**（`apps/macos/Catland/Scene/IslandScene.swift`，代码手绘、与小猫同一像素网格）：收起态本身就是一面落地窗，物理刘海当窗上横梁。分层：天空（太阳高度按新加坡经纬度本地计算，`SceneClock`）→ 日月星 → 云 → 远景楼群 → 近景楼群 + 地标（左翼金沙、右翼摩天轮）→ 海湾 → 天气（NEA：晴 / 少云 / 多云 / 霾 / 雨 / 雷雨 / 风）→ 窗框 → 地板。彩蛋：白天飞鸟、夜航飞机、元旦 / 国庆 / 跨年夜烟花。鼠标移动有视差。
+- 调试：`catland-debug scene:<小时>:<天气>`（如 `scene:21.5:thunder`），`scene:off` 恢复真实时间与天气。
 
 ## 3. 约定
 

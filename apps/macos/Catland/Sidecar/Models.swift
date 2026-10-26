@@ -125,6 +125,7 @@ struct InteractState: Codable, Hashable {
 struct Settings: Codable, Hashable {
     var muted: Bool
     var sources: [String: [String]]
+    var weather: Bool?
 }
 
 struct CardSnapshot: Codable, Hashable {

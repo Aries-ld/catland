@@ -8,6 +8,7 @@ import type { FeedCard, PlatformAdapter } from './content/types.ts'
 import type { Logger } from './log.ts'
 import { bool, oneOf, optInt, optStr, ParamError, RpcServer, str } from './rpc/server.ts'
 import { snapshot, type CardSnapshot, type Settings, Store } from './store/store.ts'
+import { WeatherService } from './weather/weather.ts'
 
 export const VERSION = '0.0.1'
 
@@ -20,6 +21,7 @@ export interface AppDeps {
   /** 测试注入：自定义适配器。 */
   adapterFor?: (platform: string) => PlatformAdapter
   mixer?: FeedMixer
+  weather?: WeatherService
 }
 
 export class App {
@@ -27,6 +29,7 @@ export class App {
   readonly mixer: FeedMixer
   readonly store: Store
   private readonly comments: CommentService
+  private readonly weather: WeatherService
   private readonly log: Logger
   private readonly adapterFor: (platform: string) => PlatformAdapter
   private readonly adapters = new Map<string, PlatformAdapter>()
@@ -39,6 +42,7 @@ export class App {
     this.store = deps.store
     this.accounts = new AccountService({ catbus: deps.catbus, logger: deps.logger })
     this.comments = new CommentService({ catbus: deps.catbus })
+    this.weather = deps.weather ?? new WeatherService({ logger: deps.logger })
     this.mixer = deps.mixer ?? new FeedMixer({ logger: deps.logger, seen: deps.store })
     this.adapterFor = deps.adapterFor ?? ((p) => createAdapter(p, { catbus: deps.catbus, logger: deps.logger }))
   }
@@ -181,6 +185,8 @@ export class App {
         this.store.clearHistory()
         return null
       })
+
+      .register('weather.get', () => (this.store.getSettings().weather ? this.weather.get() : null))
 
       .register('settings.get', () => this.store.getSettings())
       .register('settings.update', (p) => {

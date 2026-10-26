@@ -99,12 +99,12 @@ describe('Store', () => {
 
   it('设置：默认静音，部分更新，拒绝非法值与未知项', () => {
     const s = new Store({ path: ':memory:' })
-    expect(s.getSettings()).toEqual({ muted: true, sources: {} })
-    expect(s.updateSettings({ sources: { content: ['xhs', 'x'] } })).toEqual({ muted: true, sources: { content: ['xhs', 'x'] } })
+    expect(s.getSettings()).toEqual({ muted: true, sources: {}, weather: true })
+    expect(s.updateSettings({ sources: { content: ['xhs', 'x'] } })).toEqual({ muted: true, sources: { content: ['xhs', 'x'] }, weather: true })
     expect(s.updateSettings({ muted: false }).muted).toBe(false)
     expect(() => s.updateSettings({ muted: 'no' as never })).toThrow(TypeError)
     expect(() => s.updateSettings({ sources: { video: ['x'] } as never })).toThrow(TypeError)
     s.updateSettings({ evil: 1 } as never)
-    expect(Object.keys(s.getSettings())).toEqual(['muted', 'sources'])
+    expect(Object.keys(s.getSettings())).toEqual(['muted', 'sources', 'weather'])
   })
 })

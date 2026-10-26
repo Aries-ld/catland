@@ -64,10 +64,15 @@ struct CollapsedView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            CatStage(cats: state.notch.shelf > 0 ? 3 : 2,
-                     hiddenWidth: state.notch.hasNotch && state.notch.shelf == 0 ? state.notch.notchSize.width : 0,
-                     excited: state.hovering)
-                .frame(height: state.notch.notchSize.height + state.notch.shelf)
+            ZStack {
+                IslandScene(state: state)
+                CatStage(cats: state.notch.shelf > 0 ? 3 : 2,
+                         hiddenWidth: state.notch.hasNotch && state.notch.shelf == 0 ? state.notch.notchSize.width : 0,
+                         excited: state.hovering)
+                    .padding(.bottom, IslandScene.floorInset)
+            }
+            .frame(width: state.notch.collapsedSize.width, height: state.notch.collapsedSize.height)
+            .clipShape(NotchShape(bottomRadius: 10))
             if state.hovering {
                 HStack(spacing: 6) {
                     ForEach(state.connectedContentPlatforms.prefix(5)) { p in
@@ -76,6 +81,9 @@ struct CollapsedView: View {
                     Text(state.connectedContentPlatforms.isEmpty ? "点一下，连接平台" : "点一下，开刷")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.white.opacity(0.85))
+                    if let w = state.weather, let t = w.temperature {
+                        Text("· \(Int(t.rounded()))° \(IslandScene.weatherName(w.condition))").font(.system(size: 11)).foregroundStyle(.white.opacity(0.6))
+                    }
                 }
                 .frame(height: 26)
                 .transition(.opacity)

@@ -36,9 +36,11 @@ export interface Settings {
   muted: boolean
   /** 每个板块启用的信息源；undefined 表示「全部已登录的平台」。 */
   sources: Partial<Record<'content' | 'commerce', string[]>>
+  /** 猫咪之家的天气联动（请求 NEA 开放数据，不带用户信息）。 */
+  weather: boolean
 }
 
-const DEFAULT_SETTINGS: Settings = { muted: true, sources: {} }
+const DEFAULT_SETTINGS: Settings = { muted: true, sources: {}, weather: true }
 
 const SCHEMA_VERSION = 1
 
@@ -184,6 +186,7 @@ export class Store implements SeenStore {
   /** 只接受已知的设置项，并做类型校验。 */
   updateSettings(patch: Partial<Settings>): Settings {
     if (patch.muted !== undefined && typeof patch.muted !== 'boolean') throw new TypeError('muted must be boolean')
+    if (patch.weather !== undefined && typeof patch.weather !== 'boolean') throw new TypeError('weather must be boolean')
     if (patch.sources !== undefined) {
       const ok = typeof patch.sources === 'object' && patch.sources !== null &&
         Object.entries(patch.sources).every(([k, v]) => (k === 'content' || k === 'commerce') && (v === undefined || (Array.isArray(v) && v.every((p) => typeof p === 'string'))))

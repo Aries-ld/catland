@@ -25,6 +25,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let pager = ScrollPager()
     /// 调试：固定展开，点击面板外不收起。
     private var pinned = false
+    /// 调试：固定显示猫咪之家（不随鼠标离开收起）。
+    private var pinnedHover = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         geometry = NotchGeometry.current(Self.targetScreen())
@@ -70,6 +72,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self.state.overlay = AppState.Overlay(rawValue: cmd) ?? .none
                 case "close": self.state.overlay = .none
                 case "boss": self.state.bossKey()
+                case let c where c.hasPrefix("scene:"):
+                    // scene:<小时>:<天气>，如 scene:19.2:rain；scene:off 恢复真实时间与天气
+                    let parts = c.split(separator: ":")
+                    if parts.count == 3, let h = Double(parts[1]) { self.state.sceneOverride = (h, String(parts[2])) } else { self.state.sceneOverride = nil }
+                case "hoverpin": self.state.hovering = true; self.pinnedHover = true
+                case "hoverunpin": self.pinnedHover = false
                 default: break
                 }
             }
@@ -185,7 +193,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func updateMouse(_ p: NSPoint) {
         let inside = geometry.activeRect(expanded: state.expanded, hovering: state.hovering).contains(p)
+        if inside && !state.expanded {
+            let x = (p.x - geometry.screenFrame.midX) / (geometry.collapsedSize.width / 2)
+            if abs(x - state.roomMouse) > 0.02 { state.roomMouse = min(1, max(-1, x)) }
+        }
         panel.ignoresMouseEvents = !(inside || state.expanded)
+        if pinnedHover { return }
         if state.hovering != inside {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) { state.hovering = inside }
         }

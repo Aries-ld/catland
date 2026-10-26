@@ -49,6 +49,7 @@ final class AppState {
             settings = hello.settings
             feed.muted = settings.muted
             phase = .ready
+            startWeather()
         } catch {
             log.error("start failed: \(error.localizedDescription, privacy: .public)")
             phase = .failed(error.localizedDescription)
@@ -156,6 +157,43 @@ final class AppState {
     }
 
     var catwalk = NotchGeometry.catwalkEnabled
+
+    // MARK: - 猫咪之家（时间 / 天气）
+
+    struct WeatherInfo: Decodable, Equatable {
+        let condition: String
+        let text: String
+        let temperature: Double?
+    }
+
+    var weather: WeatherInfo?
+    /// 鼠标在场景里的水平位置（-1~1），驱动视差。
+    var roomMouse: CGFloat = 0
+    /// 调试：覆盖场景的时间（小时）与天气。
+    var sceneOverride: (hour: Double, condition: String)?
+    private var weatherTask: Task<Void, Never>?
+
+    func sceneEnv(now: Date) -> SceneEnv {
+        if let o = sceneOverride {
+            let start = Calendar.current.startOfDay(for: now)
+            return SceneEnv(date: start.addingTimeInterval(o.hour * 3600), condition: o.condition, temperature: weather?.temperature, mouse: roomMouse)
+        }
+        return SceneEnv(date: now, condition: weather?.condition ?? "partly", temperature: weather?.temperature, mouse: roomMouse)
+    }
+
+    /// 每 30 分钟取一次天气（sidecar 侧有缓存；设置关闭时返回 null）。
+    func startWeather() {
+        weatherTask?.cancel()
+        weatherTask = Task { [weak self] in
+            while !Task.isCancelled {
+                if let self, let w: WeatherInfo? = try? await self.sidecar.call("weather.get") {
+                    self.weather = w
+                    if let w { AppLog.info("weather", ["condition": w.condition, "text": w.text, "temp": w.temperature ?? -1]) }
+                }
+                try? await Task.sleep(for: .seconds(30 * 60))
+            }
+        }
+    }
 
     /// 刘海下方小猫步道开关：存在本机 UserDefaults，改完重算刘海几何。
     func setCatwalk(_ on: Bool) {
