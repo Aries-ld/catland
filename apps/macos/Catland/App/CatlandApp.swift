@@ -86,6 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 case let c where c.hasPrefix("snapshots:"):
                     let files = SceneSnapshot.renderAll(to: URL(fileURLWithPath: String(c.dropFirst(10))))
                     AppLog.info("snapshots", ["count": files.count])
+                case "weblogin:close": WebLoginController.shared.close()
                 case let c where c.hasPrefix("weblogin:"):
                     if let p = self.state.platforms.first(where: { $0.id == String(c.dropFirst(9)) }) { WebLoginController.shared.open(state: self.state, platform: p) }
                 case let c where c.hasPrefix("egg:"):

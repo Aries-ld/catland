@@ -19,7 +19,9 @@ export interface PlatformSpec {
 
 export const PLATFORMS: readonly PlatformSpec[] = [
   { id: 'xhs', name: '小红书', primaryLogin: 'qrcode', catbusDefault: 'qrcode', loginUrl: 'https://www.xiaohongshu.com', requiredCookies: [['a1', 'web_session']], sections: ['content'] },
-  { id: 'douyin', name: '抖音', primaryLogin: 'qrcode', catbusDefault: 'qrcode', loginUrl: 'https://www.douyin.com', requiredCookies: [['sessionid']], sections: ['content'] },
+  // 抖音：catbus 模拟的网页扫码协议近期常被风控拦下（error_code 2046「请前往 App 完成验证」，换电脑也会复现），
+  // 改为在内嵌的抖音官方网页上扫码（真实网页环境，更少被拦），登录后自动取登录态；只读能力不受影响。
+  { id: 'douyin', name: '抖音', primaryLogin: 'cookie', catbusDefault: 'qrcode', loginUrl: 'https://www.douyin.com', requiredCookies: [['sessionid']], sections: ['content'] },
   { id: 'bilibili', name: 'B 站', primaryLogin: 'qrcode', catbusDefault: 'qrcode', loginUrl: 'https://www.bilibili.com', requiredCookies: [['SESSDATA', 'bili_jct']], sections: ['content'] },
   { id: 'kuaishou', name: '快手', primaryLogin: 'qrcode', catbusDefault: 'qrcode', loginUrl: 'https://www.kuaishou.com', requiredCookies: [], sections: ['content'] },
   { id: 'x', name: 'X', primaryLogin: 'cookie', catbusDefault: 'cookie', loginUrl: 'https://x.com/i/flow/login', requiredCookies: [['auth_token', 'ct0']], sections: ['content'] },

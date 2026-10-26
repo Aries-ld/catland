@@ -74,9 +74,11 @@ final class WebLoginController: NSObject, NSWindowDelegate, WKUIDelegate, WKNavi
         let container = NSStackView(views: [chrome, web, importView])
         container.orientation = .vertical
         container.spacing = 0
-        chrome.heightAnchor.constraint(equalToConstant: 84).isActive = true
+        chrome.heightAnchor.constraint(equalToConstant: 90).isActive = true
 
-        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 760), styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
+        // 抖音、快手的网页是宽屏布局，「登录」在右上角，窗口要够宽才看得到。
+        let wide = ["douyin", "kuaishou"].contains(platform.id)
+        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: wide ? 1180 : 520, height: wide ? 800 : 760), styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
         w.title = "登录\(platform.name)"
         w.titlebarAppearsTransparent = true
         w.titleVisibility = .hidden
@@ -241,6 +243,12 @@ private struct WebLoginChrome: View {
 
     private var secure: Bool { model.url?.scheme == "https" }
 
+    /// 各平台官方页面上「登录」入口的位置提示。
+    static let hint: [String: String] = [
+        "douyin": "点页面右上角「登录」，用抖音 App 扫码 · 完成后自动连接",
+        "kuaishou": "点页面右上角「登录」，用快手 App 扫码 · 完成后自动连接",
+    ]
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
@@ -264,7 +272,7 @@ private struct WebLoginChrome: View {
                 PlatformIcon(platform: platform.id, size: 18)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("在\(platform.name)官方页面登录").font(.system(size: 12, weight: .semibold))
-                    Text("登录完成后自动连接并关闭窗口 · 登录态只保存在这台 Mac").font(.system(size: 10)).foregroundStyle(.secondary)
+                    Text(Self.hint[platform.id] ?? "登录完成后自动连接并关闭窗口 · 登录态只保存在这台 Mac").font(.system(size: 10)).foregroundStyle(.secondary)
                 }
                 Spacer()
                 if model.mode == .web {
@@ -274,7 +282,7 @@ private struct WebLoginChrome: View {
                 }
                 Button("取消", action: onCancel).controlSize(.small)
             }
-            .padding(.horizontal, 12).frame(height: 40)
+            .padding(.horizontal, 12).frame(height: 46)
 
             GeometryReader { g in
                 Rectangle().fill(Color.accentColor)
