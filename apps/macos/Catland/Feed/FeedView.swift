@@ -19,6 +19,9 @@ struct FeedView: View {
                         .frame(width: geo.size.width, height: geo.size.height)
                         .offset(y: CGFloat(entry.offset) * geo.size.height)
                         .zIndex(entry.offset == 0 ? 1 : 0)
+                        // 上一条 / 下一条只是预渲染：.clipped() 只裁画面不裁点击区域，不禁用的话它们会盖在
+                        // 顶栏和右侧按钮上抢点击（翻过几条后「+ 连接」「点赞收藏」点不动或点错）。
+                        .allowsHitTesting(entry.offset == 0)
                 }
                 if state.commentsOpen {
                     // 点评论区以外的地方收起评论（抖音式），不必非点关闭按钮。
@@ -36,6 +39,7 @@ struct FeedView: View {
                 }
             }
             .clipped()
+            .contentShape(Rectangle())
         }
     }
 
@@ -289,7 +293,7 @@ struct VideoLayer: NSViewRepresentable {
         v.attach(player, gravity: fill ? .resizeAspectFill : .resizeAspect)
     }
 
-    final class PlayerNSView: NSView {
+    final class PlayerNSView: NSView, DisplayOnlyView {
         private let playerLayer = AVPlayerLayer()
         private var readyObs: NSKeyValueObservation?
 

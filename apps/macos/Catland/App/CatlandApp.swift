@@ -199,7 +199,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } as Any)
         // 本 App 内的点击：收起态点刘海直接展开，在 AppKit 层处理，不依赖 SwiftUI 手势识别。
         monitors.append(NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] e in
-            guard let self, e.window === self.panel, !self.state.expanded else { return e }
+            guard let self, e.window === self.panel else { return e }
+            if self.state.expanded {
+                // 诊断：记录点击落在哪个视图上（排查「点不动」）。
+                let hit = self.panel.contentView?.hitTest(self.panel.contentView?.convert(e.locationInWindow, from: nil) ?? .zero)
+                AppLog.debug("click", ["x": Int(e.locationInWindow.x), "y": Int(e.locationInWindow.y), "hit": hit.map { String(describing: type(of: $0)) } ?? "nil",
+                                       "key": self.panel.isKeyWindow, "ignores": self.panel.ignoresMouseEvents])
+                return e
+            }
             self.expand(source: "click")
             return nil
         } as Any)

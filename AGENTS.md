@@ -60,7 +60,7 @@
 - 媒体请求头按平台给（`MEDIA_HEADERS`），不要统一加 Referer：X 带错 Referer 会 403。
 - 界面自检截图只用 `shot-window`（只拍 catland 窗口），不要全屏截图，避免拍到用户其他应用的内容。
 - 面板是不抢焦点的 NSPanel：系统控件（Toggle 等）会显示为非活跃样式，用自绘控件（如 `PillToggle`）。
-- NSViewRepresentable 包装的 AppKit 视图（如视频的 AVPlayerLayer）会抢在其上方的 SwiftUI 按钮之前接到点击：纯展示的视图要 `hitTest` 返回 nil。自绘按钮的 label 要加 `contentShape`，否则只有实色像素可点。
+- NSViewRepresentable 包装的 AppKit 视图（如视频的 AVPlayerLayer）连同 SwiftUI 给它包的容器（PlatformGroupContainer）会抢在其上方的 SwiftUI 按钮之前接到点击：纯展示视图实现 `DisplayOnlyView`，`FirstMouseHostingView.hitTest` 会把落在它（及只包着它的容器）上的点击交还 SwiftUI。屏幕外预渲染的卡片要 `.allowsHitTesting(false)`——`.clipped()` 只裁画面不裁点击区域。自绘按钮的 label 要加 `contentShape`，否则只有实色像素可点。
 
 ## 4. 常用命令
 

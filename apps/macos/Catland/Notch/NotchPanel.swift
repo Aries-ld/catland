@@ -85,7 +85,24 @@ final class NotchPanel: NSPanel {
     }
 }
 
+/// 纯展示的 AppKit 视图（如视频画面）：不应接收任何点击。
+protocol DisplayOnlyView: NSView {}
+
 /// 面板不抢焦点：默认第一次点击只会激活窗口而不传给内容，导致「点了没反应」。
 final class FirstMouseHostingView: NSHostingView<AnyView> {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    /// SwiftUI 会给 NSViewRepresentable 包一层容器（PlatformGroupContainer），AppKit 命中测试时它会抢在
+    /// 叠在上面的 SwiftUI 按钮之前接到点击——视频铺满时，右侧点赞 / 收藏 / 评论就「点不动」。
+    /// 命中的是纯展示视图（或只包着它的容器）时，把点击交还给 SwiftUI 自己分发。
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard let hit = super.hitTest(point) else { return nil }
+        return Self.isDisplayOnly(hit) ? self : hit
+    }
+
+    static func isDisplayOnly(_ v: NSView) -> Bool {
+        if v is DisplayOnlyView { return true }
+        // 只包着展示视图的容器（SwiftUI 的 PlatformGroupContainer 等）
+        return !v.subviews.isEmpty && v.subviews.allSatisfy { isDisplayOnly($0) }
+    }
 }

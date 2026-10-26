@@ -231,3 +231,17 @@ final class EventSchedulerTests: XCTestCase {
         }
     }
 }
+
+final class DisplayOnlyHitTestTests: XCTestCase {
+    @MainActor
+    func testVideoContainerDoesNotSwallowClicks() {
+        let player = VideoLayer.PlayerNSView(frame: .init(x: 0, y: 0, width: 100, height: 100))
+        let container = NSView(frame: player.frame)   // 模拟 SwiftUI 的 PlatformGroupContainer
+        container.addSubview(player)
+        XCTAssertTrue(FirstMouseHostingView.isDisplayOnly(player))
+        XCTAssertTrue(FirstMouseHostingView.isDisplayOnly(container))
+        let control = NSSegmentedControl(frame: player.frame) // 真正可交互的 AppKit 控件不受影响
+        XCTAssertFalse(FirstMouseHostingView.isDisplayOnly(control))
+        XCTAssertNil(player.hitTest(NSPoint(x: 10, y: 10)))
+    }
+}
