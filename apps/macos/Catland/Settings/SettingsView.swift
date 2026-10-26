@@ -137,8 +137,11 @@ struct SavedTile: View {
             if let u = URL(string: entry.card.url) { NSWorkspace.shared.open(u) }
         } label: {
             ZStack(alignment: .bottomLeading) {
-                RemoteImage(source: entry.card.cover.map { ImageSource(url: $0, headers: [:], width: nil, height: nil) })
-                    .frame(height: 150).clipped()
+                // 先定格子尺寸，再把封面铺在里面裁切：只限高度时，横版封面会按比例撑宽、盖到旁边的卡片上。
+                Color.clear
+                    .frame(maxWidth: .infinity, minHeight: 150, maxHeight: 150)
+                    .overlay(RemoteImage(source: entry.card.cover.map { ImageSource(url: $0, headers: [:], width: nil, height: nil) }))
+                    .clipped()
                 LinearGradient(colors: [.clear, .black.opacity(0.7)], startPoint: .center, endPoint: .bottom)
                 VStack(alignment: .leading, spacing: 3) {
                     PlatformBadge(platform: entry.card.platform)
@@ -146,8 +149,9 @@ struct SavedTile: View {
                 }
                 .padding(8)
             }
-            .frame(height: 150)
+            .frame(maxWidth: .infinity, minHeight: 150, maxHeight: 150)
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(PressStyle())
     }
