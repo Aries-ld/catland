@@ -276,7 +276,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.button?.title = "🐾"
+        if let paw = NSImage(named: "MenuBarIcon") {
+            paw.isTemplate = true // 模板图：随菜单栏深浅色自动着色
+            paw.size = NSSize(width: 18, height: 18)
+            statusItem.button?.image = paw
+        } else {
+            statusItem.button?.title = "🐾"
+        }
         let menu = NSMenu()
         menu.addItem(withTitle: "打开 catland（⌥`）", action: #selector(menuToggle), keyEquivalent: "").target = self
         menu.addItem(withTitle: "连接平台…", action: #selector(menuConnections), keyEquivalent: "").target = self

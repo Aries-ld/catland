@@ -21,11 +21,19 @@ targets:
       # 各平台官方图标（scripts/fetch_platform_icons.py 下载），按文件夹原样拷进 App
       - path: Resources/PlatformIcons
         type: folder
+      # 品牌图标（scripts/make_icons.py 生成）：App 图标 + 菜单栏模板图
+      - path: Resources/AppIcon.icns
+        buildPhase: resources
+      - path: Resources/MenuBarIcon.png
+        buildPhase: resources
+      - path: Resources/MenuBarIcon@2x.png
+        buildPhase: resources
     info:
       path: Catland/Info.plist
       properties:
         CFBundleDisplayName: catland
-        CFBundleShortVersionString: "0.0.1"
+        CFBundleIconFile: AppIcon
+        CFBundleShortVersionString: "0.1.0"
         CFBundleVersion: "1"
         LSUIElement: true
         LSMinimumSystemVersion: "14.0"

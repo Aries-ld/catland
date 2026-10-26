@@ -49,8 +49,8 @@ struct CatStage: View {
                     if speaker == nil, snap.opacity > 0.9, snap.lift == 0, !hidden { speaker = snap }
                 }
                 if !bubbles.isEmpty, let s = speaker {
-                    // 每句停留 5 秒，让人读完再换。
-                    let text = bubbles[max(0, Int((t - bubbleEpoch) / 5)) % bubbles.count]
+                    // 每句停留 3 秒。
+                    let text = bubbles[max(0, Int((t - bubbleEpoch) / 3)) % bubbles.count]
                     drawBubble(text, above: s, in: &ctx, size: size, px: px)
                 }
             }

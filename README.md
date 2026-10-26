@@ -1,64 +1,172 @@
-# catland
+<div align="center">
 
-把各平台的小猫放进同一片 land：常驻 macOS 刘海的聚合刷刷器，基于 [catbus](https://github.com/cv-cat/catbus)。
+<img src="assets/brand/banner.png" width="100%" alt="catland — 把小猫们装进你的刘海里，点一下就开刷">
 
-> 仅供学习研究，不商用。数据与登录态只保存在本机。
-> 各平台名称与图标归其所有者所有，本项目仅用于标识内容来源，与这些平台无关联。
+<br>
 
-## 状态
+**MacBook 的刘海，是你离摸鱼最近的地方。**<br>
+小红书 · B 站 · X · 抖音 · 快手 · 微博 · TikTok，点一下刘海就开刷。
 
-MVP 开发中：sidecar（账号、内容管线、本地库、RPC）与 macOS App 首版（刘海面板、刷刷页、评论、连接、设置）已可运行；小猫为占位像素画，正式美术待生成。
+<br>
 
-## 运行（开发版）
+[![macOS](https://img.shields.io/badge/macOS-14%2B-000000?style=for-the-badge&logo=apple&logoColor=white)](#-下载安装)
+[![License: MIT](https://img.shields.io/badge/license-MIT-A6E3A1?style=for-the-badge)](LICENSE)
+[![Local First](https://img.shields.io/badge/数据-只在本机-F38BA8?style=for-the-badge)](#-隐私纯本地)
+[![Powered by catbus](https://img.shields.io/badge/powered%20by-catbus-FAB387?style=for-the-badge)](https://github.com/cv-cat/catbus)
+[![Agent Ready](https://img.shields.io/badge/AI%20Agent-可直接构建-CBA6F7?style=for-the-badge)](#-让-agent-帮你从源码构建)
+
+[下载安装](#-下载安装) · [它能做什么](#-它能做什么) · [刘海里的小世界](#-刘海里的小世界) · [从源码构建](#-从源码构建) · [开发者文档](docs/development.md)
+
+</div>
+
+<br>
+
+> [catbus](https://github.com/cv-cat/catbus)（猫巴士）把各个平台的小猫装上同一辆车；**catland 把它们放进同一片 land**——你 MacBook 屏幕顶上的那块刘海（land 也谐音 is**land**，灵动岛）。
+>
+> 写代码等编译、跑模型等结果、开会等别人说完……这些碎片时间里，你不想拿起手机、不想切窗口、更不想一个个打开 App。**鼠标往刘海上一放，点一下，就开刷。**
+
+## ✨ 它能做什么
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### 🐾 刘海就是入口
+平时刘海里是一面像素风落地窗：窗外是你所在城市的天际线，小猫在窗台上散步、打盹、钻进刘海里的「猫洞」。鼠标移上去小猫会蹦一下跟你打招呼，**点一下就展开成刷刷面板**，再点外面就收起。老板来了？`⌥ Esc` 一键收起并暂停。
+
+</td>
+<td width="50%" valign="top">
+
+### 📱 多平台混排，手感对标短视频 App
+小红书、B 站、X……的推荐流混在一条流里，**各平台均匀轮换、看过的不再出现**。封面先行、前后条预加载，划到下一条几乎零等待；触控板一滑一页，横屏视频居中铺模糊底，图文左右翻页，评论抽屉一点就开。
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### ❤️ 点赞收藏只留在本地
+在 catland 里点赞、收藏，**不会回写到原平台**，不会被推荐算法拿去「更懂你」，也不会出现在你的主页。所有平台的喜欢，收在同一个地方。
+
+</td>
+<td width="50%" valign="top">
+
+### 🔒 纯本地，没有服务器
+没有 catland 账号、没有云端、没有遥测。登录态在你 Mac 的 `~/.catbus/`，点赞 / 收藏 / 历史在本机数据库，App 和本地服务之间连网络端口都不开。
+
+</td>
+</tr>
+</table>
+
+## 🌆 刘海里的小世界
+
+刘海不只是入口，也是一个会陪你上班的小世界。我们把天气、季节、节日、彩蛋、事件统称为**表现层**，全部手绘像素风：
+
+<div align="center">
+<img src="assets/brand/scenes.png" width="88%" alt="刘海里的场景：四季、昼夜、天气与事件">
+</div>
+
+- **跟你同一片天**：用 Mac 的系统定位（不看 IP，挂 VPN 也准），窗外的日出日落、晴雨雪雾跟你所在城市一致；上海能看到东方明珠，新加坡能看到金沙和摩天轮。
+- **四季会变**：春天飘樱花、夏夜有萤火虫、秋天落叶、冬天窗户结霜、挂满冰凌。
+- **节日有仪式感**：春节挂红灯笼、中秋一整晚的金色满月、万圣节南瓜灯、圣诞彩灯。
+- **会发生大事件**：真实流星雨极大日的流星雨、夏夜花火大会、滨海湾灯光秀、樱花雨、热气球节……**小猫会提前 6 小时预告**，事件开始时大家一起坐下来看窗外。
+- **随机彩蛋**：雨天海湾里漂着纸船，工作日上午窗台上有杯冒热气的咖啡，偶尔……会有 UFO。
+- **一只懂你的猫**：悬停刘海，小猫会跟你聊两句——「今日搬砖进度 63%，快通关了」「老板画的饼，猫猫不吃」「距国庆还有 5 天，数着日子摸鱼」。
+
+## 📦 下载安装
+
+1. 到 [Releases](https://github.com/Aries-ld/catland/releases) 下载对应芯片的 DMG：
+   - Apple 芯片（M1 / M2 / M3 / M4…）：`catland-x.y.z-macos-arm64.dmg`
+   - Intel 芯片：`catland-x.y.z-macos-x86_64.dmg`
+2. 打开 DMG，把 **Catland** 拖进「应用程序」。
+3. **第一次打开**：catland 是开源项目，没有付费的 Apple 开发者签名，macOS 会提示「无法验证开发者」。任选一种方式放行：
+   - 打开「系统设置 → 隐私与安全性」，在下方找到 Catland，点 **仍要打开**；或者
+   - 在终端执行：`xattr -dr com.apple.quarantine /Applications/Catland.app`
+4. 打开后刘海里会出现小猫。点一下刘海 → **连接平台**：
+   - 小红书、B 站、抖音、快手：用手机 App 扫码。
+   - X、微博、TikTok：在弹出的官方登录页登录；想用浏览器里已有的账号（或 Google 登录），点 **在浏览器中登录**，按提示导入。
+
+> App 里已经自带运行所需的一切（Node 运行时、本地服务、catbus），不需要另外安装任何东西。需要 macOS 14 及以上，带刘海的 MacBook 体验最好；没有刘海的 Mac 也能用，小猫会住在屏幕顶部正中。
+
+## ⌨️ 快捷键
+
+| 操作 | 方式 |
+|---|---|
+| 呼出 / 收起 | 点刘海，或 `⌥ \`` |
+| 老板键 | `⌥ Esc`：立刻收起并暂停 |
+| 翻页 | 触控板上下滑、鼠标滚轮、`↑` `↓` / `J` `K` |
+| 图集翻页 | 触控板左右滑、`←` `→` |
+| 点赞 / 收藏 / 评论 | 双击画面或 `L` / `S` / `C` |
+| 暂停 / 静音 | `空格` / `M`（默认静音） |
+
+## 🧩 支持的平台
+
+| 平台 | 登录方式 | 状态 |
+|---|---|---|
+| 小红书 | 扫码 | ✅ 已实测 |
+| B 站 | 扫码 | ✅ 已实测 |
+| X | 官方登录页 / 浏览器导入 | ✅ 已实测 |
+| 抖音 · 快手 | 扫码 | 🧪 已接入，待实测 |
+| 微博 · TikTok | 官方登录页 / 浏览器导入 | 🧪 已接入，待实测 |
+| 淘宝 · 京东 · 闲鱼 | — | 🚧 电商比价，下个版本 |
+
+平台能力来自 [catbus](https://github.com/cv-cat/catbus)，它支持的平台 catland 都可以逐步接进来。
+
+## 🛠 从源码构建
+
+不想用打包好的 DMG，或者想自己改？在你的 Mac 上几分钟就能构建：
 
 ```bash
-cd apps/sidecar && npm install          # 首次
-brew install xcodegen                   # 首次
-apps/macos/scripts/run.sh               # 构建并启动，刘海处出现小猫
+# 准备（只需一次）：Xcode 16+、Homebrew
+brew install node xcodegen             # Node 需要 26 及以上
+git clone https://github.com/Aries-ld/catland.git && cd catland
+(cd apps/sidecar && npm install)
+
+# 方式一：直接运行开发版
+apps/macos/scripts/run.sh
+
+# 方式二：打包成和 Releases 一样的 DMG（产物在 dist/）
+scripts/package-dmg.sh
 ```
 
-快捷键：`⌥ \`` 呼出 / 收起，`⌥ Esc` 老板键；展开后 ↑↓ / 触控板上下滑翻页，L 点赞，S 收藏，C 评论，M 静音。
+### 🤖 让 Agent 帮你从源码构建
 
-## 架构
+把下面这段话直接发给 Claude Code / Codex / Cursor 等编码 Agent 就行：
 
-- `apps/macos`（待建）：Swift 原生客户端，刘海灵动岛 + 播放器
-- `apps/sidecar`：Node 本地服务，由客户端以子进程启动，经 stdio 通信、不监听端口；包装 catbus 取数
-
-纯本地：无自有服务器、无账号、无遥测，数据与登录态只在本机。
-
-## sidecar RPC 概览
-
-行分隔 JSON-RPC 2.0，经 stdin / stdout。实现见 `apps/sidecar/src/app.ts`。
-
-| 方法 | 说明 |
-|---|---|
-| `app.hello` | 版本与设置 |
-| `accounts.list` / `refresh` / `checkHealth` | 平台点亮状态、登录态体检 |
-| `accounts.loginQrcode` / `loginCookie` / `cancelLogin` / `logout` / `use` | 扫码 / 网页登录、登出、切换账号 |
-| `feed.next {count, waitMs}` | 取已解析、可直接播放的卡片（带 liked / collected） |
-| `feed.refresh {key}` / `feed.view {key, dwellMs}` / `feed.sources` | 换新媒体地址、记录浏览、信息源状态 |
-| `comments.list {key, cursor}` / `comments.replies` | 评论（只读） |
-| `interact.set {key, kind, on}` / `states` / `list` | 本地点赞、收藏 |
-| `history.list` / `history.clear` | 浏览历史 |
-| `settings.get` / `settings.update` | 静音、各板块信息源 |
-
-服务端通知：`app.ready`、`accounts.changed`、`accounts.login`（二维码 / 进度）、`feed.source`（平台冷却 / 失效）。
-
-数据：`~/Library/Application Support/catland/catland.db`（0600），日志：`~/Library/Logs/catland/`。
-
-## 本地环境
-
-- macOS 26（Apple Silicon）、Xcode 26、Node 26
-- `npm i -g catbus-cli`，然后按需 `catbus <platform> auth login`
-- 美术工具：`conda create -n catlands python=3.12`，`pip install requests Pillow`
-- `cp .env.example .env` 后填写密钥
-
-## 目录
-
+```text
+请在我的 Mac 上从源码构建并安装 catland（https://github.com/Aries-ld/catland）：
+1. 确认已安装 Xcode 16+；用 Homebrew 安装 node（26 及以上）和 xcodegen。
+2. 克隆仓库，在 apps/sidecar 里执行 npm install。
+3. 在仓库根目录执行 scripts/package-dmg.sh，按我的芯片架构打包 DMG（产物在 dist/）。
+4. 挂载 DMG，把 Catland.app 拷到 /Applications，执行 xattr -dr com.apple.quarantine /Applications/Catland.app，然后打开它。
+仓库里的 AGENTS.md 和 docs/development.md 有项目约定和更多命令。
 ```
-apps/       客户端与本地服务（待定）
-assets/art  美术资源
-docs/       设计文档与 ADR
-scripts/    工具脚本
-vendor/     catbus 源码只读参考（不进版本控制）
-```
+
+## 🔒 隐私：纯本地
+
+- **没有 catland 服务器、账号、统计或崩溃上报。**
+- 网络请求只发往你连接的平台；唯一的例外是窗外天气：新加坡用 NEA，其他地区用 Open-Meteo，只发送约 10 km 精度的坐标，设置里可以关掉。
+- 登录态保存在 `~/.catbus/`，本地数据在 `~/Library/Application Support/catland/`，日志在 `~/Library/Logs/catland/`（会自动打码 cookie、token）。
+- 网页登录用的是一次性的隔离浏览器环境，窗口关闭即清空；catland 不读取你浏览器里保存的任何数据。
+
+## ⚠️ 声明
+
+- 本项目**仅供学习研究，不商用**。内容来自各平台公开接口（经 catbus），请遵守各平台的用户协议，合理使用、不要高频请求。
+- 各平台名称与图标归其所有者所有，本项目仅用于标识内容来源，与这些平台无任何关联。
+- catland 不会代你在平台上点赞、评论、关注或发布；这些写操作容易触发平台风控，默认不调用。
+
+## 🗺 接下来
+
+- [ ] 电商板块：淘宝 / 京东 / 闲鱼商品搜索与跨平台比价
+- [ ] 宣传视频与动图演示
+- [ ] 更多城市的窗外地标、更多事件与彩蛋
+- [ ] 本地数据导出 / 导入
+
+## 🙏 致谢
+
+- [catbus](https://github.com/cv-cat/catbus) 与作者 [cv-cat](https://github.com/cv-cat)：catland 的全部平台能力都来自这辆猫巴士。
+- 所有在工位上偷偷看刘海的打工人。🐱
+
+<div align="center">
+<sub>MIT License · Made with 🐾 for every tired worker</sub>
+</div>

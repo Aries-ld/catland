@@ -206,6 +206,13 @@ final class AppState {
         Task { _ = try? await sidecar.callRaw("accounts.cancelLogin", ["platform": p]) }
     }
 
+    /// 从浏览器复制来的 Cookie 请求头（「在浏览器中登录」后导入）。
+    func loginCookie(_ platform: String, header: String) async throws {
+        let _: Account = try await sidecar.call("accounts.loginCookie", ["platform": platform, "cookies": header])
+        showToast("已连接 \(PlatformBrand.shortName(platform))")
+        await refreshAccounts()
+    }
+
     func loginCookie(_ platform: String, cookies: [[String: Any]]) async throws {
         let _: Account = try await sidecar.call("accounts.loginCookie", ["platform": platform, "cookies": cookies])
         showToast("已连接 \(PlatformBrand.shortName(platform))")

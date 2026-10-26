@@ -31,6 +31,8 @@
 
 | 小猫美术 | **手绘像素（代码生成，用户确认保持此风格）**：`apps/macos/Catland/Cat/PixelCatArt.swift`。Meowa 版（`assets/art/cats/`，`scripts/gen_cats.py` / `pack_cats.py`）用户觉得不如手绘可爱，已不打包进 App，仅留档 |
 
+| 开发者文档 | `docs/development.md`（开发运行、打包、品牌素材、sidecar RPC、目录结构）；README 是面向用户的产品介绍页 |
+
 后续新资源统一补充到本表。
 
 ### 2.1 小猫美术规范
@@ -79,6 +81,12 @@ apps/macos/build/catland-debug <pin|unpin|toggle|next|prev|right|pause|comments|
 apps/macos/build/shot-window /tmp/x.png             # 只截 catland 自己的窗口（不拍用户其他应用）
 # App 日志：~/Library/Logs/catland/app.log；sidecar 日志：~/Library/Logs/catland/sidecar.log
 
+
+# macOS 客户端（apps/macos）
+apps/macos/scripts/run.sh                           # 开发版：构建并启动
+scripts/package-dmg.sh [arm64|x86_64]               # 打包可分发的 DMG（自带 Node + sidecar + catbus，ad-hoc 签名），产物在 dist/
+~/miniconda3/envs/catlands/bin/python scripts/make_icons.py        # App 图标 + 菜单栏图标
+~/miniconda3/envs/catlands/bin/python scripts/make_readme_art.py   # README banner / 场景拼图（输入为实机截图）
 
 catbus auth list                                  # 已登录的平台
 catbus <platform> feed list --limit 10            # 推荐流
