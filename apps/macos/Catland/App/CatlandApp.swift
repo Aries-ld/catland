@@ -83,6 +83,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     UserDefaults.standard.set(m == "den" || m == "both", forKey: NotchGeometry.denKey)
                     self.screenChanged()
                 case "den": CatDirector.shared.forceDen = true
+                case let c where c.hasPrefix("date:"):
+                    // date:2026-12-24T21:00 覆盖日期与时间（看季节 / 节日）；date:off 恢复
+                    let f = ISO8601DateFormatter(); f.formatOptions = [.withFullDate, .withTime, .withColonSeparatorInTime]; f.timeZone = .current
+                    self.state.sceneDateOverride = f.date(from: String(c.dropFirst(5)))
+                case let c where c.hasPrefix("intensity:"): self.state.sceneIntensityOverride = Double(c.dropFirst(10))
                 case "city:shanghai": self.state.location = SceneLocation(name: "上海", latitude: 31.23, longitude: 121.47, source: .timezone)
                 case "city:singapore": self.state.location = .singapore
                 case "ceiling:on", "ceiling:off":

@@ -24,6 +24,8 @@ struct CatStage: View {
     /// 悬停 / 点开时让猫开心地蹦一下。
     var excited = false
     var den: CatDen? = nil
+    /// 悬停时某只猫头顶冒出的像素对话气泡（如「点我开刷 · 21°晴」）。
+    var bubble: String? = nil
 
     @Environment(\.displayScale) private var displayScale
 
@@ -32,13 +34,19 @@ struct CatStage: View {
             Canvas { ctx, size in
                 let px = pixel > 0 ? pixel : max(1, (1.5 * displayScale).rounded()) / max(displayScale, 1)
                 let t = tl.date.timeIntervalSinceReferenceDate
+                var speaker: CatDirector.Snapshot?
                 for i in 0..<cats {
                     let lane = CatDirector.shared.lane(for: i, count: cats, width: size.width, hidden: hiddenWidth, catWidth: CGFloat(PixelCatArt.width) * px)
                     let snap = CatDirector.shared.tick(actor: "\(id)#\(i)", lane: lane, pixel: px, time: t, excited: excited,
                                                        den: den, groundToDen: den.map { size.height - px - $0.bottom } ?? 0)
                     if let effect = snap.denEffect, let den { drawDenEffect(effect, skin: snap.skin, den: den, in: &ctx, px: px, t: t) }
                     if snap.opacity > 0 { draw(snap, in: &ctx, size: size, px: px) }
+                    // 说话的猫：选第一只不在刘海下方（头不会被刘海挡住）的猫。
+                    let catTop = size.height - px - CGFloat(PixelCatArt.height - 3) * px
+                    let hidden = den.map { snap.x > $0.minX && snap.x < $0.maxX && catTop - 14 * px < $0.bottom } ?? false
+                    if speaker == nil, snap.opacity > 0.9, snap.lift == 0, !hidden { speaker = snap }
                 }
+                if let text = bubble, let s = speaker { drawBubble(text, above: s, in: &ctx, size: size, px: px) }
             }
         }
         .allowsHitTesting(false)
@@ -71,6 +79,27 @@ struct CatStage: View {
             for (dx, dy) in [(px, 0), (-px, 0), (0, px), (0, -px)] { c.draw(rim, in: rect.offsetBy(dx: dx, dy: dy)) }
         }
         c.draw(c.resolve(Image(decorative: frame, scale: 1).interpolation(.none)), in: rect)
+    }
+
+    /// 像素风对话气泡：白底、1 像素深色描边、方角，带一个指向猫头的小尾巴。
+    private func drawBubble(_ text: String, above s: CatDirector.Snapshot, in ctx: inout GraphicsContext, size: CGSize, px: CGFloat) {
+        let label = ctx.resolve(Text(text).font(.system(size: 9, weight: .bold, design: .rounded)).foregroundColor(Color(red: 0.16, green: 0.14, blue: 0.2)))
+        let ts = label.measure(in: CGSize(width: 300, height: 40))
+        let w = ((ts.width + 8 * px) / px).rounded(.up) * px, h = ((ts.height + 3 * px) / px).rounded(.up) * px
+        let catTop = size.height - px - CGFloat(PixelCatArt.height - 3) * px
+        var x = ((s.x - w / 2) / px).rounded() * px
+        x = min(max(px, x), size.width - w - px)
+        let y = max(px, catTop - h - 3 * px)
+        let border = Color(red: 0.16, green: 0.14, blue: 0.2)
+        ctx.fill(Path(CGRect(x: x - px, y: y, width: w + 2 * px, height: h)), with: .color(border))
+        ctx.fill(Path(CGRect(x: x, y: y - px, width: w, height: h + 2 * px)), with: .color(border))
+        ctx.fill(Path(CGRect(x: x, y: y, width: w, height: h)), with: .color(.white.opacity(0.96)))
+        // 尾巴：两格台阶
+        let tx = min(max(x + 2 * px, ((s.x - px) / px).rounded() * px), x + w - 3 * px)
+        ctx.fill(Path(CGRect(x: tx, y: y + h, width: 2 * px, height: px)), with: .color(.white.opacity(0.96)))
+        ctx.fill(Path(CGRect(x: tx, y: y + h + px, width: px, height: px)), with: .color(border))
+        ctx.fill(Path(CGRect(x: tx + 2 * px, y: y + h, width: px, height: px)), with: .color(border))
+        ctx.draw(label, at: CGPoint(x: x + w / 2, y: y + h / 2), anchor: .center)
     }
 
     /// 猫在洞里时，洞口（刘海底边）露出来的小动作。
@@ -308,7 +337,8 @@ final class CatDirector {
             return
         }
         let have = CatAtlas.shared.cats[a.skin] ?? [:]
-        let options = have.filter { $0.key != "hop" }.map { ($0.key, $0.key == a.action ? $0.value.weight * 0.3 : $0.value.weight) }
+        let season = SceneSeason.current
+        let options = have.filter { $0.key != "hop" }.map { ($0.key, ($0.key == a.action ? $0.value.weight * 0.3 : $0.value.weight) * season.catWeight($0.key)) }
         var r = Double.random(in: 0..<max(options.map(\.1).reduce(0, +), 0.001))
         var pick = "idle"
         for (name, w) in options.sorted(by: { $0.0 < $1.0 }) {

@@ -19,10 +19,11 @@ function fakeNea(forecast = 'Thundery Showers', opts: { fail?: boolean } = {}) {
 
 describe('classify', () => {
   it.each([
-    ['Fair (Day)', 'clear'], ['Fair & Warm', 'clear'], ['Partly Cloudy (Night)', 'partly'], ['Cloudy', 'cloudy'],
-    ['Light Showers', 'rain'], ['Heavy Rain', 'rain'], ['Thundery Showers', 'thunder'], ['Heavy Thundery Showers with Gusty Winds', 'thunder'],
-    ['Hazy', 'haze'], ['Mist', 'haze'], ['Windy', 'windy'], ['Something New', 'cloudy'],
-  ])('%s → %s', (text, c) => expect(classify(text)).toBe(c))
+    ['Fair (Day)', 'clear', 0], ['Fair & Warm', 'clear', 0], ['Partly Cloudy (Night)', 'partly', 0.4], ['Cloudy', 'cloudy', 0.6],
+    ['Light Showers', 'rain', 0.4], ['Showers', 'rain', 0.7], ['Heavy Rain', 'rain', 1], ['Thundery Showers', 'thunder', 0.7],
+    ['Heavy Thundery Showers with Gusty Winds', 'thunder', 1], ['Hazy', 'haze', 0.7], ['Slightly Hazy', 'haze', 0.4],
+    ['Mist', 'fog', 0.5], ['Fog', 'fog', 0.9], ['Drizzle', 'drizzle', 0.5], ['Windy', 'windy', 0.6], ['Something New', 'cloudy', 0.6],
+  ])('%s → %s (%s)', (text, c, i) => expect(classify(text)).toEqual({ condition: c, intensity: i }))
 })
 
 describe('WeatherService', () => {
@@ -30,7 +31,7 @@ describe('WeatherService', () => {
     let t = 0
     const nea = fakeNea()
     const w = new WeatherService({ logger: createMemoryLogger(), fetch: nea.fetch, now: () => t })
-    expect(await w.get()).toMatchObject({ condition: 'thunder', text: 'Thundery Showers', area: 'City', temperature: 30.8, source: 'NEA' })
+    expect(await w.get()).toMatchObject({ condition: 'thunder', intensity: 0.7, text: 'Thundery Showers', area: 'City', temperature: 30.8, source: 'NEA' })
     t += 10 * 60_000
     await w.get()
     expect(nea.calls).toHaveLength(2)
@@ -83,7 +84,12 @@ describe('按位置选择数据源', () => {
   })
 
   it.each([
-    [0, 0, 'clear'], [2, 0, 'partly'], [3, 0, 'cloudy'], [45, 0, 'haze'], [61, 0, 'rain'], [81, 0, 'rain'],
-    [73, 0, 'snow'], [86, 0, 'snow'], [95, 0, 'thunder'], [1, 35, 'windy'], [3, 40, 'cloudy'],
-  ])('WMO %i（风速 %i）→ %s', (code, wind, c) => expect(classifyWmo(code, wind)).toBe(c))
+    [0, 0, 'clear'], [2, 0, 'partly'], [3, 0, 'cloudy'], [45, 0, 'fog'], [53, 0, 'drizzle'], [61, 0, 'rain'], [82, 0, 'rain'],
+    [57, 0, 'sleet'], [67, 0, 'sleet'], [73, 0, 'snow'], [86, 0, 'snow'], [95, 0, 'thunder'], [99, 0, 'hail'], [1, 35, 'windy'], [3, 40, 'cloudy'],
+  ])('WMO %i（风速 %i）→ %s', (code, wind, c) => expect(classifyWmo(code, wind).condition).toBe(c))
+
+  it('强度区分小雨 / 大雨、小雪 / 大雪', () => {
+    expect(classifyWmo(61).intensity).toBeLessThan(classifyWmo(65).intensity)
+    expect(classifyWmo(71).intensity).toBeLessThan(classifyWmo(75).intensity)
+  })
 })

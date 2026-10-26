@@ -162,6 +162,7 @@ final class AppState {
 
     struct WeatherInfo: Decodable, Equatable {
         let condition: String
+        let intensity: Double?
         let text: String
         let temperature: Double?
     }
@@ -171,6 +172,9 @@ final class AppState {
     var roomMouse: CGFloat = 0
     /// 调试：覆盖场景的时间（小时）与天气。
     var sceneOverride: (hour: Double, condition: String)?
+    /// 调试：覆盖日期（看季节 / 节日）与天气强度。
+    var sceneDateOverride: Date?
+    var sceneIntensityOverride: Double?
     private var weatherTask: Task<Void, Never>?
     var location: SceneLocation = LocationProvider.fromTimeZone()
     private let locationProvider = LocationProvider()
@@ -178,9 +182,11 @@ final class AppState {
     func sceneEnv(now: Date) -> SceneEnv {
         if let o = sceneOverride {
             let start = Calendar.current.startOfDay(for: now)
-            return SceneEnv(date: start.addingTimeInterval(o.hour * 3600), condition: o.condition, temperature: weather?.temperature, mouse: roomMouse, location: location)
+            return SceneEnv(date: sceneDateOverride ?? start.addingTimeInterval(o.hour * 3600), condition: o.condition, temperature: weather?.temperature,
+                            mouse: roomMouse, location: location, intensity: sceneIntensityOverride ?? 0.7)
         }
-        return SceneEnv(date: now, condition: weather?.condition ?? "partly", temperature: weather?.temperature, mouse: roomMouse, location: location)
+        return SceneEnv(date: sceneDateOverride ?? now, condition: weather?.condition ?? "partly", temperature: weather?.temperature, mouse: roomMouse,
+                        location: location, intensity: weather?.intensity ?? 0.6)
     }
 
     func setWeatherEnabled(_ on: Bool) {

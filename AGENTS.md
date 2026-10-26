@@ -46,7 +46,12 @@
 - 刘海创意（实验中，默认两个都开）：**猫洞**（刘海 = 天花板猫洞，猫走到刘海下方跳进去，洞口垂尾巴 / 扒爪子 / 飘 z，过一阵跳下来；CatDirector 的 toDen → climbing → inDen → dropping）和**地铁隧道**（刘海 = 隧道口，刘海底边下是高架桥，MRT 小列车每 50 秒穿过一次）。切换：`catland-debug notch:den|tunnel|both|beam`，`catland-debug den` 强制一只猫进洞。
 - 地面是深色抛光地面（颜色取自窗外天色，白天映天光、夜里映城市灯），猫脚下有影子。
 - 所在地：Mac 系统定位（CoreLocation，基于 Wi-Fi，与 VPN / IP 无关），未授权时按系统时区估计城市（`LocationProvider`）。太阳位置、天气、窗外地标都跟随所在地：新加坡（金沙、摩天轮）、上海（东方明珠、上海中心、环球金融中心），其他城市用通用楼群。`catland-debug city:shanghai|singapore` 可切换预览。
-- 平台图标：各平台官方 App 图标，`scripts/fetch_platform_icons.py` 下载到 `apps/macos/Resources/PlatformIcons`（来源记录在 SOURCES.json；B 站去掉官网图标的 WEB 角标，京东 / 淘宝用官网常规图标，避开 App Store 的活动版）。界面里统一用 `PlatformIcon` / `PlatformBadge`。
+- 平台图标：各平台官方 App 图标，`scripts/fetch_platform_icons.py` 下载到 `apps/macos/Resources/PlatformIcons`（地址固定在脚本的 PINNED 里，都是人工确认过的干净版本，不随 App Store 的双 11 等活动图标变化；B 站去掉官网图标的 WEB 角标）。界面里统一用 `PlatformIcon` / `PlatformBadge`。
+- 天气（`classify` / `classifyWmo` → condition + intensity）：晴、少云、多云 / 阴、雾、霾、毛毛雨、小 / 中 / 大雨、雷雨、冰雹、雨夹雪 / 冻雨、小 / 中 / 大雪、大风（雨雪随风倾斜）。
+- 季节（`SceneSeason`，按日期 + 纬度，南半球相反，回归线内为「常夏」）：岸边行道树（春嫩绿带粉花 / 夏浓绿 / 秋红橙黄 / 冬枯枝，雪天枝头积雪）、春樱花瓣、秋落叶、夏夜萤火虫、冬天玻璃结霜、天色倾向；小猫行为权重随季节变（冬天更爱睡）。
+- 节日（`SceneHoliday`）：春节红灯笼、中秋金色满月、万圣节南瓜灯、圣诞彩灯、元旦 / 跨年 / 新加坡国庆烟花。
+- 悬停：整面窗变大（城市地平线固定，多出的高度露出海湾与倒影，不再有黑边），小猫蹦一下，其中一只冒出像素对话气泡（「点我开刷 · 温度天气」）。
+- 调试：`catland-debug date:2026-12-24T21:00:00`（看季节 / 节日，`date:off` 恢复）、`intensity:0~1`（天气强度）、`hoverpin` / `hoverunpin`。
 - 调试：`catland-debug scene:<小时>:<天气>`（如 `scene:21.5:thunder`），`scene:off` 恢复真实时间与天气。
 
 ## 3. 约定

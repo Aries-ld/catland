@@ -58,46 +58,39 @@ struct NotchShape: Shape {
     }
 }
 
-/// 收起态：小猫在刘海两侧散步；悬停时下探一行，显示已连接平台与提示。
+/// 收起态：刘海本身是一面像素落地窗，小猫在地面上活动。
+/// 悬停时整面窗跟着变大（露出更多海湾和岸边的树，没有黑边），小猫蹦一下，其中一只冒出对话气泡。
 struct CollapsedView: View {
     let state: AppState
+
+    private var width: CGFloat { state.notch.collapsedSize.width + (state.hovering ? NotchGeometry.hoverGrow.width : 0) }
 
     /// 猫洞 = 物理刘海所在区域（需要有刘海且开了步道，猫才走得到洞口下方）。
     private var denRect: CatDen? {
         let n = state.notch
         guard n.den, n.hasNotch, n.shelf > 0 else { return nil }
-        let left = (n.collapsedSize.width - n.notchSize.width) / 2
+        let left = (width - n.notchSize.width) / 2
         return CatDen(minX: left, maxX: left + n.notchSize.width, bottom: n.notchSize.height)
     }
 
+    private var bubble: String? {
+        guard state.hovering else { return nil }
+        let action = state.connectedContentPlatforms.isEmpty ? "点我连接平台" : "点我开刷"
+        guard let w = state.weather else { return action }
+        let temp = w.temperature.map { "\(Int($0.rounded()))°" } ?? ""
+        return "\(action) · \(temp)\(IslandScene.weatherName(w.condition))"
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            ZStack {
-                IslandScene(state: state)
-                CatStage(cats: state.notch.shelf > 0 ? 3 : 2,
-                         hiddenWidth: state.notch.hasNotch && state.notch.shelf == 0 ? state.notch.notchSize.width : 0,
-                         excited: state.hovering,
-                         den: denRect)
-                    .padding(.bottom, IslandScene.floorInset)
-            }
-            .frame(width: state.notch.collapsedSize.width, height: state.notch.collapsedSize.height)
-            .clipShape(NotchShape(bottomRadius: 10))
-            if state.hovering {
-                HStack(spacing: 6) {
-                    HStack(spacing: -3) {
-                        ForEach(state.connectedContentPlatforms.prefix(5)) { p in PlatformIcon(platform: p.id, size: 13) }
-                    }
-                    Text(state.connectedContentPlatforms.isEmpty ? "点一下，连接平台" : "点一下，开刷")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.85))
-                    if let w = state.weather, let t = w.temperature {
-                        Text("· \(Int(t.rounded()))° \(IslandScene.weatherName(w.condition))").font(.system(size: 11)).foregroundStyle(.white.opacity(0.6))
-                    }
-                }
-                .frame(height: 26)
-                .transition(.opacity)
-            }
+        ZStack {
+            IslandScene(state: state)
+            CatStage(cats: state.notch.shelf > 0 ? 3 : 2,
+                     hiddenWidth: state.notch.hasNotch && state.notch.shelf == 0 ? state.notch.notchSize.width : 0,
+                     excited: state.hovering,
+                     den: denRect,
+                     bubble: bubble)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

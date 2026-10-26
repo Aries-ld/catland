@@ -6,10 +6,21 @@
  */
 import type { Logger } from '../log.ts'
 
-export type Condition = 'clear' | 'partly' | 'cloudy' | 'haze' | 'rain' | 'thunder' | 'windy' | 'snow'
+/**
+ * 场景天气。强度 intensity（0~1）区分小雨 / 中雨 / 大雨、小雪 / 大雪等。
+ * clear 晴 · partly 少云 · cloudy 多云 / 阴 · fog 雾 · haze 霾 · drizzle 毛毛雨 · rain 雨 · thunder 雷雨 ·
+ * hail 冰雹（雷暴伴冰雹）· sleet 雨夹雪 / 冻雨 · snow 雪 · windy 大风
+ */
+export type Condition = 'clear' | 'partly' | 'cloudy' | 'fog' | 'haze' | 'drizzle' | 'rain' | 'thunder' | 'hail' | 'sleet' | 'snow' | 'windy'
+
+export interface Classified {
+  condition: Condition
+  intensity: number
+}
 
 export interface Weather {
   condition: Condition
+  intensity: number
   /** 数据源的原始描述，如 "Thundery Showers" / "WMO 61"。 */
   text: string
   area: string
@@ -34,31 +45,41 @@ export function inSingapore(c: Coordinates): boolean {
   return c.latitude > 1.15 && c.latitude < 1.48 && c.longitude > 103.6 && c.longitude < 104.1
 }
 
-/** NEA 两小时预报文本 → 场景天气。未知文本按多云处理。 */
-export function classify(text: string): Condition {
+/** NEA 两小时预报文本 → 场景天气与强度。未知文本按多云处理。 */
+export function classify(text: string): Classified {
   const t = text.toLowerCase()
-  if (t.includes('thunder')) return 'thunder'
-  if (t.includes('snow')) return 'snow'
-  if (t.includes('rain') || t.includes('shower') || t.includes('drizzle')) return 'rain'
-  if (t.includes('haz') || t.includes('mist') || t.includes('fog')) return 'haze'
-  if (t.includes('wind')) return 'windy'
-  if (t.includes('partly')) return 'partly'
-  if (t.includes('fair') || t.includes('sunny') || t.includes('clear')) return 'clear'
-  return 'cloudy'
+  const heavy = t.includes('heavy') ? 1 : t.includes('light') || t.includes('passing') || t.includes('slight') ? 0.4 : 0.7
+  const c = (condition: Condition, intensity = heavy): Classified => ({ condition, intensity })
+  if (t.includes('thunder')) return c('thunder')
+  if (t.includes('snow')) return c('snow')
+  if (t.includes('drizzle')) return c('drizzle', 0.5)
+  if (t.includes('rain') || t.includes('shower')) return c('rain')
+  if (t.includes('fog')) return c('fog', 0.9)
+  if (t.includes('mist')) return c('fog', 0.5)
+  if (t.includes('haz')) return c('haze', t.includes('slight') ? 0.4 : 0.7)
+  if (t.includes('wind')) return c('windy', t.includes('strong') ? 1 : 0.6)
+  if (t.includes('partly')) return c('partly', 0.4)
+  if (t.includes('fair') || t.includes('sunny') || t.includes('clear')) return c('clear', 0)
+  return c('cloudy', 0.6)
 }
 
-/** WMO 天气代码（Open-Meteo）→ 场景天气；风速 ≥ 30km/h 的晴 / 少云算「有风」。 */
-export function classifyWmo(code: number, windKmh = 0): Condition {
-  let c: Condition
-  if (code <= 1) c = 'clear'
-  else if (code === 2) c = 'partly'
-  else if (code === 3) c = 'cloudy'
-  else if (code === 45 || code === 48) c = 'haze'
-  else if ((code >= 71 && code <= 77) || code === 85 || code === 86) c = 'snow'
-  else if (code >= 95) c = 'thunder'
-  else if (code >= 51 && code <= 82) c = 'rain'
-  else c = 'cloudy'
-  return (c === 'clear' || c === 'partly') && windKmh >= 30 ? 'windy' : c
+/** WMO 天气代码（Open-Meteo）→ 场景天气与强度；风速 ≥ 30km/h 的晴 / 少云算「大风」。 */
+export function classifyWmo(code: number, windKmh = 0): Classified {
+  const table: Record<number, Classified> = {
+    0: { condition: 'clear', intensity: 0 }, 1: { condition: 'clear', intensity: 0.2 }, 2: { condition: 'partly', intensity: 0.4 }, 3: { condition: 'cloudy', intensity: 1 },
+    45: { condition: 'fog', intensity: 0.8 }, 48: { condition: 'fog', intensity: 1 },
+    51: { condition: 'drizzle', intensity: 0.3 }, 53: { condition: 'drizzle', intensity: 0.5 }, 55: { condition: 'drizzle', intensity: 0.8 },
+    56: { condition: 'sleet', intensity: 0.4 }, 57: { condition: 'sleet', intensity: 0.7 },
+    61: { condition: 'rain', intensity: 0.4 }, 63: { condition: 'rain', intensity: 0.7 }, 65: { condition: 'rain', intensity: 1 },
+    66: { condition: 'sleet', intensity: 0.5 }, 67: { condition: 'sleet', intensity: 0.9 },
+    71: { condition: 'snow', intensity: 0.4 }, 73: { condition: 'snow', intensity: 0.7 }, 75: { condition: 'snow', intensity: 1 }, 77: { condition: 'snow', intensity: 0.3 },
+    80: { condition: 'rain', intensity: 0.5 }, 81: { condition: 'rain', intensity: 0.8 }, 82: { condition: 'rain', intensity: 1 },
+    85: { condition: 'snow', intensity: 0.6 }, 86: { condition: 'snow', intensity: 1 },
+    95: { condition: 'thunder', intensity: 0.7 }, 96: { condition: 'hail', intensity: 0.7 }, 99: { condition: 'hail', intensity: 1 },
+  }
+  const c = table[code] ?? { condition: 'cloudy', intensity: 0.6 }
+  if ((c.condition === 'clear' || c.condition === 'partly') && windKmh >= 30) return { condition: 'windy', intensity: Math.min(1, windKmh / 60) }
+  return c
 }
 
 /** 粗化坐标：保留一位小数。 */
@@ -124,7 +145,7 @@ export class WeatherService {
     if (!mine) throw new Error('empty forecasts')
     const temperature = await this.neaTemperature().catch(() => null)
     return {
-      condition: classify(mine.forecast), text: mine.forecast, area: mine.area, temperature,
+      ...classify(mine.forecast), text: mine.forecast, area: mine.area, temperature,
       validUntil: item.valid_period?.end ?? null, fetchedAt: new Date(this.now()).toISOString(), source: 'NEA',
     }
   }
@@ -142,7 +163,7 @@ export class WeatherService {
     const code = d.current?.weather_code
     if (typeof code !== 'number') throw new Error('open-meteo: no current weather')
     return {
-      condition: classifyWmo(code, d.current?.wind_speed_10m ?? 0), text: `WMO ${code}`, area: `${c.latitude},${c.longitude}`,
+      ...classifyWmo(code, d.current?.wind_speed_10m ?? 0), text: `WMO ${code}`, area: `${c.latitude},${c.longitude}`,
       temperature: typeof d.current?.temperature_2m === 'number' ? Math.round(d.current.temperature_2m * 10) / 10 : null,
       validUntil: null, fetchedAt: new Date(this.now()).toISOString(), source: 'Open-Meteo',
     }
