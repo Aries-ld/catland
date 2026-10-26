@@ -77,7 +77,7 @@
 
 1. 到 [Releases](https://github.com/Aries-ld/catland/releases) 下载对应芯片的 DMG：
    - Apple 芯片（M1 / M2 / M3 / M4…）：`catland-x.y.z-macos-arm64.dmg`
-   - Intel 芯片：`catland-x.y.z-macos-x86_64.dmg`
+   - Intel 芯片：暂未提供安装包，请按下面的「从源码构建」在本机打包
 2. 打开 DMG，把 **Catland** 拖进「应用程序」。
 3. **第一次打开**：catland 是开源项目，没有付费的 Apple 开发者签名，macOS 会提示「无法验证开发者」。任选一种方式放行：
    - 打开「系统设置 → 隐私与安全性」，在下方找到 Catland，点 **仍要打开**；或者
