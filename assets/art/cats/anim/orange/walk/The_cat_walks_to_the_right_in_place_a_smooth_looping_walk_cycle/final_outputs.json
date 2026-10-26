@@ -1,0 +1,21 @@
+{
+  "status": "success",
+  "job_id": "job_a84544551fe54eba9f2d949cf47d05a5",
+  "outputs": [
+    {
+      "type": "media",
+      "path": "assets/art/cats/anim/pilot/The_cat_walks_to_the_right_in_place_a_smooth_looping_walk_cycle/result_output_url.webp",
+      "mime_type": "image/webp"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/cats/anim/pilot/The_cat_walks_to_the_right_in_place_a_smooth_looping_walk_cycle/result_output_transparent_output_urls_gif.gif",
+      "mime_type": "image/gif"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/cats/anim/pilot/The_cat_walks_to_the_right_in_place_a_smooth_looping_walk_cycle/result_output_transparent_output_urls_png.png",
+      "mime_type": "image/png"
+    }
+  ]
+}

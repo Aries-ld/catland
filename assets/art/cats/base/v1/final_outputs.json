@@ -1,0 +1,51 @@
+{
+  "status": "success",
+  "job_id": "job_e07134e9126848f285cef9dca02d6a8d",
+  "outputs": [
+    {
+      "type": "media",
+      "path": "assets/art/cats/base/8_只不同花色的小猫_统一侧面视角_头朝右_全身站立四脚着地_尾巴自然翘起_橘猫_白_080e8cc7/sprite_00.png",
+      "mime_type": "image/png"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/cats/base/8_只不同花色的小猫_统一侧面视角_头朝右_全身站立四脚着地_尾巴自然翘起_橘猫_白_080e8cc7/sprite_01.png",
+      "mime_type": "image/png"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/cats/base/8_只不同花色的小猫_统一侧面视角_头朝右_全身站立四脚着地_尾巴自然翘起_橘猫_白_080e8cc7/sprite_02.png",
+      "mime_type": "image/png"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/cats/base/8_只不同花色的小猫_统一侧面视角_头朝右_全身站立四脚着地_尾巴自然翘起_橘猫_白_080e8cc7/sprite_03.png",
+      "mime_type": "image/png"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/cats/base/8_只不同花色的小猫_统一侧面视角_头朝右_全身站立四脚着地_尾巴自然翘起_橘猫_白_080e8cc7/sprite_04.png",
+      "mime_type": "image/png"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/cats/base/8_只不同花色的小猫_统一侧面视角_头朝右_全身站立四脚着地_尾巴自然翘起_橘猫_白_080e8cc7/sprite_05.png",
+      "mime_type": "image/png"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/cats/base/8_只不同花色的小猫_统一侧面视角_头朝右_全身站立四脚着地_尾巴自然翘起_橘猫_白_080e8cc7/sprite_06.png",
+      "mime_type": "image/png"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/cats/base/8_只不同花色的小猫_统一侧面视角_头朝右_全身站立四脚着地_尾巴自然翘起_橘猫_白_080e8cc7/sprite_07.png",
+      "mime_type": "image/png"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/cats/base/8_只不同花色的小猫_统一侧面视角_头朝右_全身站立四脚着地_尾巴自然翘起_橘猫_白_080e8cc7/sprite_pack_preview.png",
+      "mime_type": "image/png"
+    }
+  ]
+}

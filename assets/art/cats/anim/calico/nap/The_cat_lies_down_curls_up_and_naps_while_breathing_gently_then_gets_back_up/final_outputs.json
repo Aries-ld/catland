@@ -1,0 +1,21 @@
+{
+  "status": "success",
+  "job_id": "job_811a853a087e4b33be497860e89d23b7",
+  "outputs": [
+    {
+      "type": "media",
+      "path": "/Users/lindong/catlands/assets/art/cats/anim/calico/nap/The_cat_lies_down_curls_up_and_naps_while_breathing_gently_then_gets_back_up/result_output_url.webp",
+      "mime_type": "image/webp"
+    },
+    {
+      "type": "media",
+      "path": "/Users/lindong/catlands/assets/art/cats/anim/calico/nap/The_cat_lies_down_curls_up_and_naps_while_breathing_gently_then_gets_back_up/result_output_transparent_output_urls_gif.gif",
+      "mime_type": "image/gif"
+    },
+    {
+      "type": "media",
+      "path": "/Users/lindong/catlands/assets/art/cats/anim/calico/nap/The_cat_lies_down_curls_up_and_naps_while_breathing_gently_then_gets_back_up/result_output_transparent_output_urls_png.png",
+      "mime_type": "image/png"
+    }
+  ]
+}

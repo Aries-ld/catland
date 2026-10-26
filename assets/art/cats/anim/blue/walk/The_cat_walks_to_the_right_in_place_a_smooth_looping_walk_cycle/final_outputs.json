@@ -1,0 +1,21 @@
+{
+  "status": "success",
+  "job_id": "job_1e224a527c9047399327bdf3ae2c83e3",
+  "outputs": [
+    {
+      "type": "media",
+      "path": "/Users/lindong/catlands/assets/art/cats/anim/blue/walk/The_cat_walks_to_the_right_in_place_a_smooth_looping_walk_cycle/result_output_url.webp",
+      "mime_type": "image/webp"
+    },
+    {
+      "type": "media",
+      "path": "/Users/lindong/catlands/assets/art/cats/anim/blue/walk/The_cat_walks_to_the_right_in_place_a_smooth_looping_walk_cycle/result_output_transparent_output_urls_gif.gif",
+      "mime_type": "image/gif"
+    },
+    {
+      "type": "media",
+      "path": "/Users/lindong/catlands/assets/art/cats/anim/blue/walk/The_cat_walks_to_the_right_in_place_a_smooth_looping_walk_cycle/result_output_transparent_output_urls_png.png",
+      "mime_type": "image/png"
+    }
+  ]
+}

@@ -1,0 +1,256 @@
+[
+  {
+    "cat": "orange",
+    "index": 0,
+    "action": "walk",
+    "status": "skipped",
+    "dir": "assets/art/cats/anim/orange/walk/The_cat_walks_to_the_right_in_place_a_smooth_looping_walk_cycle"
+  },
+  {
+    "cat": "orange",
+    "index": 0,
+    "action": "idle",
+    "status": "success",
+    "seconds": 156,
+    "dir": "assets/art/cats/anim/orange/idle/The_cat_stands_still_blinks_slowly_and_gently_swishes_its_tail"
+  },
+  {
+    "cat": "orange",
+    "index": 0,
+    "action": "groom",
+    "status": "skipped",
+    "dir": "assets/art/cats/anim/orange/groom/The_cat_sits_down_licks_its_front_paw_to_groom_then_stands_back_up"
+  },
+  {
+    "cat": "orange",
+    "index": 0,
+    "action": "stretch",
+    "status": "success",
+    "seconds": 159,
+    "dir": "assets/art/cats/anim/orange/stretch/The_cat_does_a_big_stretch_with_front_legs_reaching_forward_and_back_raised_then_returns_to_standing"
+  },
+  {
+    "cat": "orange",
+    "index": 0,
+    "action": "hop",
+    "status": "success",
+    "seconds": 86,
+    "dir": "assets/art/cats/anim/orange/hop/The_cat_makes_a_small_playful_hop_in_place_and_lands_back"
+  },
+  {
+    "cat": "orange",
+    "index": 0,
+    "action": "nap",
+    "status": "success",
+    "seconds": 148,
+    "dir": "assets/art/cats/anim/orange/nap/The_cat_lies_down_curls_up_and_naps_while_breathing_gently_then_gets_back_up"
+  },
+  {
+    "cat": "white",
+    "index": 1,
+    "action": "walk",
+    "status": "success",
+    "seconds": 70,
+    "dir": "assets/art/cats/anim/white/walk/The_cat_walks_to_the_right_in_place_a_smooth_looping_walk_cycle"
+  },
+  {
+    "cat": "white",
+    "index": 1,
+    "action": "idle",
+    "status": "success",
+    "seconds": 140,
+    "dir": "assets/art/cats/anim/white/idle/The_cat_stands_still_blinks_slowly_and_gently_swishes_its_tail"
+  },
+  {
+    "cat": "white",
+    "index": 1,
+    "action": "groom",
+    "status": "success",
+    "seconds": 80,
+    "dir": "assets/art/cats/anim/white/groom/The_cat_sits_down_licks_its_front_paw_to_groom_then_stands_back_up"
+  },
+  {
+    "cat": "white",
+    "index": 1,
+    "action": "stretch",
+    "status": "success",
+    "seconds": 133,
+    "dir": "assets/art/cats/anim/white/stretch/The_cat_does_a_big_stretch_with_front_legs_reaching_forward_and_back_raised_then_returns_to_standing"
+  },
+  {
+    "cat": "white",
+    "index": 1,
+    "action": "hop",
+    "status": "success",
+    "seconds": 77,
+    "dir": "assets/art/cats/anim/white/hop/The_cat_makes_a_small_playful_hop_in_place_and_lands_back"
+  },
+  {
+    "cat": "white",
+    "index": 1,
+    "action": "nap",
+    "status": "success",
+    "seconds": 162,
+    "dir": "assets/art/cats/anim/white/nap/The_cat_lies_down_curls_up_and_naps_while_breathing_gently_then_gets_back_up"
+  },
+  {
+    "cat": "black",
+    "index": 2,
+    "action": "walk",
+    "status": "success",
+    "seconds": 146,
+    "dir": "assets/art/cats/anim/black/walk/The_cat_walks_to_the_right_in_place_a_smooth_looping_walk_cycle"
+  },
+  {
+    "cat": "black",
+    "index": 2,
+    "action": "idle",
+    "status": "success",
+    "seconds": 156,
+    "dir": "assets/art/cats/anim/black/idle/The_cat_stands_still_blinks_slowly_and_gently_swishes_its_tail"
+  },
+  {
+    "cat": "black",
+    "index": 2,
+    "action": "groom",
+    "status": "success",
+    "seconds": 114,
+    "dir": "assets/art/cats/anim/black/groom/The_cat_sits_down_licks_its_front_paw_to_groom_then_stands_back_up"
+  },
+  {
+    "cat": "black",
+    "index": 2,
+    "action": "stretch",
+    "status": "success",
+    "seconds": 147,
+    "dir": "assets/art/cats/anim/black/stretch/The_cat_does_a_big_stretch_with_front_legs_reaching_forward_and_back_raised_then_returns_to_standing"
+  },
+  {
+    "cat": "black",
+    "index": 2,
+    "action": "hop",
+    "status": "success",
+    "seconds": 120,
+    "dir": "assets/art/cats/anim/black/hop/The_cat_makes_a_small_playful_hop_in_place_and_lands_back"
+  },
+  {
+    "cat": "black",
+    "index": 2,
+    "action": "nap",
+    "status": "success",
+    "seconds": 140,
+    "dir": "assets/art/cats/anim/black/nap/The_cat_lies_down_curls_up_and_naps_while_breathing_gently_then_gets_back_up"
+  },
+  {
+    "cat": "calico",
+    "index": 3,
+    "action": "walk",
+    "status": "success",
+    "seconds": 74,
+    "dir": "assets/art/cats/anim/calico/walk/The_cat_walks_to_the_right_in_place_a_smooth_looping_walk_cycle"
+  },
+  {
+    "cat": "calico",
+    "index": 3,
+    "action": "idle",
+    "status": "success",
+    "seconds": 134,
+    "dir": "assets/art/cats/anim/calico/idle/The_cat_stands_still_blinks_slowly_and_gently_swishes_its_tail"
+  },
+  {
+    "cat": "calico",
+    "index": 3,
+    "action": "groom",
+    "status": "success",
+    "seconds": 74,
+    "dir": "assets/art/cats/anim/calico/groom/The_cat_sits_down_licks_its_front_paw_to_groom_then_stands_back_up"
+  },
+  {
+    "cat": "calico",
+    "index": 3,
+    "action": "stretch",
+    "status": "success",
+    "seconds": 134,
+    "dir": "assets/art/cats/anim/calico/stretch/The_cat_does_a_big_stretch_with_front_legs_reaching_forward_and_back_raised_then_returns_to_standing"
+  },
+  {
+    "cat": "calico",
+    "index": 3,
+    "action": "hop",
+    "status": "success",
+    "seconds": 71,
+    "dir": "assets/art/cats/anim/calico/hop/The_cat_makes_a_small_playful_hop_in_place_and_lands_back"
+  },
+  {
+    "cat": "calico",
+    "index": 3,
+    "action": "nap",
+    "status": "success",
+    "seconds": 136,
+    "dir": "assets/art/cats/anim/calico/nap/The_cat_lies_down_curls_up_and_naps_while_breathing_gently_then_gets_back_up"
+  },
+  {
+    "cat": "tabby",
+    "index": 4,
+    "action": "walk",
+    "status": "success",
+    "seconds": 94,
+    "dir": "assets/art/cats/anim/tabby/walk/The_cat_walks_to_the_right_in_place_a_smooth_looping_walk_cycle"
+  },
+  {
+    "cat": "tabby",
+    "index": 4,
+    "action": "idle",
+    "status": "success",
+    "seconds": 139,
+    "dir": "assets/art/cats/anim/tabby/idle/The_cat_stands_still_blinks_slowly_and_gently_swishes_its_tail"
+  },
+  {
+    "cat": "siamese",
+    "index": 5,
+    "action": "walk",
+    "status": "success",
+    "seconds": 130,
+    "dir": "assets/art/cats/anim/siamese/walk/The_cat_walks_to_the_right_in_place_a_smooth_looping_walk_cycle"
+  },
+  {
+    "cat": "siamese",
+    "index": 5,
+    "action": "idle",
+    "status": "success",
+    "seconds": 139,
+    "dir": "assets/art/cats/anim/siamese/idle/The_cat_stands_still_blinks_slowly_and_gently_swishes_its_tail"
+  },
+  {
+    "cat": "tuxedo",
+    "index": 6,
+    "action": "walk",
+    "status": "success",
+    "seconds": 118,
+    "dir": "assets/art/cats/anim/tuxedo/walk/The_cat_walks_to_the_right_in_place_a_smooth_looping_walk_cycle"
+  },
+  {
+    "cat": "tuxedo",
+    "index": 6,
+    "action": "idle",
+    "status": "success",
+    "seconds": 87,
+    "dir": "assets/art/cats/anim/tuxedo/idle/The_cat_stands_still_blinks_slowly_and_gently_swishes_its_tail"
+  },
+  {
+    "cat": "blue",
+    "index": 7,
+    "action": "walk",
+    "status": "success",
+    "seconds": 95,
+    "dir": "assets/art/cats/anim/blue/walk/The_cat_walks_to_the_right_in_place_a_smooth_looping_walk_cycle"
+  },
+  {
+    "cat": "blue",
+    "index": 7,
+    "action": "idle",
+    "status": "success",
+    "seconds": 105,
+    "dir": "assets/art/cats/anim/blue/idle/The_cat_stands_still_blinks_slowly_and_gently_swishes_its_tail"
+  }
+]
