@@ -60,6 +60,10 @@
 - 新依赖锁精确版本，且选发布满 7 天的版本。
 - 内容体验对标抖音 / 小红书（手感、布局、时延），指标与预加载策略见 `docs/decisions/0002-content-pipeline-and-preloading.md`；改动内容管线后跑 `npm run smoke:feed` 对照指标。
 - 媒体请求头按平台给（`MEDIA_HEADERS`），不要统一加 Referer：X 带错 Referer 会 403。
+- 交互类 bug（点不动、点错）先复现再修：加点击诊断日志（落在哪个视图），用真实点击复现，看到原因再改，不凭猜测修。
+- 验证会写用户真实数据（点赞、收藏、登录态）的操作要成对、可撤销，结束后核对；用户正在使用 App 时，不做自动点击等打扰操作，先征得同意。
+- 调试覆盖（`catland-debug date: / scene: / city: / event:` 等）用完必须复原（`date:off`、`scene:off`、重启 App），不要留给用户。
+- 批量改代码后，用效果验证（截图 / 测试 / 日志），不只看编译通过：替换没匹配上时不会报错。
 - 界面自检截图只用 `shot-window`（只拍 catland 窗口），不要全屏截图，避免拍到用户其他应用的内容。
 - 面板是不抢焦点的 NSPanel：系统控件（Toggle 等）会显示为非活跃样式，用自绘控件（如 `PillToggle`）。
 - NSViewRepresentable 包装的 AppKit 视图（如视频的 AVPlayerLayer）连同 SwiftUI 给它包的容器（PlatformGroupContainer）会抢在其上方的 SwiftUI 按钮之前接到点击：纯展示视图实现 `DisplayOnlyView`，`FirstMouseHostingView.hitTest` 会把落在它（及只包着它的容器）上的点击交还 SwiftUI。屏幕外预渲染的卡片要 `.allowsHitTesting(false)`——`.clipped()` 只裁画面不裁点击区域。自绘按钮的 label 要加 `contentShape`，否则只有实色像素可点。
