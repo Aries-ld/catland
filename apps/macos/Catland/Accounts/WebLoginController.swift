@@ -92,7 +92,9 @@ final class WebLoginController: NSObject, NSWindowDelegate, WKUIDelegate, WKNavi
         w.contentView = container
         for v in [chrome, web, importView] as [NSView] { v.widthAnchor.constraint(equalTo: container.widthAnchor).isActive = true }
         w.delegate = self
-        w.level = .floating
+        // 普通窗口层级：用户切到自己的浏览器登录时，它会正常退到后面，不会一直压在最上面。
+        w.level = .normal
+        w.collectionBehavior = [.managed, .participatesInCycle]
         w.isReleasedWhenClosed = false
         w.minSize = NSSize(width: 720, height: 560)
         w.center()
@@ -212,6 +214,16 @@ final class WebLoginController: NSObject, NSWindowDelegate, WKUIDelegate, WKNavi
                 }
             }
         }
+    }
+
+    /// 登录窗口被其他窗口挡住时（catland 没有 Dock 图标），点刘海把它叫回最前面。
+    /// 返回 true 表示确实把窗口叫回来了；窗口本来就在最前面时返回 false（照常展开面板）。
+    @discardableResult
+    func bringToFront() -> Bool {
+        guard let window, !(window.isKeyWindow && NSApp.isActive) else { return false }
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+        return true
     }
 
     func close() {

@@ -227,6 +227,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func expand(source: String) {
+        // 网页登录进行中：点刘海是想回到登录窗口，而不是展开刷刷面板。
+        if state.webLoginActive, WebLoginController.shared.bringToFront() { return }
         guard !state.expanded else { return }
         AppLog.info("expand", ["source": source])
         withAnimation(.spring(response: 0.38, dampingFraction: 0.82)) { state.expanded = true }
