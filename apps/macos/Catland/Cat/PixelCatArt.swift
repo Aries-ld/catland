@@ -3,6 +3,7 @@
 //
 // 部件编码：A 耳  H 头  E 眼  C 闭眼线  N 鼻  M 口鼻  P 粉色（舌头 / 腮红）
 //          B 身体  W 胸腹  L 腿  T 尾巴  Z 睡觉的 z  V 爱心  Y 蝴蝶  . 透明
+// 平台小猫的配饰：R 蝴蝶结  K 蝴蝶结结 / 项圈品红  Q 项圈青色  U 天线杆  X 天线头（花棉袄由涂装把身体染成红底碎花）
 import CoreGraphics
 import Foundation
 
@@ -150,8 +151,23 @@ enum PixelCatArt {
         var erase: [(Int, Int)] = []
     }
 
+    /// 平台小猫的配饰：画在头部附近，跟着头的位置走（低头、抬头、趴下都跟着动）。
+    enum Accessory {
+        case bow, collar, antenna, jacket
+
+        /// 相对头部左上角的像素（头部 6×5，耳朵在第 0、1 行两侧）。
+        var pixels: [(Int, Int, Character)] {
+            switch self {
+            case .bow: return [(1, -1, "R"), (4, -1, "R"), (1, 0, "R"), (2, 0, "K"), (3, 0, "K"), (4, 0, "R")]
+            case .collar: return [(6, 2, "Q"), (6, 3, "K"), (6, 4, "Q"), (6, 5, "K")] // 脖子后面竖着一圈
+            case .antenna: return [(1, -1, "U"), (0, -2, "X"), (4, -1, "U"), (5, -2, "X")]
+            case .jacket: return [] // 由涂装处理
+            }
+        }
+    }
+
     /// 组合成 12 行 × 16 列的部件编码网格。
-    static func compose(_ f: Frame) -> [[Character]] {
+    static func compose(_ f: Frame, accessory: Accessory? = nil) -> [[Character]] {
         var g = f.pose.rows.map { Array($0) }
         for (row, line) in f.legs { g[row] = Array(line) }
         for (x, y) in f.erase where inBounds(x, y) { g[y][x] = "." }
@@ -159,6 +175,12 @@ enum PixelCatArt {
         let hx = f.pose.head.x + f.headOffset.0, hy = f.pose.head.y + f.headOffset.1
         for (r, line) in f.head.rows.enumerated() {
             for (c, ch) in line.enumerated() where ch != "." && inBounds(hx + c, hy + r) { g[hy + r][hx + c] = ch }
+        }
+        // 配饰：项圈只画在身体上（趴下时被身体挡住就不画）；蝴蝶结、天线画在头顶的空位
+        for (dx, dy, ch) in accessory?.pixels ?? [] where inBounds(hx + dx, hy + dy) {
+            let cur = g[hy + dy][hx + dx]
+            if ch == "Q" || ch == "K" && accessory == .collar { if cur == "W" || cur == "B" { g[hy + dy][hx + dx] = ch } }
+            else if cur == "." || ch == "R" || ch == "K" { g[hy + dy][hx + dx] = ch }
         }
         // 身体部件随跳跃平移；粒子（z、爱心、蝴蝶）固定在画布位置，最后再画。
         let isParticle = { (ch: Character) in ch == "Z" || ch == "V" || ch == "Y" }
@@ -332,6 +354,8 @@ enum PixelCatArt {
         var socks = false
         /// 深色猫在黑色刘海上需要浅色描边。
         var rim = false
+        /// 平台小猫的配饰（随机路过的猫没有）。
+        var accessory: Accessory? = nil
     }
 
     static let skins: [Skin] = [
@@ -345,7 +369,16 @@ enum PixelCatArt {
         Skin(name: "siamese", base: 0xF1E5D2, belly: 0xF8F0E4, point: 0x5C4234, eye: 0x4F8FE6),
         Skin(name: "tuxedo", base: 0x2C2C35, belly: 0xF4F4F6, eye: 0x8BD46A, line: 0x7A7A8C, socks: true, rim: true),
         Skin(name: "gingerWhite", base: 0xF6A75C, stripe: 0xDB7B3C, belly: 0xFFFFFF, socks: true),
+        // 平台小猫（docs/design/platform-cats.md）
+        Skin(name: "ragdoll", base: 0xF6EBDC, belly: 0xFFF8EE, point: 0x6B4A3A, eye: 0x5B8DEF, accessory: .bow),       // 薯薯 · 小红书
+        Skin(name: "tuxedoBlack", base: 0x23232B, eye: 0xF2C14E, line: 0x7A7A8C, rim: true, accessory: .collar),           // 抖抖 · 抖音
+        Skin(name: "calicoTV", base: 0xF7F3EC, belly: 0xFFFFFF, patchA: 0xEB8C3B, patchB: 0x3A3340, eye: 0x4F8FE6, accessory: .antenna), // bibi · Bilibili
+        Skin(name: "cowJacket", base: 0xF6F6F8, belly: 0xFFFFFF, patchA: 0x2C2C35, patchB: 0x2C2C35, accessory: .jacket),  // 铁铁 · 快手
+        Skin(name: "kitten", base: 0xF7DFB5, belly: 0xFDF3E1, eye: 0x6B4A2A),                                              // 箱箱 · 纸箱小奶猫
     ]
+
+    /// 平台小猫用的花色（不参与随机路过）。
+    static let platformSkins: Set<String> = ["ragdoll", "tuxedoBlack", "calicoTV", "cowJacket", "kitten"]
 
     private static let pink: UInt32 = 0xF49AB0
     private static let zColor: UInt32 = 0xC9D6FF
@@ -356,6 +389,11 @@ enum PixelCatArt {
     static func color(_ ch: Character, x: Int, y: Int, skin s: Skin) -> UInt32? {
         let belly = s.belly ?? s.base
         switch ch {
+        case "R": return 0xE23B4E
+        case "K": return s.accessory == .collar ? 0xFF3DA8 : 0xA81E35
+        case "Q": return 0x35E5F0
+        case "U": return 0x5A5A68
+        case "X": return 0xFF8A3D
         case "Z": return zColor
         case "V": return heartColor
         case "Y": return butterflyColor
@@ -363,7 +401,7 @@ enum PixelCatArt {
         case "C": return s.line
         case "N", "P": return pink
         case "M": return s.point ?? belly
-        case "W": return belly
+        case "W": return s.accessory == .jacket ? jacket(x, y) : belly
         case "L":
             if s.point != nil { return s.point }
             if s.socks && y >= 10 { return belly }
@@ -375,12 +413,20 @@ enum PixelCatArt {
             if let p = s.point { return p }
             if let st = s.stripe, x % 2 == 0 { return st }
             return patch(x, y, s) ?? s.base
+        case "B" where s.accessory == .jacket:
+            return jacket(x, y)
         case "H", "B":
             if let p = patch(x, y, s) { return p }
             if let st = s.stripe, ch == "B", x % 3 == 0 { return st }
             return s.base
         default: return nil
         }
+    }
+
+    /// 东北花棉袄：红底，稀疏地点缀几朵小黄花 / 粉花。
+    private static func jacket(_ x: Int, _ y: Int) -> UInt32 {
+        let h = (x &* 5 &+ y &* 3) % 11
+        return h == 0 ? 0xFFD54A : (h == 6 ? 0xFF9BBE : 0xD8352A)
     }
 
     /// 三花的色块：按 4×3 网格的确定性哈希分出大块橘色和黑色，避免碎成噪点。

@@ -104,7 +104,7 @@ struct StatusView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            CatStage(cats: 1, id: "status", pixel: 1).frame(width: 140, height: 44)
+            CatStage(cast: [.box], id: "status", pixel: 1).frame(width: 140, height: 44)
             Text(text).font(.system(size: 14, weight: .semibold))
             if let d = detail { Text(d).font(.system(size: 12)).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal, 30) }
             if let a = action {

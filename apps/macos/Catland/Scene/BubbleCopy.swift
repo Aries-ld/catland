@@ -1,11 +1,12 @@
 // BubbleCopy：悬停时气泡的轮播语料。受众是可怜的打工人，我们做的是陪伴：
 // 不说教、不打鸡血，站在打工人这边，顺手逗你笑一下。
-// 每句话由一位猫娘用自己的口吻说（PersonaCopy），格式「名字：内容」；接入了哪些平台就由哪些猫娘轮流说。
+// 每句话由一只平台小猫用自己的口吻说（PersonaCopy），格式「名字：内容」；正常连接的平台由对应的小猫轮流说，
+// 被风控暂停、正在打盹的小猫只说「我累了，休息一会儿再来」这类话。
 // 分三类，按情境筛选后交错轮播：
 //   a. 闲聊语：天气、季节、时段、星期几、打工共鸣
 //   b. 时间语：距下班 / 节假日 / 发薪，今日 / 本周 / 今年进度
 //   c. 戳我语：俏皮地邀请点一下（不直说「开刷」）
-// 事件预告 / 倒计时由 EventScheduler.bubbleLines 提供，排在轮播最前面（由第一位猫娘说）。
+// 事件预告 / 倒计时由 EventScheduler.bubbleLines 提供，排在轮播最前面（由第一只小猫说）。
 // 内容单句不超过 22 个字（不含名字）。
 import Foundation
 
@@ -17,8 +18,10 @@ enum BubbleCopy {
         var condition: String?
         var temperature: Double?
         var season: SceneSeason
-        /// 说话的猫娘（已接入平台对应的猫娘；都没接入时是箱箱）。
+        /// 说话的小猫（正常连接的平台对应的小猫；都没接入时是箱箱）。
         var speakers: [Persona]
+        /// 正在打盹（平台被风控暂停）的小猫。
+        var sleeping: Set<Persona> = []
         var calendar: Calendar = .current
     }
 
@@ -113,7 +116,11 @@ enum BubbleCopy {
         let speakers = c.speakers.isEmpty ? [Persona.box] : shuffledPersonas(c.speakers, &rng)
         var pools: [Persona: [String: [String]]] = [:]
         for p in speakers {
-            pools[p] = ["tap": shuffled(p.lines.tap), "time": shuffled(time(c, as: p)), "chat": shuffled(chat(c, as: p))]
+            if c.sleeping.contains(p) {
+                pools[p] = ["tap": shuffled(p.lines.tired)] // 打盹的小猫：只说累了、待会儿再来
+            } else {
+                pools[p] = ["tap": shuffled(p.lines.tap), "time": shuffled(time(c, as: p)), "chat": shuffled(chat(c, as: p))]
+            }
         }
         let pattern = ["tap", "time", "chat", "chat"]
         var out: [String] = []

@@ -24,14 +24,15 @@ final class CatAtlas {
     /// 美术朝左绘制：朝右走时翻转。
     let facesLeft = true
 
-    var skins: [String] { cats.keys.sorted() }
+    /// 随机路过的猫可选的花色（不含平台小猫）。
+    var skins: [String] { cats.keys.filter { !PixelCatArt.platformSkins.contains($0) }.sorted() }
     var isEmpty: Bool { cats.isEmpty }
 
     private init() {
         var out: [String: [String: CatAnimation]] = [:]
         for skin in PixelCatArt.skins {
             for action in PixelCatArt.actions {
-                let frames = action.frames.compactMap { PixelCatArt.render(PixelCatArt.compose($0), skin: skin) }
+                let frames = action.frames.compactMap { PixelCatArt.render(PixelCatArt.compose($0, accessory: skin.accessory), skin: skin) }
                 guard frames.count == action.frames.count else { continue }
                 out[skin.name, default: [:]][action.name] = CatAnimation(
                     frames: frames, frameWidth: PixelCatArt.width, frameHeight: PixelCatArt.height,

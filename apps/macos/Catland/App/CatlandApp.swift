@@ -83,7 +83,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     UserDefaults.standard.set(m == "den" || m == "both", forKey: NotchGeometry.denKey)
                     self.screenChanged()
                 case "den": CatDirector.shared.forceDen = true
+                case "cats:dump": AppLog.info("cats", CatDirector.shared.debugDump())
                 case "cast:off": self.state.castOverride = nil
+                case "sleep:off": self.state.sleepOverride = nil
+                case let c where c.hasPrefix("sleep:"):
+                    self.state.sleepOverride = Set(c.dropFirst(6).split(separator: ",").compactMap { Persona(rawValue: String($0)) })
                 case let c where c.hasPrefix("cast:"):
                     self.state.castOverride = c.dropFirst(5).split(separator: ",").compactMap { Persona(rawValue: String($0)) }
                 case let c where c.hasPrefix("snapshots:"):

@@ -153,8 +153,8 @@ final class RestDaysTests: XCTestCase {
                                       season: .autumn, speakers: [.shushu])
         let chat = BubbleCopy.chat(base, as: .shushu)
         XCTAssertTrue(chat.contains("上海 19°，雨"))
-        XCTAssertTrue(chat.contains("下雨了，妆可别花了"))
-        XCTAssertTrue(chat.contains("周一，连口红都提不起劲"))
+        XCTAssertTrue(chat.contains("下雨了，毛可别淋湿了"))
+        XCTAssertTrue(chat.contains("周一，连舔毛都提不起劲"))
         XCTAssertTrue(chat.contains("秋天的第一杯奶茶，喝了吗"))
         let time = BubbleCopy.time(base, as: .tietie)
         XCTAssertTrue(time.contains("还有 3 小时 0 分下班，挺住"), "\(time)")
@@ -171,7 +171,11 @@ final class RestDaysTests: XCTestCase {
         XCTAssertEqual(Set(a).count, a.count)
         XCTAssertNotEqual(a, b)
         let names = Set(a.compactMap { line in Persona.allCases.first { line.hasPrefix("\($0.name)：") } })
-        XCTAssertEqual(names, [.shushu, .doudou, .bibi, .tietie], "四位猫娘都应该轮到说话")
+        XCTAssertEqual(names, [.shushu, .doudou, .bibi, .tietie], "四只小猫都应该轮到说话")
+        var tired = ctx; tired.sleeping = [.bibi]
+        let t = BubbleCopy.rotation(tired, seed: 4).filter { $0.hasPrefix("bibi：") }
+        XCTAssertFalse(t.isEmpty)
+        XCTAssertTrue(t.allSatisfy { line in Persona.bibi.lines.tired.contains { line == "bibi：\($0)" } }, "打盹的小猫只说累了：\(t)")
         let offline = BubbleCopy.rotation(BubbleCopy.Context(now: day("2026-10-28 10:00"), region: .other, city: "x", condition: nil, temperature: nil,
                                                              season: .tropical, speakers: []), seed: 3)
         XCTAssertFalse(offline.isEmpty)
@@ -182,7 +186,7 @@ final class RestDaysTests: XCTestCase {
     func testPersonaLinesFitBubble() {
         for p in Persona.allCases {
             let l = p.lines
-            var all = l.tap + l.mood + l.weather.values.flatMap { $0 } + l.season.values.flatMap { $0 }
+            var all = l.tap + l.tired + l.mood + l.weather.values.flatMap { $0 } + l.season.values.flatMap { $0 }
                 + l.daypart.values.flatMap { $0 } + l.weekday.values.flatMap { $0 }
             all += [l.offWork(12, 59), l.offSoon(59), l.dayProgress(100), l.weekProgress(100), l.holidayToday("劳动节"),
                     l.holidayTomorrow("劳动节"), l.holidayNear("劳动节", 7), l.holidayFar("劳动节", 365), l.monthEnd(6), l.yearProgress(2026, 100)]

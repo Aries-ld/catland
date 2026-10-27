@@ -1,7 +1,10 @@
 // CatStage：小猫的随机行为引擎 + 绘制。
+// 每个正常连接的平台对应一只固定花色的小猫（docs/design/platform-cats.md）：薯薯布偶猫戴红蝴蝶结、抖抖黑猫戴酷炫项圈、
+// bibi 三花猫顶小电视天线、铁铁奶牛猫穿花棉袄；什么都没接入时只有纸箱里的小奶猫箱箱。
 // 每只猫是一个「演员」：在自己的活动区间里按权重随机选动作（发呆、东张西望、坐下、舔爪、打哈欠、打盹、
-// 趴成面包、伸懒腰、追蝴蝶、翻肚皮、走几步），节奏和停顿随机；悬停时开心地蹦一下冒爱心；
-// 每隔几分钟有一只猫走出画面「下班」，换一只随机花色的新猫走进来。
+// 趴成面包、伸懒腰、追蝴蝶、翻肚皮、走几步），节奏和停顿随机；悬停时开心地蹦一下冒爱心。
+// 新连接的平台，它的猫从画面外走进来；断开 / 登录失效的走出画面；被风控暂停的趴下打盹冒 z。
+// 第一次接入平台时，箱箱在纸箱里开心地蹦一下，然后退场。
 // 猫洞（刘海 = 天花板上的猫洞）：猫会走到刘海下方跳进洞里「消失」，在洞里时洞口会垂下尾巴、
 // 伸出爪子或飘出 z，过一阵再跳下来。
 import SwiftUI
@@ -14,8 +17,10 @@ struct CatDen: Equatable {
 }
 
 struct CatStage: View {
-    /// 同时在场的猫数量。
-    let cats: Int
+    /// 在场的小猫：正常连接的平台各一只；都没接入时是 [.box]。
+    let cast: [Persona]
+    /// 被风控暂停的平台：它的猫趴下打盹。
+    var sleeping: Set<Persona> = []
     var id = "notch"
     /// 中间被物理刘海挡住、看不见的宽度：此时每只猫固定在一侧活动。0 表示整条都可见（含刘海下方步道）。
     var hiddenWidth: CGFloat = 0
@@ -44,23 +49,27 @@ struct CatStage: View {
     private func canvas(t: TimeInterval) -> some View {
             Canvas { ctx, size in
                 let px = pixel > 0 ? pixel : max(1, (1.5 * displayScale).rounded()) / max(displayScale, 1)
-                var speaker: CatDirector.Snapshot?
-                for i in 0..<cats {
-                    let lane = CatDirector.shared.lane(for: i, count: cats, width: size.width, hidden: hiddenWidth, catWidth: CGFloat(PixelCatArt.width) * px)
-                    let snap = CatDirector.shared.tick(actor: "\(id)#\(i)", lane: lane, pixel: px, time: t, excited: excited,
-                                                       den: den, groundToDen: den.map { size.height - px - $0.bottom } ?? 0)
+                let text = bubbles.isEmpty ? nil : bubbles[max(0, Int((t - bubbleEpoch) / 3)) % bubbles.count] // 每句停留 3 秒
+                var speaker: CatDirector.Snapshot?, fallback: CatDirector.Snapshot?
+                let ids = CatDirector.shared.sync(stage: id, cast: cast, time: t)
+                for (i, member) in ids.enumerated() {
+                    let lane = CatDirector.shared.lane(for: member.slot, count: max(cast.count, 1), width: size.width, hidden: hiddenWidth,
+                                                       catWidth: CGFloat(PixelCatArt.width) * px)
+                    let snap = CatDirector.shared.tick(actor: member.actor, lane: lane, pixel: px, time: t, excited: excited,
+                                                       sleeping: sleeping.contains(member.persona), box: member.persona == .box,
+                                                       den: member.persona == .box ? nil : den, groundToDen: den.map { size.height - px - $0.bottom } ?? 0)
+                    _ = i
                     if let effect = snap.denEffect, let den { drawDenEffect(effect, skin: snap.skin, den: den, in: &ctx, px: px, t: t) }
                     if snap.opacity > 0 { draw(snap, in: &ctx, size: size, px: px) }
-                    // 说话的猫：选第一只不在刘海下方（头不会被刘海挡住）的猫。
+                    if member.persona == .box, snap.opacity > 0 { drawBox(under: snap, in: &ctx, size: size, px: px) }
+                    // 说话的猫：报名字的那只；它被刘海挡住或不在场时，选第一只看得见的猫。
                     let catTop = size.height - px - CGFloat(PixelCatArt.height - 3) * px
                     let hidden = den.map { snap.x > $0.minX && snap.x < $0.maxX && catTop - 14 * px < $0.bottom } ?? false
-                    if speaker == nil, snap.opacity > 0.9, snap.lift == 0, !hidden { speaker = snap }
+                    guard snap.opacity > 0.9, snap.lift == 0, !hidden, !member.departing else { continue }
+                    if fallback == nil { fallback = snap }
+                    if let text, speaker == nil, text.hasPrefix("\(member.persona.name)：") { speaker = snap }
                 }
-                if !bubbles.isEmpty, let s = speaker {
-                    // 每句停留 3 秒。
-                    let text = bubbles[max(0, Int((t - bubbleEpoch) / 3)) % bubbles.count]
-                    drawBubble(text, above: s, in: &ctx, size: size, px: px)
-                }
+                if let text, let s = speaker ?? fallback { drawBubble(text, above: s, in: &ctx, size: size, px: px) }
             }
             .allowsHitTesting(false)
     }
@@ -92,6 +101,27 @@ struct CatStage: View {
             for (dx, dy) in [(px, 0), (-px, 0), (0, px), (0, -px)] { c.draw(rim, in: rect.offsetBy(dx: dx, dy: dy)) }
         }
         c.draw(c.resolve(Image(decorative: frame, scale: 1).interpolation(.none)), in: rect)
+    }
+
+    /// 箱箱的纸箱：画在小奶猫前面，挡住身体下半截，只露出脑袋和爪子扒着箱沿。
+    private func drawBox(under s: CatDirector.Snapshot, in ctx: inout GraphicsContext, size: CGSize, px: CGFloat) {
+        let w = 13 * px, h = 6 * px
+        let x = ((s.x - w / 2) / px).rounded() * px, y = size.height - px - h
+        let side = Color(red: 0.78, green: 0.58, blue: 0.36), top = Color(red: 0.88, green: 0.70, blue: 0.47)
+        let edge = Color(red: 0.45, green: 0.31, blue: 0.18), tape = Color(red: 0.93, green: 0.82, blue: 0.62)
+        ctx.fill(Path(CGRect(x: x, y: y, width: w, height: h)), with: .color(side))
+        ctx.fill(Path(CGRect(x: x, y: y, width: w, height: px)), with: .color(top))
+        // 两片翻开的箱盖
+        ctx.fill(Path(CGRect(x: x - 2 * px, y: y - px, width: 3 * px, height: px)), with: .color(top))
+        ctx.fill(Path(CGRect(x: x + w - px, y: y - px, width: 3 * px, height: px)), with: .color(top))
+        ctx.fill(Path(CGRect(x: x + w / 2 - px, y: y + px, width: 2 * px, height: h - px)), with: .color(tape))
+        // 描边
+        ctx.fill(Path(CGRect(x: x, y: y + h - px, width: w, height: px)), with: .color(edge))
+        ctx.fill(Path(CGRect(x: x, y: y, width: px, height: h)), with: .color(edge))
+        ctx.fill(Path(CGRect(x: x + w - px, y: y, width: px, height: h)), with: .color(edge))
+        // 贴在箱子上的猫爪纸条
+        ctx.fill(Path(CGRect(x: x + 2 * px, y: y + 2 * px, width: 3 * px, height: 2 * px)), with: .color(.white.opacity(0.92)))
+        ctx.fill(Path(CGRect(x: x + 3 * px, y: y + 3 * px, width: px, height: px)), with: .color(Color(red: 0.95, green: 0.45, blue: 0.55)))
     }
 
     /// 像素风对话气泡：白底、1 像素深色描边、方角，带一个指向猫头的小尾巴。
@@ -183,6 +213,8 @@ final class CatDirector {
 
     private struct Actor {
         var skin: String
+        /// 平台断开 / 登录失效：走出画面后移除，不再换新猫。
+        var departing = false
         var x: CGFloat
         var lift: CGFloat = 0
         var facingLeft = true
@@ -198,13 +230,69 @@ final class CatDirector {
     }
 
     private var actors: [String: Actor] = [:]
+
+    /// 每个舞台的出场名单（含正在离场的）：平台 → 演员 id。
+    struct Member { let persona: Persona; let actor: String; let slot: Int; let departing: Bool }
+    private var rosters: [String: [Persona]] = [:]
+    private var departing: [String: [Persona]] = [:]
+
+    /// 同步出场名单：新出现的平台，它的猫从画面外走进来；不在名单里的走出画面。返回这一帧要画的演员。
+    func sync(stage: String, cast: [Persona], time t: TimeInterval) -> [Member] {
+        let old = rosters[stage] ?? []
+        if old != cast {
+            for p in old where !cast.contains(p) {
+                let key = "\(stage)#\(p.rawValue)"
+                guard var a = actors[key] else { continue }
+                a.departing = true
+                a.lift = 0
+                if p == .box {
+                    // 箱箱：在纸箱里开心地蹦一下，然后连箱子一起退场
+                    start(&a, action: "hop", time: t)
+                } else {
+                    // 平台断开 / 登录失效：朝最近的一侧走两步，同时淡出
+                    a.phase = .leaving
+                    a.action = "walk"
+                    a.started = t
+                }
+                a.until = t + Self.departDuration
+                actors[key] = a
+                departing[stage, default: []].append(p)
+            }
+            for p in cast where old.isEmpty == false && !old.contains(p) { pendingEntrance.insert("\(stage)#\(p.rawValue)") }
+            departing[stage]?.removeAll { cast.contains($0) }
+            rosters[stage] = cast
+        }
+        departing[stage]?.removeAll { actors["\(stage)#\($0.rawValue)"] == nil }
+        var out = cast.enumerated().map { Member(persona: $0.element, actor: "\(stage)#\($0.element.rawValue)", slot: $0.offset, departing: false) }
+        for p in departing[stage] ?? [] {
+            out.append(Member(persona: p, actor: "\(stage)#\(p.rawValue)", slot: old.firstIndex(of: p) ?? 0, departing: true))
+        }
+        return out
+    }
+
+    /// 调试：每个演员的位置、动作、阶段。
+    func debugDump() -> [String: String] {
+        actors.mapValues { "x=\(Int($0.x)) lift=\(Int($0.lift)) action=\($0.action) phase=\($0.phase) departing=\($0.departing)" }
+    }
+
+    static let departDuration: TimeInterval = 1.2
+
+    /// 需要从画面外走进来的演员（新连接的平台）。
+    private var pendingEntrance: Set<String> = []
     /// 调试：下一次决策时强制去猫洞。
     var forceDen = false
     /// 窗外有事件（流星雨、烟花…）正在进行：所有猫停下来坐着抬头看。
     var watching = false
     private var onStage: Set<String> { Set(actors.values.map(\.skin)) }
     /// 同一时刻只允许一只猫在洞里（洞口小，效果更清楚）。
-    private var denOccupied: Bool { actors.values.contains { if case .inDen = $0.phase { return true }; if case .climbing = $0.phase { return true }; return false } }
+    private var denOccupied: Bool {
+        actors.values.contains {
+            switch $0.phase {
+            case .toDen, .climbing, .inDen, .dropping: return true
+            default: return false
+            }
+        }
+    }
     /// 走路速度：每秒多少个美术像素。
     private let walkSpeed: CGFloat = 9
     /// 离场 / 入场时走到区间外多远。
@@ -223,9 +311,30 @@ final class CatDirector {
         return Lane(min: seg * CGFloat(i) + half, max: max(seg * CGFloat(i) + half + 1, seg * CGFloat(i + 1) - half), exitLeft: i % 2 == 0)
     }
 
-    func tick(actor id: String, lane: Lane, pixel: CGFloat, time t: TimeInterval, excited: Bool, den: CatDen? = nil, groundToDen: CGFloat = 0) -> Snapshot {
+    func tick(actor id: String, lane: Lane, pixel: CGFloat, time t: TimeInterval, excited: Bool, sleeping: Bool = false, box: Bool = false,
+              den: CatDen? = nil, groundToDen: CGFloat = 0) -> Snapshot {
         let atlas = CatAtlas.shared
-        var a = actors[id] ?? newActor(lane: lane, time: t)
+        let skin = Self.skin(for: id)
+        var a = actors[id] ?? newActor(lane: lane, time: t, entering: pendingEntrance.remove(id) != nil, skin: skin)
+        if box, !a.departing { a.x = lane.min + 6 } // 箱箱待在纸箱里不走动，蹲在左侧看得见的地方（不躲在刘海下面）
+        // 离场的猫：淡出结束就移除
+        if a.departing, t >= a.until {
+            actors[id] = nil
+            return Snapshot(animation: atlas.cats[a.skin]!["idle"]!, frame: 0, x: a.x, lift: 0, facingLeft: a.facingLeft, opacity: 0,
+                            rim: false, skin: a.skin, denEffect: nil)
+        }
+        // 平台被风控：趴下打盹（一直睡，直到恢复）；恢复后起身
+        if sleeping, !a.departing, a.action != "nap" {
+            switch a.phase {
+            case .acting, .walking:
+                start(&a, action: "nap", time: t)
+                a.loops = 9999
+                a.until = .infinity
+            default: break
+            }
+        } else if !sleeping, a.action == "nap", a.loops == 9999 {
+            start(&a, action: "look", time: t)
+        }
         let dt = a.lastTick == 0 ? 0 : min(0.1, t - a.lastTick)
         a.lastTick = t
         let step = walkSpeed * pixel * CGFloat(dt)
@@ -233,7 +342,7 @@ final class CatDirector {
         let denLift = groundToDen + CGFloat(PixelCatArt.height) * pixel
 
         // 事件开始：正在发呆 / 散步的猫原地坐下看窗外；事件结束：起身继续自己的事。
-        if watching, a.action != "watch" {
+        if watching, a.action != "watch", a.action != "nap" {
             switch a.phase {
             case .acting, .walking: start(&a, action: "watch", time: t)
             default: break
@@ -241,7 +350,7 @@ final class CatDirector {
         } else if !watching, a.action == "watch", case .acting = a.phase, a.until > t + 1 {
             a.until = t
         }
-        if excited && !a.wasExcited, case .acting = a.phase, a.action != "watch" { start(&a, action: "hop", time: t) }
+        if excited && !a.wasExcited, case .acting = a.phase, a.action != "watch", a.action != "nap" { start(&a, action: "hop", time: t) }
         a.wasExcited = excited
         var effect: DenEffect?
 
@@ -256,7 +365,11 @@ final class CatDirector {
         case .leaving:
             let exit = lane.exitLeft ? lane.min - offstage : lane.max + offstage
             moveToward(&a, goal: exit, step: step)
-            if abs(a.x - exit) < 0.5 { a = newActor(lane: lane, time: t, entering: true, excluding: onStage) }
+            if abs(a.x - exit) < 0.5 {
+                // 断开的平台：走出画面后移除
+                if a.departing { actors[id] = nil; return Snapshot(animation: atlas.cats[a.skin]!["idle"]!, frame: 0, x: a.x, lift: 0, facingLeft: a.facingLeft, opacity: 0, rim: false, skin: a.skin, denEffect: nil) }
+                a = newActor(lane: lane, time: t, entering: true, excluding: onStage)
+            }
         case .acting:
             if t >= a.until { decide(&a, lane: lane, time: t, den: den) }
         case .toDen(let goal):
@@ -270,7 +383,8 @@ final class CatDirector {
             let k = min(1, (t - from) / jumpTime)
             a.lift = denLift * CGFloat(1 - pow(1 - k, 2)) // 先快后慢的起跳
             if k >= 1 {
-                a.phase = .inDen(until: t + Double.random(in: 18...50), effect: DenEffect.Kind.allCases.randomElement()!)
+                // 小猫代表平台连接状态，不能躲太久：在洞里待 8–20 秒
+                a.phase = .inDen(until: t + Double.random(in: 8...20), effect: DenEffect.Kind.allCases.randomElement()!)
                 a.effectChange = t + Double.random(in: 5...10)
             }
         case .inDen(let until, var kind):
@@ -300,6 +414,7 @@ final class CatDirector {
         let edge = lane.exitLeft ? a.x - (lane.min - offstage) : (lane.max + offstage) - a.x
         var opacity = min(1, max(0, Double(edge) / 16))
         if case .inDen = a.phase { opacity = 0 }
+        if a.departing { opacity = min(opacity, max(0, (a.until - t) / Self.departDuration)) }
         return Snapshot(animation: anim, frame: Self.frameIndex(raw: raw, anim: anim, loops: a.loops), x: a.x, lift: a.lift, facingLeft: a.facingLeft,
                         opacity: opacity, rim: atlas.rimmed.contains(a.skin), skin: a.skin, denEffect: effect, action: a.action)
     }
@@ -323,12 +438,19 @@ final class CatDirector {
         return Double(frames) / anim.fps
     }
 
-    private func newActor(lane: Lane, time t: TimeInterval, entering: Bool = false, excluding: Set<String> = []) -> Actor {
+    /// 演员 id（舞台#平台）→ 固定花色。
+    static func skin(for actor: String) -> String? {
+        guard let raw = actor.split(separator: "#").last, let p = Persona(rawValue: String(raw)) else { return nil }
+        return p.skin
+    }
+
+    private func newActor(lane: Lane, time t: TimeInterval, entering: Bool = false, excluding: Set<String> = [], skin fixed: String? = nil) -> Actor {
         let skins = CatAtlas.shared.skins
         let pool = skins.filter { !excluding.contains($0) }
-        let skin = (pool.isEmpty ? skins : pool).randomElement() ?? "orange"
+        let skin = fixed ?? (pool.isEmpty ? skins : pool).randomElement() ?? "orange"
         var a = Actor(skin: skin, x: entering ? (lane.exitLeft ? lane.min - offstage : lane.max + offstage) : CGFloat.random(in: lane.min...max(lane.min + 1, lane.max)))
-        a.nextSwap = t + Double.random(in: 150...360)
+        // 平台小猫固定在场，不会「下班」换猫；随机路过的猫每隔几分钟换一只
+        a.nextSwap = fixed == nil ? t + Double.random(in: 150...360) : .infinity
         if entering {
             a.phase = .entering
             a.action = "walk"
@@ -351,7 +473,7 @@ final class CatDirector {
             return
         }
         // 去猫洞：洞没人占、并且这只猫离洞不太远时才考虑。
-        if let den, !denOccupied, forceDen || Double.random(in: 0..<1) < 0.14 {
+        if let den, !denOccupied, forceDen || Double.random(in: 0..<1) < 0.06 {
             forceDen = false
             let margin = CGFloat(PixelCatArt.width)
             let target = CGFloat.random(in: (den.minX + margin)...max(den.minX + margin + 1, den.maxX - margin))
@@ -359,6 +481,11 @@ final class CatDirector {
             a.phase = .toDen(x: target)
             a.action = "walk"
             a.started = t
+            return
+        }
+        // 箱箱在纸箱里：只发呆、张望、打哈欠
+        if a.skin == Persona.box.skin {
+            start(&a, action: ["idle", "look", "yawn", "idle"].randomElement()!, time: t)
             return
         }
         let have = CatAtlas.shared.cats[a.skin] ?? [:]

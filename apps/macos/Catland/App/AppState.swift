@@ -45,14 +45,26 @@ final class AppState {
     private var announced: Set<String> = []
     private var eventsTask: Task<Void, Never>?
 
-    /// 说话的猫娘：已接入平台对应的猫娘；一个都没接入时是纸箱猫娘箱箱。
-    var speakers: [Persona] { castOverride ?? Persona.speakers(platforms: connectedContentPlatforms.map(\.id)) }
+    /// 刘海里出场的小猫：只有正常连接的平台（登录失效、被禁用的不出现）；一个都没有时是纸箱里的箱箱。
+    var speakers: [Persona] {
+        castOverride ?? Persona.speakers(platforms: connectedContentPlatforms
+            .filter { $0.health != "expired" && sourceStatus[$0.id] != "auth" }
+            .map(\.id))
+    }
+    /// 被风控暂停中的平台：它的小猫趴下打盹。
+    var sleepingCats: Set<Persona> {
+        if let o = sleepOverride { return o }
+        return Set(sourceStatus.filter { $0.value == "cooldown" }.compactMap { Persona.forPlatform($0.key) })
+    }
+    /// 调试：临时让某些小猫打盹（catland-debug sleep:bibi / sleep:off）。
+    var sleepOverride: Set<Persona>?
     /// 调试：临时指定刘海里出场的角色（catland-debug cast:box / cast:off），不影响真实的平台连接。
     var castOverride: [Persona]?
 
     func announce(_ text: String, seconds: Double = 8) {
         // 主动探头说话也带上名字（随机挑一位在场的猫娘）
-        let text = Persona.allCases.contains { text.hasPrefix("\($0.name)：") } ? text : (speakers.randomElement() ?? .box).say(text)
+        let awake = speakers.filter { !sleepingCats.contains($0) }
+        let text = Persona.allCases.contains { text.hasPrefix("\($0.name)：") } ? text : ((awake.isEmpty ? speakers : awake).randomElement() ?? .box).say(text)
         AppLog.info("cat announce", ["text": text])
         peekTask?.cancel()
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { peekMessage = text }

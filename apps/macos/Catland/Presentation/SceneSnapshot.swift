@@ -97,14 +97,13 @@ enum SceneSnapshot {
         let p: CGFloat = 1.5
         let live = EventScheduler.active(now: env.date, region: RestDays.region(for: env.location), latitude: env.location.latitude)
         CatDirector.shared.watching = live != nil
-        CatgirlDirector.shared.watching = live != nil
         let id = "snapshot-\(Int(t))"
         func view(catTime: TimeInterval) -> some View {
             ZStack {
                 Canvas { ctx, sz in
                     Presentation.render(SceneCanvas(ctx: ctx, size: sz, p: p, env: env, notch: notch, t: t))
                 }
-                CatgirlStage(cast: [.shushu, .doudou, .bibi, .tietie], bubbles: bubble.map { [Persona.shushu.say($0)] } ?? [], bubbleEpoch: catTime, frozenTime: catTime)
+                CatStage(cast: [.shushu, .doudou, .bibi, .tietie], id: id, pixel: p, bubbles: bubble.map { [Persona.shushu.say($0)] } ?? [], bubbleEpoch: catTime, frozenTime: catTime)
             }
             .frame(width: size.width, height: size.height)
             .environment(\.displayScale, scale)
