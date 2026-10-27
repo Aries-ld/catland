@@ -1,0 +1,51 @@
+{
+  "status": "success",
+  "job_id": "job_ba2c61a63703406a89105b898d292e12",
+  "outputs": [
+    {
+      "type": "media",
+      "path": "assets/art/catgirls/design-v2/egg/Chibi_anime_cat_girl_about_2_5_heads_tall_standing_and_facing_forward_whose_head_and_whole_upper_body_are_hidd_975df823/sprite_00.png",
+      "mime_type": "image/png"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/catgirls/design-v2/egg/Chibi_anime_cat_girl_about_2_5_heads_tall_standing_and_facing_forward_whose_head_and_whole_upper_body_are_hidd_975df823/sprite_01.png",
+      "mime_type": "image/png"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/catgirls/design-v2/egg/Chibi_anime_cat_girl_about_2_5_heads_tall_standing_and_facing_forward_whose_head_and_whole_upper_body_are_hidd_975df823/sprite_02.png",
+      "mime_type": "image/png"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/catgirls/design-v2/egg/Chibi_anime_cat_girl_about_2_5_heads_tall_standing_and_facing_forward_whose_head_and_whole_upper_body_are_hidd_975df823/sprite_03.png",
+      "mime_type": "image/png"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/catgirls/design-v2/egg/Chibi_anime_cat_girl_about_2_5_heads_tall_standing_and_facing_forward_whose_head_and_whole_upper_body_are_hidd_975df823/sprite_04.png",
+      "mime_type": "image/png"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/catgirls/design-v2/egg/Chibi_anime_cat_girl_about_2_5_heads_tall_standing_and_facing_forward_whose_head_and_whole_upper_body_are_hidd_975df823/sprite_05.png",
+      "mime_type": "image/png"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/catgirls/design-v2/egg/Chibi_anime_cat_girl_about_2_5_heads_tall_standing_and_facing_forward_whose_head_and_whole_upper_body_are_hidd_975df823/sprite_06.png",
+      "mime_type": "image/png"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/catgirls/design-v2/egg/Chibi_anime_cat_girl_about_2_5_heads_tall_standing_and_facing_forward_whose_head_and_whole_upper_body_are_hidd_975df823/sprite_07.png",
+      "mime_type": "image/png"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/catgirls/design-v2/egg/Chibi_anime_cat_girl_about_2_5_heads_tall_standing_and_facing_forward_whose_head_and_whole_upper_body_are_hidd_975df823/sprite_pack_preview.png",
+      "mime_type": "image/png"
+    }
+  ]
+}

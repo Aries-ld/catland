@@ -1,0 +1,46 @@
+{
+  "status": "success",
+  "job_id": "job_1fcd4487183a42d786dd34c5e7227993",
+  "outputs": [
+    {
+      "type": "media",
+      "path": "assets/art/catgirls/design-v2/tietie/Chibi_anime_cat_girl_about_2_5_heads_tall_cat_ears_and_a_cat_tail_standing_and_facing_forward_A_tall_confident_481b73e6/sprite_00.png",
+      "mime_type": "image/png"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/catgirls/design-v2/tietie/Chibi_anime_cat_girl_about_2_5_heads_tall_cat_ears_and_a_cat_tail_standing_and_facing_forward_A_tall_confident_481b73e6/sprite_01.png",
+      "mime_type": "image/png"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/catgirls/design-v2/tietie/Chibi_anime_cat_girl_about_2_5_heads_tall_cat_ears_and_a_cat_tail_standing_and_facing_forward_A_tall_confident_481b73e6/sprite_02.png",
+      "mime_type": "image/png"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/catgirls/design-v2/tietie/Chibi_anime_cat_girl_about_2_5_heads_tall_cat_ears_and_a_cat_tail_standing_and_facing_forward_A_tall_confident_481b73e6/sprite_03.png",
+      "mime_type": "image/png"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/catgirls/design-v2/tietie/Chibi_anime_cat_girl_about_2_5_heads_tall_cat_ears_and_a_cat_tail_standing_and_facing_forward_A_tall_confident_481b73e6/sprite_04.png",
+      "mime_type": "image/png"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/catgirls/design-v2/tietie/Chibi_anime_cat_girl_about_2_5_heads_tall_cat_ears_and_a_cat_tail_standing_and_facing_forward_A_tall_confident_481b73e6/sprite_06.png",
+      "mime_type": "image/png"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/catgirls/design-v2/tietie/Chibi_anime_cat_girl_about_2_5_heads_tall_cat_ears_and_a_cat_tail_standing_and_facing_forward_A_tall_confident_481b73e6/sprite_07.png",
+      "mime_type": "image/png"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/catgirls/design-v2/tietie/Chibi_anime_cat_girl_about_2_5_heads_tall_cat_ears_and_a_cat_tail_standing_and_facing_forward_A_tall_confident_481b73e6/sprite_pack_preview.png",
+      "mime_type": "image/png"
+    }
+  ]
+}
