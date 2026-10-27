@@ -2,10 +2,12 @@
 // 不说教、不打鸡血，站在打工人这边，顺手逗你笑一下。
 // 每句话由一只平台小猫用自己的口吻说（PersonaCopy），格式「名字：内容」；正常连接的平台由对应的小猫轮流说，
 // 被风控暂停、正在打盹的小猫只说「我累了，休息一会儿再来」这类话。
-// 分三类，按情境筛选后交错轮播：
-//   a. 闲聊语：天气、季节、时段、星期几、打工共鸣
+// 分四类，按情境筛选后交错轮播：
+//   a. 闲聊语：天气、季节、时段、星期几、打工共鸣（泛化，避免每句都「看穿你」显得刻意）
 //   b. 时间语：距下班 / 节假日 / 发薪，今日 / 本周 / 今年进度
 //   c. 戳我语：俏皮地邀请点一下（不直说「开刷」）
+//   d. 情境语：此刻最贴切的话。强情境（凌晨还亮着屏、工作日晚上加班、雷雨暴雪、极端冷热）每次悬停的第一句必定是它；
+//      普通情境（周一早上、周五下午、早起、下雨、时段、季节）约一半悬停排第一句，之后和泛化语料按较低比例交错。
 // 事件预告 / 倒计时由 EventScheduler.bubbleLines 提供，排在轮播最前面（由第一只小猫说）。
 // 内容单句不超过 22 个字（不含名字）。
 import Foundation
@@ -61,6 +63,34 @@ enum BubbleCopy {
         }
     }
 
+    // MARK: - d. 情境语
+
+    /// 此刻的情境语：strong 是特别值得说的（凌晨、加班、雷雨暴雪、极端冷热），mild 是普通的（周一、周五、早起、下雨、时段、季节）。
+    static func moments(_ c: Context, as p: Persona) -> (strong: [String], mild: [String]) {
+        let l = p.lines, m = l.moments
+        let cal = c.calendar
+        let hm = Double(cal.component(.hour, from: c.now)) + Double(cal.component(.minute, from: c.now)) / 60
+        let weekday = cal.component(.weekday, from: c.now) // 1 = 周日 … 7 = 周六
+        let workday = (2...6).contains(weekday)
+        var strong: [String] = [], mild: [String] = []
+        if hm < 5 { strong += m["lateNight"] ?? [] }
+        if workday && hm >= 19 { strong += m["overtime"] ?? [] }
+        if let cond = c.condition {
+            if ["thunder", "snow", "sleet"].contains(cond) { strong += l.weather[cond] ?? [] }
+            else if ["rain", "drizzle", "fog", "haze", "windy"].contains(cond) { mild += l.weather[cond] ?? [] }
+        }
+        if let t = c.temperature {
+            if t >= 33 { strong += l.weather["hot"] ?? [] } else if t <= 3 { strong += l.weather["cold"] ?? [] }
+        }
+        if hm >= 5 && hm < 7 { mild += m["earlyBird"] ?? [] }
+        if weekday == 2 && hm >= 8 && hm < 11.5 { mild += m["mondayMorning"] ?? [] }
+        if weekday == 6 && hm >= 14 && hm < 18.5 { mild += m["fridayAfternoon"] ?? [] }
+        if !workday && hm >= 9 && hm < 18 { mild += m["weekendWork"] ?? [] }
+        if hm >= 5 { mild += l.daypart[daypart(hm)] ?? [] }
+        mild += l.season[c.season] ?? []
+        return (strong, mild)
+    }
+
     // MARK: - b. 时间语
 
     static func time(_ c: Context, as p: Persona) -> [String] {
@@ -105,7 +135,8 @@ enum BubbleCopy {
 
     // MARK: - 组合
 
-    /// 三类交错：戳我 → 时间 → 闲聊 → 闲聊 → …；说话的小猫轮流来；同一次悬停内不重复。
+    /// 第一句：有强情境时必定是情境语，普通情境约一半是；之后四类交错：戳我 → 情境 → 闲聊 → 时间 → 闲聊 → …
+    /// 说话的小猫轮流来；同一次悬停内不重复。
     static func rotation(_ c: Context, seed: UInt64, count: Int = 12) -> [String] {
         var rng = SeededRandom(seed: seed)
         func shuffled(_ a: [String]) -> [String] {
@@ -115,16 +146,29 @@ enum BubbleCopy {
         }
         let speakers = c.speakers.isEmpty ? [Persona.box] : shuffledPersonas(c.speakers, &rng)
         var pools: [Persona: [String: [String]]] = [:]
+        var hasStrong = false
         for p in speakers {
             if c.sleeping.contains(p) {
-                pools[p] = ["tap": shuffled(p.lines.tired)] // 打盹的小猫：只说累了、待会儿再来
+                // 打盹的小猫：轮到它时不管哪一类，都只说累了、待会儿再来
+                let tired = shuffled(p.lines.tired)
+                pools[p] = ["tap": tired, "moment": tired, "chat": tired, "time": tired]
             } else {
-                pools[p] = ["tap": shuffled(p.lines.tap), "time": shuffled(time(c, as: p)), "chat": shuffled(chat(c, as: p))]
+                let mo = moments(c, as: p)
+                hasStrong = hasStrong || !mo.strong.isEmpty
+                // popLast 先取末尾：强情境排在后面，先被说到
+                pools[p] = ["tap": shuffled(p.lines.tap), "time": shuffled(time(c, as: p)), "chat": shuffled(chat(c, as: p)),
+                            "moment": shuffled(mo.mild) + shuffled(mo.strong)]
             }
         }
-        let pattern = ["tap", "time", "chat", "chat"]
+        let pattern = ["tap", "moment", "chat", "time", "chat"]
         var out: [String] = []
         var seen = Set<String>()
+        // 第一句：由第一只醒着的小猫说情境语（强情境必定，普通情境约一半）
+        if hasStrong || rng.next() % 2 == 0, let first = speakers.first(where: { !c.sleeping.contains($0) }),
+           let line = pools[first]?["moment"]?.popLast() {
+            seen.insert(line)
+            out.append(first.say(line))
+        }
         var i = 0
         while out.count < count, i < count * 12 {
             let p = speakers[i % speakers.count], kind = pattern[(i / speakers.count + i) % pattern.count]

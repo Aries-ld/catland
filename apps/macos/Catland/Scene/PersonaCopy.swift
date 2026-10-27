@@ -60,10 +60,13 @@ enum Persona: String, CaseIterable {
 /// - weather：rain / drizzle / thunder / snow / sleet / fog / haze / windy / clear / cloudy / hot / cold
 /// - daypart：morning / forenoon / lunch / afternoon / lastHour / evening / night / late
 /// - weekday：2 = 周一 … 6 = 周五，7 = 周末
+/// - moments（情境语，此刻最贴切的话）：lateNight 凌晨还亮着屏 / overtime 工作日晚上还在加班 / earlyBird 起得很早 /
+///   mondayMorning 周一上午 / fridayAfternoon 周五下午 / weekendWork 周末白天还在电脑前
 struct PersonaLines {
     let tap: [String]
     /// 平台被风控暂停、小猫在打盹时说的话。
     let tired: [String]
+    let moments: [String: [String]]
     let weather: [String: [String]]
     let season: [SceneSeason: [String]]
     let daypart: [String: [String]]
@@ -91,6 +94,14 @@ extension PersonaLines {
             "本小姐的时间很贵，快点", "点我，今日份精致已备好", "别光看我，点进来呀",
         ],
         tired: ["本小姐累了，休息一会儿再来", "今天营业结束，晚点再看"],
+        moments: [
+            "lateNight": ["这么晚还在工作？辛苦了，真的", "凌晨还亮着屏，本小姐都心疼了", "工作再重要，也没你重要", "熬到这个点，明天记得补觉"],
+            "overtime": ["还在加班？老板可不会感动", "下班时间过了，优雅地关电脑吧", "加班到现在，奖励自己一杯奶茶"],
+            "earlyBird": ["起这么早？本小姐都还没醒", "这么早就开工，勤快得可怕"],
+            "mondayMorning": ["周一早上，先精致地发会儿呆", "周一的脸色，本小姐懂"],
+            "fridayAfternoon": ["周五下午了，心早飞走了吧", "周五了，晚上约饭定了吗"],
+            "weekendWork": ["周末还在电脑前？过分了", "周末加班，记得加钱"],
+        ],
         weather: [
             "rain": ["下雨了，毛可别淋湿了", "雨天也要精致，懂吗", "这种天气只配窝着看笔记"],
             "drizzle": ["毛毛雨而已，本小姐不出门"],
@@ -157,6 +168,14 @@ extension PersonaLines {
             "点我点我，BGM 已就位 ♪", "冲！点我开刷", "别划走，点我",
         ],
         tired: ["电量不足，我先眯会儿", "冲太猛了，歇一下再来"],
+        moments: [
+            "lateNight": ["这个点还没睡，辛苦啦", "这么晚还在肝，抱抱", "夜深了，刷完这条就睡好吗", "熬夜的打工人，今天你最酷"],
+            "overtime": ["还在加班？家人们这不合理", "下班了还在卷？歇会儿", "加班到现在，给你点个赞"],
+            "earlyBird": ["这么早？卷王本王了", "早起的你，今天必火"],
+            "mondayMorning": ["周一早上，先来点 BGM 续命", "周一，打工人集合"],
+            "fridayAfternoon": ["周五下午，摸鱼合法化", "周五了，今晚去哪嗨"],
+            "weekendWork": ["周末还上班？这波不值", "周末就该出去浪"],
+        ],
         weather: [
             "rain": ["下雨天，雨声当 BGM 绝了", "雨天，窗边听雨 chill 一下"],
             "drizzle": ["毛毛雨，氛围感拉满"],
@@ -223,6 +242,14 @@ extension PersonaLines {
             "不点我？下次一定（哼）", "点我！新番更新啦 (/≧▽≦)/", "勉强允许你点一下",
         ],
         tired: ["才、才不是累了…就眯一会儿", "我先睡会儿，等下再陪你看"],
+        moments: [
+            "lateNight": ["这么晚还在工作…辛、辛苦了", "都几点了！快去睡啦笨蛋", "才不是担心你…早点休息嘛", "陪你熬一会儿…就一会儿哦"],
+            "overtime": ["还在加班？笨蛋，快下班", "加班到现在…哼，陪你一会儿"],
+            "earlyBird": ["这么早？我还没睡呢…", "早起什么的，才不羡慕"],
+            "mondayMorning": ["周一早上…我也不想上学", "周一了，打起精神来…一点点"],
+            "fridayAfternoon": ["周五下午！周末补番预定", "周五了，才不是期待周末"],
+            "weekendWork": ["周末还工作？笨蛋吗你", "周末就该宅着补番啊"],
+        ],
         weather: [
             "rain": ["下雨天，最适合补番了", "雨好大…才不是怕打雷"],
             "drizzle": ["小雨天，宅着追番吧"],
@@ -289,6 +316,14 @@ extension PersonaLines {
             "别磨叽，点我", "大妹子、大兄弟，点我", "点一下，大姐请你看好的",
         ],
         tired: ["累了，大姐先眯会儿再整", "歇会儿，一会儿接着唠"],
+        moments: [
+            "lateNight": ["大半夜还干活呢？辛苦了老铁", "这么晚了还没歇，大姐心疼", "活儿明天整，先睡觉去", "熬这么晚，饿不饿？"],
+            "overtime": ["还加班呢？差不多得了", "加班到这会儿，整点夜宵去", "下班了还干，老板给加钱不？"],
+            "earlyBird": ["起这么早！比大姐还勤快", "这么早，吃早饭没？"],
+            "mondayMorning": ["周一早上，打起精神来老铁", "周一了，整碗热乎的再干"],
+            "fridayAfternoon": ["周五下午了，麻溜收尾", "周五了，晚上整顿好的"],
+            "weekendWork": ["周末还干活？歇歇吧", "周末就该出去溜达溜达"],
+        ],
         weather: [
             "rain": ["下雨了，早点回家别淋着", "雨天，炖个汤整点热乎的"],
             "drizzle": ["小毛毛雨，不打伞也嘎嘎好"],
@@ -355,6 +390,14 @@ extension PersonaLines {
             "带我去认识你的 App 吧…", "接上平台，我就能出来了",
         ],
         tired: ["有点困了…睡一下下…"],
+        moments: [
+            "lateNight": ["这么晚了…你还在忙吗…辛苦了", "夜好深…我陪着你…", "好晚了…要早点睡哦…"],
+            "overtime": ["还没下班吗…辛苦了…", "加班好累吧…摸摸…"],
+            "earlyBird": ["好早…你是来看我的吗…"],
+            "mondayMorning": ["周一了…你会来接我吗…"],
+            "fridayAfternoon": ["周五了…周末能陪我吗…"],
+            "weekendWork": ["周末也在忙吗…辛苦啦…"],
+        ],
         weather: [
             "rain": ["下雨了…纸箱要湿了", "雨好大…你会来接我吗"],
             "drizzle": ["毛毛雨…箱子还撑得住"],

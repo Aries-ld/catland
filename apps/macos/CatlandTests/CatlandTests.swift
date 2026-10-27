@@ -194,11 +194,44 @@ final class RestDaysTests: XCTestCase {
         XCTAssertTrue(offline.allSatisfy { $0.hasPrefix("箱箱：") })
     }
 
+    /// 凌晨、加班这类强情境：每次悬停的第一句必定是情境语；普通时段不总是情境语开头（避免刻意）。
+    func testMomentsLeadTheRotation() {
+        func ctx(_ t: String, _ cond: String? = "clear", _ temp: Double? = 20) -> BubbleCopy.Context {
+            BubbleCopy.Context(now: day(t), region: .china, city: "上海", condition: cond, temperature: temp, season: .autumn,
+                               speakers: [.shushu, .doudou, .bibi, .tietie])
+        }
+        func strip(_ line: String) -> (Persona, String)? {
+            Persona.allCases.first { line.hasPrefix("\($0.name)：") }.map { ($0, String(line.dropFirst($0.name.count + 1))) }
+        }
+        for seed in UInt64(1)...20 {
+            // 周三凌晨 3 点
+            let (p, first) = strip(BubbleCopy.rotation(ctx("2026-10-28 03:00"), seed: seed)[0])!
+            XCTAssertTrue(p.lines.moments["lateNight"]!.contains(first), "凌晨 3 点第一句应该是关心熬夜：\(first)")
+            // 周三晚上 20:30 还在加班
+            let (p2, first2) = strip(BubbleCopy.rotation(ctx("2026-10-28 20:30"), seed: seed)[0])!
+            XCTAssertTrue(p2.lines.moments["overtime"]!.contains(first2), "加班时第一句应该是加班：\(first2)")
+            // 雷雨
+            let (p3, first3) = strip(BubbleCopy.rotation(ctx("2026-10-28 15:00", "thunder"), seed: seed)[0])!
+            XCTAssertTrue(p3.lines.weather["thunder"]!.contains(first3), "雷雨天第一句应该说打雷：\(first3)")
+        }
+        // 周三上午 10 点：没有强情境，20 次悬停里应该既有情境语开头、也有泛化开头
+        let firsts = (UInt64(1)...20).map { seed -> Bool in
+            let (p, line) = strip(BubbleCopy.rotation(ctx("2026-10-28 10:00"), seed: seed)[0])!
+            let mo = BubbleCopy.moments(ctx("2026-10-28 10:00"), as: p)
+            return mo.mild.contains(line)
+        }
+        XCTAssertTrue(firsts.contains(true) && firsts.contains(false), "普通时段不应该总是情境语开头")
+        // 周六下午还在电脑前
+        let sat = BubbleCopy.moments(ctx("2026-10-31 15:00"), as: .bibi)
+        XCTAssertTrue(sat.mild.contains("周末还工作？笨蛋吗你"))
+        XCTAssertTrue(sat.strong.isEmpty)
+    }
+
     /// 每只小猫的所有语料（含带数字的模板）都不超过 22 个字（不含名字），气泡放得下。
     func testPersonaLinesFitBubble() {
         for p in Persona.allCases {
             let l = p.lines
-            var all = l.tap + l.tired + l.mood + l.weather.values.flatMap { $0 } + l.season.values.flatMap { $0 }
+            var all = l.tap + l.tired + l.moments.values.flatMap { $0 } + l.mood + l.weather.values.flatMap { $0 } + l.season.values.flatMap { $0 }
                 + l.daypart.values.flatMap { $0 } + l.weekday.values.flatMap { $0 }
             all += [l.offWork(12, 59), l.offSoon(59), l.dayProgress(100), l.weekProgress(100), l.holidayToday("劳动节"),
                     l.holidayTomorrow("劳动节"), l.holidayNear("劳动节", 7), l.holidayFar("劳动节", 365), l.monthEnd(6), l.yearProgress(2026, 100)]
