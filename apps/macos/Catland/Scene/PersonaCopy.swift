@@ -56,7 +56,7 @@ enum Persona: String, CaseIterable {
     }
 }
 
-/// 一位猫娘的全部语料。情境键：
+/// 一只小猫的全部语料。情境键：
 /// - weather：rain / drizzle / thunder / snow / sleet / fog / haze / windy / clear / cloudy / hot / cold
 /// - daypart：morning / forenoon / lunch / afternoon / lastHour / evening / night / late
 /// - weekday：2 = 周一 … 6 = 周五，7 = 周末
@@ -347,7 +347,7 @@ extension PersonaLines {
         yearProgress: { y, p in "\(y) 年过去 \(p)%，日子嘎嘎快" }
     )
 
-    // MARK: 箱箱 · 纸箱猫娘：没接入任何平台时，怯生生又满怀期待，说话软糯爱带「…」
+    // MARK: 箱箱 · 纸箱小奶猫：没接入任何平台时，怯生生又满怀期待，说话软糯爱带「…」
     static let box = PersonaLines(
         tap: [
             "可以…带我回家吗？(｡•́︿•̀｡)", "点我一下，接个平台吧…", "纸箱有点冷…快来接我",

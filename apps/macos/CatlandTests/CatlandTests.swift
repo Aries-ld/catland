@@ -182,7 +182,7 @@ final class RestDaysTests: XCTestCase {
         XCTAssertTrue(offline.allSatisfy { $0.hasPrefix("箱箱：") })
     }
 
-    /// 每位猫娘的所有语料（含带数字的模板）都不超过 22 个字（不含名字），气泡放得下。
+    /// 每只小猫的所有语料（含带数字的模板）都不超过 22 个字（不含名字），气泡放得下。
     func testPersonaLinesFitBubble() {
         for p in Persona.allCases {
             let l = p.lines

@@ -62,7 +62,7 @@ final class AppState {
     var castOverride: [Persona]?
 
     func announce(_ text: String, seconds: Double = 8) {
-        // 主动探头说话也带上名字（随机挑一位在场的猫娘）
+        // 主动探头说话也带上名字（随机挑一只醒着的小猫）
         let awake = speakers.filter { !sleepingCats.contains($0) }
         let text = Persona.allCases.contains { text.hasPrefix("\($0.name)：") } ? text : ((awake.isEmpty ? speakers : awake).randomElement() ?? .box).say(text)
         AppLog.info("cat announce", ["text": text])

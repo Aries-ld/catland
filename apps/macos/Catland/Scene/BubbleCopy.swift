@@ -105,7 +105,7 @@ enum BubbleCopy {
 
     // MARK: - 组合
 
-    /// 三类交错：戳我 → 时间 → 闲聊 → 闲聊 → …；说话的猫娘轮流来；同一次悬停内不重复。
+    /// 三类交错：戳我 → 时间 → 闲聊 → 闲聊 → …；说话的小猫轮流来；同一次悬停内不重复。
     static func rotation(_ c: Context, seed: UInt64, count: Int = 12) -> [String] {
         var rng = SeededRandom(seed: seed)
         func shuffled(_ a: [String]) -> [String] {
