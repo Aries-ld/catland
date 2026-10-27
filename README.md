@@ -16,7 +16,7 @@
 [![Local only](https://img.shields.io/badge/数据-只留在你的%20Mac-F38BA8?style=flat-square)](#岛上的东西只属于你)
 [![Powered by catbus](https://img.shields.io/badge/powered%20by-catbus-FAB387?style=flat-square)](https://github.com/cv-cat/catbus)
 
-[安装](#安装) · [四只猫](#四只猫和一只还在等你的) · [和我的世界同频](#和我的世界同频) · [从源码构建](#从源码构建) · [开发者文档](docs/development.md)
+[English](README.en.md) · [安装](#安装) · [四只猫](#四只猫和一只还在等你的) · [和我的世界同频](#和我的世界同频) · [从源码构建](#从源码构建) · [开发者文档](docs/development.md)
 
 </div>
 
@@ -37,6 +37,14 @@
 </div>
 
 <br>
+
+## 它能干嘛
+
+<div align="center">
+<img src="assets/promo/how-zh-wide.png" width="92%" alt="鼠标推到屏幕顶上，点一下，几个平台混着刷">
+</div>
+
+catland 是一个住在屏幕顶部的 Mac 小工具。点开它，你接入的几个平台的推荐会混成一条竖向的流：视频、图文笔记、评论都在里面，手感和刷短视频一样。点赞和收藏只存在本机，不会回写到任何平台。
 
 ## 四只猫，和一只还在等你的
 

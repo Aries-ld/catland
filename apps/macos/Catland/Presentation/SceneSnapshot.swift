@@ -30,6 +30,11 @@ enum SceneSnapshot {
         Preset(file: "event-meteor", date: "2026-12-13 22:05", condition: "clear", event: "meteorShower"),
         Preset(file: "event-fireworks", date: "2026-07-11 20:05", condition: "clear", event: "fireworks"),
         Preset(file: "event-lightshow", date: "2026-10-28 20:05", condition: "clear", city: .singapore, event: "lightShow"),
+        // 宣传主视觉里的小岛：和真机悬停时一样大（刘海 180×32 + 两翼，悬停后 282×75），中间的刘海黑块由宣传图脚本叠上
+        Preset(file: "island-hover", date: "2026-10-28 21:30", condition: "clear", bubble: "还不点？品味有待提高哦", size: CGSize(width: 282, height: 75)),
+        // 宣传主视觉里「刷到的内容」：竖版画面，用我们自己的像素场景，不用别人的视频
+        Preset(file: "feed-sakura", date: "2026-04-11 15:05", condition: "partly", event: "sakuraRain", size: CGSize(width: 260, height: 380)),
+        Preset(file: "feed-fireworks", date: "2026-07-11 20:05", condition: "clear", event: "fireworks", size: CGSize(width: 260, height: 380)),
     ]
 
     /// 宣传短片：夜里的上海窗外，四只平台小猫走动、轮流说话，逐帧渲染成 PNG（frame_000.png …），再由脚本合成 GIF / MP4。
@@ -133,7 +138,7 @@ enum SceneSnapshot {
         let p: CGFloat = 1.5
         let live = EventScheduler.active(now: env.date, region: RestDays.region(for: env.location), latitude: env.location.latitude)
         CatDirector.shared.watching = live != nil
-        let id = "snapshot-\(Int(t))"
+        let id = "snapshot-\(Int(t))-\(Int(size.width))"
         func view(catTime: TimeInterval) -> some View {
             ZStack {
                 Canvas { ctx, sz in

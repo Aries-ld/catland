@@ -33,6 +33,13 @@ scripts/package-dmg.sh x86_64     # 指定架构
 - 交互回归：刘海悬停 / 点击展开、翻页、点赞收藏评论（含视频卡片）、连接面板、设置、收藏页。
 - 打包：`scripts/package-dmg.sh`，挂载 DMG 拷出 App 启动一次，确认使用的是内置 Node、能刷出内容。
 
+## 宣发素材
+
+- `scripts/make_launch_kit.py`：各平台需要的宣发图（`assets/promo/`）：「它能干嘛」主视觉（横版 / 竖版）、Product Hunt 展示图与缩略图、小红书 5 张图。先执行 `catland-debug snapshots:/tmp/catland-snaps`（场景、真机大小的小岛、竖版「刷到的内容」）。
+- 小岛动画：`catland-debug film:/tmp/catland-film` 逐帧渲染，再用 ffmpeg 合成 `assets/brand/island.gif`（README）和 `assets/promo/island.mp4`（社交平台）。
+- 小猫立绘（`/tmp/cat_<花色>.png`）：用 `PixelCatArt` 渲染单帧并放大 10 倍（宣发脚本里的阵容图、小红书第 3 张会用到）。
+- 宣发手册（平台顺序、文案）在本地 `launch/`，不进版本控制。
+
 ## 品牌素材
 
 - `scripts/make_icons.py`：App 图标（`apps/macos/Resources/AppIcon.icns`、`assets/brand/icon-1024.png`）与菜单栏模板图。
