@@ -24,13 +24,14 @@ export const PLATFORMS: readonly PlatformSpec[] = [
   // 抖音：catbus 模拟的网页扫码协议近期常被风控拦下（error_code 2046「请前往 App 完成验证」，换电脑也会复现），
   // 改为在内嵌的抖音官方网页上扫码（真实网页环境，更少被拦），登录后自动取登录态；只读能力不受影响。
   { id: 'douyin', name: '抖音', primaryLogin: 'cookie', catbusDefault: 'qrcode', loginUrl: 'https://www.douyin.com', requiredCookies: [['sessionid']], sections: ['content'] },
-  { id: 'bilibili', name: 'B 站', primaryLogin: 'qrcode', catbusDefault: 'qrcode', loginUrl: 'https://www.bilibili.com', requiredCookies: [['SESSDATA', 'bili_jct']], sections: ['content'] },
+  { id: 'bilibili', name: 'Bilibili', primaryLogin: 'qrcode', catbusDefault: 'qrcode', loginUrl: 'https://www.bilibili.com', requiredCookies: [['SESSDATA', 'bili_jct']], sections: ['content'] },
   { id: 'kuaishou', name: '快手', primaryLogin: 'qrcode', catbusDefault: 'qrcode', loginUrl: 'https://www.kuaishou.com', requiredCookies: [], sections: ['content'] },
   // X、TikTok：大量用户用 Google / Apple 账号登录，而这两家禁止在 App 内嵌窗口里登录；TikTok 还需要特定网络环境。
   // 体验不好先置灰，等「浏览器助手」能把浏览器里的登录态自动交给 catland 后再开放。
   { id: 'x', name: 'X', primaryLogin: 'cookie', catbusDefault: 'cookie', loginUrl: 'https://x.com/i/flow/login', requiredCookies: [['auth_token', 'ct0']], sections: ['content'], unavailable: '暂未开放：Google / Apple 账号无法在 App 内登录，正在做浏览器助手' },
   { id: 'tiktok', name: 'TikTok', primaryLogin: 'cookie', catbusDefault: 'cookie', loginUrl: 'https://www.tiktok.com/login', requiredCookies: [['sessionid'], ['sid_tt'], ['multi_sids']], sections: ['content'], unavailable: '暂未开放：需要特定网络环境，且 Google / Apple 账号无法在 App 内登录' },
-  { id: 'weibo', name: '微博', primaryLogin: 'cookie', catbusDefault: 'cookie', loginUrl: 'https://weibo.com/login.php', requiredCookies: [['SUB']], sections: ['content'] },
+  // 微博：catbus 0.2.1 还没有实现微博的推荐流（feed list 返回 NOT_IMPLEMENTED），能登录但刷不出内容，先置灰。
+  { id: 'weibo', name: '微博', primaryLogin: 'cookie', catbusDefault: 'cookie', loginUrl: 'https://weibo.com/login.php', requiredCookies: [['SUB']], sections: ['content'], unavailable: '暂未开放：catbus 还不支持微博推荐流，暂时刷不出内容' },
   { id: 'jd', name: '京东', primaryLogin: 'qrcode', catbusDefault: 'qrcode', loginUrl: 'https://passport.jd.com/new/login.aspx', requiredCookies: [['thor', 'pin'], ['pt_key', 'pin']], sections: ['commerce'] },
   { id: 'taobao', name: '淘宝', primaryLogin: 'cookie', catbusDefault: 'cookie', loginUrl: 'https://login.taobao.com', requiredCookies: [['unb', '_m_h5_tk', 'cookie2']], sections: ['commerce'] },
   { id: 'xianyu', name: '闲鱼', primaryLogin: 'qrcode', catbusDefault: 'qrcode', loginUrl: 'https://www.goofish.com', requiredCookies: [['unb', '_m_h5_tk', 'cookie2']], sections: ['commerce'] },

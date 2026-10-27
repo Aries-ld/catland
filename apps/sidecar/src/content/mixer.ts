@@ -47,6 +47,10 @@ export interface MixerOptions {
   resolveMinIntervalMs?: number
   /** 同一平台最多连续出现几条。 */
   maxConsecutive?: number
+  /** 硬上限：同一平台最多连续这么多条。超过时若其他平台还在供货，最多等 balanceWaitMs 让它们补上。 */
+  maxRun?: number
+  /** 为保证均匀（连续上限、新连接的平台优先）愿意等待的最长时间。 */
+  balanceWaitMs?: number
   riskCooldownMs?: number
   backoffBaseMs?: number
   backoffMaxMs?: number
@@ -83,6 +87,8 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
   private readonly known = new Set<string>()
   private readonly items = new Map<string, { item: Item; platform: string }>()
   private recent: string[] = []
+  /** 刚连接、还没下发过卡片的平台：下一次取卡时优先等它的第一张，让新平台立刻出现在刷刷流里。 */
+  private readonly newcomers = new Set<string>()
   private inflight = 0
   private rr = 0
   private timer: NodeJS.Timeout | null = null
@@ -100,6 +106,8 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
       feedMinIntervalMs: opts.feedMinIntervalMs ?? 2_000,
       resolveMinIntervalMs: opts.resolveMinIntervalMs ?? 250,
       maxConsecutive: opts.maxConsecutive ?? 1,
+      maxRun: opts.maxRun ?? 3,
+      balanceWaitMs: opts.balanceWaitMs ?? 2_500,
       riskCooldownMs: opts.riskCooldownMs ?? 10 * 60_000,
       backoffBaseMs: opts.backoffBaseMs ?? 5_000,
       backoffMaxMs: opts.backoffMaxMs ?? 2 * 60_000,
@@ -116,8 +124,11 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
       this.sources.delete(p)
       this.ready = this.ready.filter((c) => c.platform !== p)
     }
+    for (const p of [...this.newcomers]) if (!next.has(p)) this.newcomers.delete(p)
+    const first = this.sources.size === 0
     for (const a of adapters) {
       if (this.sources.has(a.platform)) continue
+      if (!first) this.newcomers.add(a.platform)
       this.sources.set(a.platform, {
         adapter: a, pending: [], cursor: null, fetching: false, inflight: 0, lastFetchAt: -Infinity, nextResolveAt: 0,
         status: 'active', until: 0, failures: 0, lastError: null, abort: new AbortController(),
@@ -135,14 +146,57 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
     this.dropExpired()
     if (this.ready.length === 0 && (opts.waitMs ?? 0) > 0) await this.waitReady(opts.waitMs!)
     const out: FeedCard[] = []
+    const deadline = Date.now() + this.o.balanceWaitMs
     while (out.length < n && this.ready.length > 0) {
-      const i = this.pickDiverse()
+      const left = deadline - Date.now()
+      // 新连接的平台：还没有就绪卡片时稍等它的第一张
+      const waitingNew = [...this.newcomers].filter((p) => this.isActive(p) && !this.ready.some((c) => c.platform === p))
+      if (waitingNew.length > 0 && left > 0) {
+        if (await this.waitFor((c) => waitingNew.includes(c.platform), left)) continue
+        for (const p of waitingNew) this.newcomers.delete(p) // 等不到就不再等，避免每次都卡
+      }
+      const fresh = this.ready.findIndex((c) => this.newcomers.has(c.platform)) // 新平台的第一张直接插队
+      const i = fresh >= 0 ? fresh : this.pickDiverse()
+      const p = this.ready[i]!.platform
+      // 连续上限：再给就超了，而其他平台还在供货 → 等一下别的平台
+      if (this.runLength(p) >= this.o.maxRun && left > 0 && [...this.sources.keys()].some((q) => q !== p && this.isActive(q))) {
+        if (await this.waitFor((c) => c.platform !== p, deadline - Date.now())) continue
+      }
       const [card] = this.ready.splice(i, 1)
       out.push(card!)
       this.markDelivered(card!)
     }
     this.pump()
     return out
+  }
+
+  /** 最近连续下发同一平台的条数。 */
+  private runLength(platform: string): number {
+    let n = 0
+    for (let i = this.recent.length - 1; i >= 0 && this.recent[i] === platform; i--) n++
+    return n
+  }
+
+  private isActive(platform: string): boolean {
+    return this.sources.get(platform)?.status === 'active'
+  }
+
+  /** 等到有满足条件的就绪卡片（true）或超时（false）。 */
+  private waitFor(pred: (c: FeedCard) => boolean, ms: number): Promise<boolean> {
+    if (this.ready.some(pred)) return Promise.resolve(true)
+    return new Promise((resolve) => {
+      const check = () => {
+        if (!this.ready.some(pred)) return
+        clearTimeout(t)
+        this.off('ready', check)
+        resolve(true)
+      }
+      const t = setTimeout(() => {
+        this.off('ready', check)
+        resolve(false)
+      }, Math.max(0, ms))
+      this.on('ready', check)
+    })
   }
 
   /** 播放失败（如 403 / 地址过期）时重新解析一张已下发的卡片。 */
@@ -173,9 +227,10 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
       if (s.status !== 'active' && s.status !== 'auth' && now >= s.until) this.setStatus(s, 'active')
     }
     const list = [...this.sources.values()]
-    const target = Math.max(this.o.readyAhead, this.o.readyPerSource * list.length)
-    while (this.ready.length + this.inflight < target && this.inflight < this.o.resolveConcurrency) {
-      // 优先给「待播 + 解析中」最少的平台补货，产出率低的平台（如 X 纯文字多）也能保持在场。
+    // 每个平台各有自己的缓冲额度：一个平台快、另一个慢时，快平台不会占满缓冲把慢平台 / 新平台挤掉。
+    const perSource = Math.max(this.o.readyPerSource, Math.ceil(this.o.readyAhead / Math.max(1, list.length)))
+    while (this.inflight < this.o.resolveConcurrency) {
+      // 优先给「待播 + 解析中」最少的平台补货，产出率低的平台（如纯文字多的）也能保持在场。
       let best: Source | null = null
       let bestLoad = Infinity
       for (let k = 0; k < list.length; k++) {
@@ -184,6 +239,8 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
           if (s.status !== 'auth') wakeAt = Math.min(wakeAt, s.until)
           continue
         }
+        const load = this.readyCount(s.adapter.platform) + s.inflight
+        if (load >= perSource) continue
         if (s.pending.length === 0) {
           wakeAt = Math.min(wakeAt, this.maybeFetch(s, now))
           continue
@@ -192,7 +249,6 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
           wakeAt = Math.min(wakeAt, s.nextResolveAt)
           continue
         }
-        const load = this.readyCount(s.adapter.platform) + s.inflight
         if (load < bestLoad) [best, bestLoad] = [s, load]
       }
       if (!best) break
@@ -337,6 +393,7 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
   }
 
   private markDelivered(card: FeedCard): void {
+    this.newcomers.delete(card.platform)
     this.seen.add(card.key)
     this.recent = [...this.recent, card.platform].slice(-RECENT_WINDOW)
     if (this.items.size > ITEM_MEMORY) this.items.delete(this.items.keys().next().value!)

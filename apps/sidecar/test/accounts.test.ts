@@ -60,10 +60,10 @@ describe('AccountService.refresh / platforms', () => {
 })
 
 describe('置灰的平台', () => {
-  it('X、TikTok 标记为暂未开放，且不能发起登录', async () => {
+  it('X、TikTok、微博标记为暂未开放，且不能发起登录', async () => {
     const { svc } = setup()
     const list = await svc.refresh()
-    expect(list.filter((p) => p.unavailable).map((p) => p.id)).toEqual(['x', 'tiktok'])
+    expect(list.filter((p) => p.unavailable).map((p) => p.id)).toEqual(['x', 'tiktok', 'weibo'])
     expect(list.find((p) => p.id === 'xhs')!.unavailable).toBeNull()
     await expect(svc.loginCookie('x', 'auth_token=a; ct0=b')).rejects.toMatchObject({ code: 'USAGE' })
     await expect(svc.loginCookie('tiktok', 'sessionid=a')).rejects.toMatchObject({ code: 'USAGE' })
@@ -122,7 +122,7 @@ describe('AccountService.loginQrcode', () => {
 
   it('只支持 cookie 的平台拒绝扫码', async () => {
     const { svc } = setup()
-    await expect(svc.loginQrcode('weibo')).rejects.toMatchObject({ code: 'UNSUPPORTED' })
+    await expect(svc.loginQrcode('douyin')).rejects.toMatchObject({ code: 'UNSUPPORTED' })
   })
 
   it('同一平台不能并发登录；cancelLogin 中止进行中的登录', async () => {
@@ -142,13 +142,13 @@ describe('AccountService.loginCookie', () => {
   it('cookie 经 stdin 传入，不进 argv；默认非 cookie 的平台补 --method cookie', async () => {
     const { catbus, svc } = setup()
     catbus.on('xhs auth login', () => acct('xhs'))
-    catbus.on('weibo auth login', () => acct('weibo'))
+    catbus.on('douyin auth login', () => acct('douyin'))
     await svc.loginCookie('xhs', [{ name: 'web_session', value: 'SECRET', domain: '.xiaohongshu.com' }])
-    await svc.loginCookie('weibo', 'SUB=SECRET; SUBP=1', { account: 'work' })
-    const [xhs, wb] = catbus.calls.filter((c) => c.argv.includes('login'))
+    await svc.loginCookie('douyin', 'sessionid=SECRET; ttwid=1', { account: 'work' })
+    const [xhs, dy] = catbus.calls.filter((c) => c.argv.includes('login'))
     expect(xhs!.argv).toEqual(['xhs', 'auth', 'login', '--method', 'cookie', '--cookie', '-'])
     expect(JSON.parse(xhs!.opts.stdin!)).toEqual([{ name: 'web_session', value: 'SECRET', domain: '.xiaohongshu.com' }])
-    expect(wb!.argv).toEqual(['weibo', 'auth', 'login', '--cookie', '-', '-a', 'work'])
+    expect(dy!.argv).toEqual(['douyin', 'auth', 'login', '--method', 'cookie', '--cookie', '-', '-a', 'work'])
     expect(catbus.calls.every((c) => !c.argv.join(' ').includes('SECRET'))).toBe(true)
   })
 

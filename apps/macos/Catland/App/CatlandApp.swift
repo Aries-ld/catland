@@ -333,7 +333,7 @@ final class ScrollPager {
             if abs(accY) > Self.threshold, abs(accY) > abs(accX) {
                 fired = true
                 onPage?(accY < 0 ? 1 : -1) // 与系统滚动方向一致：内容向上滚 = 下一条
-            } else if abs(accX) > Self.threshold * 1.5, abs(accX) > abs(accY) {
+            } else if abs(accX) > Self.threshold * 1.1, abs(accX) > abs(accY) {
                 fired = true
                 onHorizontal?(accX < 0 ? 1 : -1)
             }

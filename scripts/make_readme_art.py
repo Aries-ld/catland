@@ -87,7 +87,7 @@ def banner(snaps: Path) -> None:
     img.alpha_composite(title, (tx, y0 + 6))
     d.text((tx + 4, y0 + 6 + title.height + 12), tag, font=f_tag, fill=PINK)
     f_sub = ImageFont.truetype(CJK, 21)
-    sub = "小红书 · 抖音 · B 站 · 快手 · 微博      纯本地 · 开源 · 不商用"
+    sub = "小红书 · 抖音 · Bilibili · 快手      纯本地 · 开源 · 不商用"
     d.text(((W - d.textlength(sub, font=f_sub)) // 2, y0 + icon.height + 24), sub, font=f_sub, fill=LAVENDER)
     img.convert("RGB").save(BRAND / "banner.png", optimize=True)
 

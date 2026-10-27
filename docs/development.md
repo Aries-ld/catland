@@ -17,7 +17,15 @@ scripts/package-dmg.sh            # 按本机架构（Apple 芯片 arm64 / Intel
 scripts/package-dmg.sh x86_64     # 指定架构
 ```
 
-产物在 `dist/`：`catland-<版本>-macos-<架构>.dmg` 与 `.sha256`。App 内自带锁定版本的官方 Node、sidecar 与 catbus，用户无需安装任何依赖。签名为 ad-hoc（未公证）。
+产物在 `dist/`：`catland-<版本>-macos-<架构>.dmg` 与 `.sha256`。App 内自带锁定版本的官方 Node、sidecar 与 catbus，用户无需安装任何依赖。
+
+签名与公证（脚本自动完成，用户下载后双击即可打开）：
+
+1. 钥匙串里需要「Developer ID Application」证书（Xcode → Settings → Accounts → Manage Certificates → ＋），可用 `CATLAND_SIGN_IDENTITY` 指定。
+2. 公证凭证只存钥匙串：`xcrun notarytool store-credentials catland-notary --apple-id <邮箱> --team-id <TeamID>`（App 专用密码），脚本只引用名字，可用 `CATLAND_NOTARY_PROFILE` 改。
+3. 流程：内层 Mach-O（原生模块、Node）逐个签名（强化运行时 + 时间戳，Node 带 `packaging/node.entitlements` 的 JIT 授权）→ App 带 `packaging/Catland.entitlements`（定位）签名 → App 公证并钉票据 → `dmgbuild` 生成带安装窗口排版的 DMG（`packaging/dmg_settings.py`、背景图 `packaging/make_dmg_background.py`）→ DMG 签名、公证、钉票据 → `spctl` / `stapler` 验证。
+4. 没有证书时自动退回 ad-hoc 签名并跳过公证，适合自己构建自用。
+5. 依赖：conda env `catlands` 里的 `dmgbuild==1.6.7`。
 
 ## 阶段验收（每个阶段结束时做）
 

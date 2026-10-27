@@ -178,9 +178,14 @@ final class AppState {
         let before = Set(connectedContentPlatforms.map(\.id))
         platforms = list
         let added = Set(connectedContentPlatforms.map(\.id)).subtracting(before)
-        if !added.isEmpty, feed.cards.isEmpty {
+        guard !added.isEmpty else { return }
+        if feed.cards.isEmpty {
             AppLog.info("first content source connected, priming feed", ["added": added.sorted().joined(separator: ",")])
             Task { await feed.prime() }
+        } else {
+            // 新连上平台：丢掉还没看的预取卡片重新取，新平台的内容马上出现（当前这条继续播）。
+            AppLog.info("content source added, refreshing upcoming cards", ["added": added.sorted().joined(separator: ",")])
+            Task { await feed.sourcesChanged() }
         }
     }
 

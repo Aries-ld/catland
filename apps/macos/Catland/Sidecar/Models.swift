@@ -185,7 +185,7 @@ enum PlatformBrand {
         switch id {
         case "xhs": return "小红书"
         case "douyin": return "抖音"
-        case "bilibili": return "B站"
+        case "bilibili": return "Bilibili"
         case "kuaishou": return "快手"
         case "x": return "X"
         case "tiktok": return "TikTok"

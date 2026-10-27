@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- 强化运行时下使用 CoreLocation（窗外的时间与天气跟随所在地）需要声明 -->
+	<key>com.apple.security.personal-information.location</key>
+	<true/>
+</dict>
+</plist>

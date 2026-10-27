@@ -146,6 +146,39 @@ describe('FeedMixer', () => {
     m.stop()
   })
 
+  it('同一平台最多连续 3 条：慢平台还在供货时稍等它，而不是一直给快平台', async () => {
+    const fast = new FakeAdapter('bilibili', 10)
+    const slow = new FakeAdapter('xhs', 10)
+    slow.resolveDelayMs = 120 // 慢到缓冲里几乎全是 bilibili
+    const m = mixer({ readyAhead: 8, maxConsecutive: 1, balanceWaitMs: 400 })
+    m.setSources([fast, slow])
+    const seq: string[] = []
+    for (let k = 0; k < 6; k++) {
+      await sleep(20)
+      seq.push(...(await m.next(2)).map((c) => c.platform))
+    }
+    let run = 1
+    for (let i = 1; i < seq.length; i++) {
+      run = seq[i] === seq[i - 1] ? run + 1 : 1
+      expect(run).toBeLessThanOrEqual(3)
+    }
+    expect(seq).toContain('xhs')
+    m.stop()
+  })
+
+  it('新连接的平台立刻出现在下一批卡片里', async () => {
+    const a = new FakeAdapter('bilibili', 10)
+    const m = mixer({ readyAhead: 6 })
+    m.setSources([a])
+    await sleep(30) // 缓冲里攒满 bilibili
+    const b = new FakeAdapter('douyin', 10)
+    b.resolveDelayMs = 60
+    m.setSources([a, b])
+    const batch = (await m.next(3)).map((c) => c.platform)
+    expect(batch[0]).toBe('douyin')
+    m.stop()
+  })
+
   it('去重：跨页重复、已看过的内容不再出现；纯文字被过滤', async () => {
     const a = new FakeAdapter('x')
     a.pageIds = (p) => (p === 0 ? ['1', '2', 't1', '3'] : ['2', '3', '4', 'seen', `${p}0`])

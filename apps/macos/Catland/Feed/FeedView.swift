@@ -59,6 +59,10 @@ struct CardView: View {
     let size: CGSize
     @State private var expandedText = false
     @State private var heartBurst = false
+    @State private var hovering = false
+
+    /// 多图帖子：可以左右切换（触控板横滑、方向键、鼠标左右拖动、两侧按钮）。
+    private var isGallery: Bool { !card.isVideo && card.images.count > 1 }
 
     private var feed: FeedController { state.feed }
     /// 画面比例接近面板时铺满（抖音式），否则完整显示并以模糊封面垫底。
@@ -79,6 +83,12 @@ struct CardView: View {
                 .contentShape(Rectangle())
                 .gesture(TapGesture(count: 2).onEnded { doubleTapLike() }
                     .exclusively(before: TapGesture().onEnded { if card.isVideo && isCurrent { feed.togglePause() } }))
+                // 鼠标按住左右拖动翻图集（和手机上左右滑一样）
+                .simultaneousGesture(DragGesture(minimumDistance: 20).onEnded { v in
+                    guard isGallery, isCurrent, abs(v.translation.width) > 50, abs(v.translation.width) > abs(v.translation.height) else { return }
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.88)) { feed.carousel(v.translation.width < 0 ? 1 : -1) }
+                })
+            if isGallery && isCurrent { galleryControls }
             if heartBurst {
                 Image(systemName: "heart.fill").font(.system(size: 90)).foregroundStyle(.red).shadow(radius: 10)
                     .transition(.scale(scale: 0.4).combined(with: .opacity))
@@ -88,6 +98,45 @@ struct CardView: View {
             }
             overlayInfo
         }
+        .onHover { hovering = $0 }
+    }
+
+    /// 图集控件：右上角页码；鼠标移到画面上时两侧出现切换按钮（到头时隐藏对应一侧）。
+    private var galleryControls: some View {
+        let i = feed.carouselIndex, n = card.images.count
+        return ZStack {
+            Text("\(i + 1)/\(n)")
+                .font(.system(size: 11, weight: .semibold, design: .rounded)).foregroundStyle(.white)
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .background(Capsule().fill(.black.opacity(0.45)))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .padding(.top, 12).padding(.trailing, 12)
+                .allowsHitTesting(false)
+            if hovering {
+                HStack {
+                    galleryButton("chevron.left", visible: i > 0) { feed.carousel(-1) }
+                    Spacer()
+                    galleryButton("chevron.right", visible: i < n - 1) { feed.carousel(1) }
+                }
+                .padding(.horizontal, 10)
+                .padding(.bottom, 60)
+                .transition(.opacity)
+            }
+        }
+    }
+
+    private func galleryButton(_ icon: String, visible: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.88)) { action() }
+        } label: {
+            Image(systemName: icon).font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
+                .frame(width: 34, height: 34)
+                .background(Circle().fill(.black.opacity(0.45)))
+                .contentShape(Circle())
+        }
+        .buttonStyle(PressStyle())
+        .opacity(visible ? 1 : 0)
+        .allowsHitTesting(visible)
     }
 
     @ViewBuilder private var media: some View {
