@@ -15,6 +15,8 @@ export interface PlatformSpec {
   requiredCookies: string[][]
   /** 板块归属：MVP 只开放 content。 */
   sections: Array<'content' | 'commerce'>
+  /** 暂不开放的原因（有值即置灰：不能连接、不进刷刷流）。体验不好的平台先置灰，解决后再开放。 */
+  unavailable?: string
 }
 
 export const PLATFORMS: readonly PlatformSpec[] = [
@@ -24,8 +26,10 @@ export const PLATFORMS: readonly PlatformSpec[] = [
   { id: 'douyin', name: '抖音', primaryLogin: 'cookie', catbusDefault: 'qrcode', loginUrl: 'https://www.douyin.com', requiredCookies: [['sessionid']], sections: ['content'] },
   { id: 'bilibili', name: 'B 站', primaryLogin: 'qrcode', catbusDefault: 'qrcode', loginUrl: 'https://www.bilibili.com', requiredCookies: [['SESSDATA', 'bili_jct']], sections: ['content'] },
   { id: 'kuaishou', name: '快手', primaryLogin: 'qrcode', catbusDefault: 'qrcode', loginUrl: 'https://www.kuaishou.com', requiredCookies: [], sections: ['content'] },
-  { id: 'x', name: 'X', primaryLogin: 'cookie', catbusDefault: 'cookie', loginUrl: 'https://x.com/i/flow/login', requiredCookies: [['auth_token', 'ct0']], sections: ['content'] },
-  { id: 'tiktok', name: 'TikTok', primaryLogin: 'cookie', catbusDefault: 'cookie', loginUrl: 'https://www.tiktok.com/login', requiredCookies: [['sessionid'], ['sid_tt'], ['multi_sids']], sections: ['content'] },
+  // X、TikTok：大量用户用 Google / Apple 账号登录，而这两家禁止在 App 内嵌窗口里登录；TikTok 还需要特定网络环境。
+  // 体验不好先置灰，等「浏览器助手」能把浏览器里的登录态自动交给 catland 后再开放。
+  { id: 'x', name: 'X', primaryLogin: 'cookie', catbusDefault: 'cookie', loginUrl: 'https://x.com/i/flow/login', requiredCookies: [['auth_token', 'ct0']], sections: ['content'], unavailable: '暂未开放：Google / Apple 账号无法在 App 内登录，正在做浏览器助手' },
+  { id: 'tiktok', name: 'TikTok', primaryLogin: 'cookie', catbusDefault: 'cookie', loginUrl: 'https://www.tiktok.com/login', requiredCookies: [['sessionid'], ['sid_tt'], ['multi_sids']], sections: ['content'], unavailable: '暂未开放：需要特定网络环境，且 Google / Apple 账号无法在 App 内登录' },
   { id: 'weibo', name: '微博', primaryLogin: 'cookie', catbusDefault: 'cookie', loginUrl: 'https://weibo.com/login.php', requiredCookies: [['SUB']], sections: ['content'] },
   { id: 'jd', name: '京东', primaryLogin: 'qrcode', catbusDefault: 'qrcode', loginUrl: 'https://passport.jd.com/new/login.aspx', requiredCookies: [['thor', 'pin'], ['pt_key', 'pin']], sections: ['commerce'] },
   { id: 'taobao', name: '淘宝', primaryLogin: 'cookie', catbusDefault: 'cookie', loginUrl: 'https://login.taobao.com', requiredCookies: [['unb', '_m_h5_tk', 'cookie2']], sections: ['commerce'] },

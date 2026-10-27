@@ -20,6 +20,8 @@ export interface PlatformState {
   loginUrl: string
   requiredCookies: string[][]
   sections: PlatformSpec['sections']
+  /** 暂不开放的原因；null 表示可用。 */
+  unavailable: string | null
   connected: boolean
   current: Account | null
   accounts: Account[]
@@ -80,6 +82,7 @@ export class AccountService extends EventEmitter<{ changed: [] }> {
         loginUrl: p.loginUrl,
         requiredCookies: p.requiredCookies,
         sections: p.sections,
+        unavailable: p.unavailable ?? null,
         connected: current !== null,
         current,
         accounts,
@@ -107,7 +110,7 @@ export class AccountService extends EventEmitter<{ changed: [] }> {
   }
 
   async loginQrcode(platformId: string, opts: LoginOptions = {}): Promise<Account> {
-    const spec = this.spec(platformId)
+    const spec = this.loginSpec(platformId)
     if (spec.primaryLogin !== 'qrcode') throw new CatbusCallError('UNSUPPORTED', `${spec.name} 不支持扫码登录`, { hint: '使用网页登录' })
     const argv = [platformId, 'auth', 'login', '--method', 'qrcode', ...this.accountArgs(opts.account)]
     return this.withLogin(platformId, opts.signal, async (signal) => {
@@ -136,7 +139,7 @@ export class AccountService extends EventEmitter<{ changed: [] }> {
 
   /** 网页登录完成后由客户端提交 cookie；经 stdin 传给 catbus，由 catbus 在线校验后才保存。 */
   async loginCookie(platformId: string, cookies: BrowserCookie[] | string, opts: Omit<LoginOptions, 'onEvent'> = {}): Promise<Account> {
-    const spec = this.spec(platformId)
+    const spec = this.loginSpec(platformId)
     const payload = typeof cookies === 'string' ? cookies : JSON.stringify(cookies)
     if (!payload.trim() || (Array.isArray(cookies) && cookies.length === 0)) throw new CatbusCallError('USAGE', '没有可提交的 cookie')
     const argv = [platformId, 'auth', 'login', ...(spec.catbusDefault === 'cookie' ? [] : ['--method', 'cookie']), '--cookie', '-', ...this.accountArgs(opts.account)]
@@ -194,6 +197,13 @@ export class AccountService extends EventEmitter<{ changed: [] }> {
   private spec(platformId: string): PlatformSpec {
     const spec = getPlatform(platformId)
     if (!spec) throw new CatbusCallError('USAGE', `未知平台：${platformId}`)
+    return spec
+  }
+
+  /** 置灰的平台不允许发起登录。 */
+  private loginSpec(platformId: string): PlatformSpec {
+    const spec = this.spec(platformId)
+    if (spec.unavailable) throw new CatbusCallError('USAGE', spec.unavailable)
     return spec
   }
 

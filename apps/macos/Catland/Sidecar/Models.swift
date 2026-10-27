@@ -77,6 +77,8 @@ struct PlatformState: Codable, Identifiable, Hashable {
     let loginUrl: String
     let requiredCookies: [[String]]
     let sections: [String]
+    /// 暂不开放的原因（置灰：不能连接、不进刷刷流）；nil 表示可用。
+    let unavailable: String?
     let connected: Bool
     let current: Account?
     let accounts: [Account]

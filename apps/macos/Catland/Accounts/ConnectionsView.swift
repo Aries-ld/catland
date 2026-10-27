@@ -5,7 +5,10 @@ struct ConnectionsView: View {
     let state: AppState
 
     private var groups: [(String, [PlatformState])] {
-        [("内容", state.platforms.filter { $0.sections.contains("content") }), ("电商 · 下个版本", state.platforms.filter { $0.sections.contains("commerce") })]
+        // 暂未开放的平台排在分组最后，不夹在可用平台中间。
+        let content = state.platforms.filter { $0.sections.contains("content") }
+        return [("内容", content.filter { $0.unavailable == nil } + content.filter { $0.unavailable != nil }),
+                ("电商 · 下个版本", state.platforms.filter { $0.sections.contains("commerce") })]
     }
 
     var body: some View {
@@ -37,7 +40,10 @@ struct PlatformTile: View {
     @State private var hovering = false
 
     private var commerce: Bool { platform.sections.contains("commerce") }
+    /// 电商（下个版本）与暂未开放的平台都置灰、不能连接。
+    private var disabled: Bool { commerce || platform.unavailable != nil }
     private var statusText: String {
+        if platform.unavailable != nil { return "暂未开放" }
         if platform.loginInProgress { return "登录中…" }
         if !platform.connected { return platform.primaryLogin == "qrcode" ? "扫码登录" : "网页登录" }
         switch platform.health {
@@ -49,22 +55,23 @@ struct PlatformTile: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            PlatformIcon(platform: platform.id, size: 30, dimmed: !platform.connected)
+            PlatformIcon(platform: platform.id, size: 30, dimmed: !platform.connected || disabled)
                 .overlay(alignment: .bottomTrailing) {
-                    if platform.connected { Circle().fill(platform.health == "expired" ? .orange : .green).frame(width: 9, height: 9).overlay(Circle().stroke(.black, lineWidth: 1.5)).offset(x: 2, y: 2) }
+                    if platform.connected && !disabled { Circle().fill(platform.health == "expired" ? .orange : .green).frame(width: 9, height: 9).overlay(Circle().stroke(.black, lineWidth: 1.5)).offset(x: 2, y: 2) }
                 }
             VStack(alignment: .leading, spacing: 2) {
                 Text(platform.name).font(.system(size: 13, weight: .medium))
                 Text(statusText).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 0)
-            if platform.connected && hovering && !commerce {
+            if platform.connected && hovering && !disabled {
                 Button("退出") { Task { await state.logout(platform.id) } }.buttonStyle(.plain).font(.system(size: 10)).foregroundStyle(.red.opacity(0.9))
             }
         }
         .padding(10)
         .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.white.opacity(hovering ? 0.09 : 0.05)))
-        .opacity(commerce ? 0.45 : 1)
+        .opacity(disabled ? 0.45 : 1)
+        .help(platform.unavailable ?? "")
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture { connect() }
@@ -72,6 +79,7 @@ struct PlatformTile: View {
 
     private func connect() {
         guard !commerce else { return state.showToast("电商板块下个版本上线") }
+        if let reason = platform.unavailable { return state.showToast(reason) }
         guard !platform.connected || platform.health == "expired" else { return }
         if platform.primaryLogin == "qrcode" {
             Task { await state.loginQrcode(platform.id) }

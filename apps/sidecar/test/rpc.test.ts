@@ -140,6 +140,20 @@ async function startApp() {
 }
 
 describe('App via RPC', () => {
+  it('置灰的平台即使已有登录态也不进刷刷流', async () => {
+    const logger = createMemoryLogger()
+    const catbus = new FakeCatbus()
+    catbus.accounts = [...catbus.accounts, account('x')]
+    const store = new Store({ path: ':memory:' })
+    const mixer = new FeedMixer({ logger, seen: store, feedMinIntervalMs: 0, resolveMinIntervalMs: 0 })
+    const app = new App({ catbus, logger, store, mixer, adapterFor: (p) => new StubAdapter(p) })
+    const rpc = new RpcServer({ logger })
+    app.register(rpc)
+    await app.start()
+    expect((await connect(rpc).ok('feed.sources')).enabled).toEqual(['xhs', 'bilibili'])
+    app.stop()
+  })
+
   it('信息源 = 已登录的内容平台（不含电商）；刷卡片带点赞状态', async () => {
     const { app, client } = await startApp()
     expect((await client.ok('feed.sources')).enabled).toEqual(['xhs', 'bilibili'])

@@ -124,7 +124,7 @@ final class AppState {
     }
 
     var connectedContentPlatforms: [PlatformState] {
-        platforms.filter { $0.connected && $0.sections.contains("content") }
+        platforms.filter { $0.connected && $0.unavailable == nil && $0.sections.contains("content") }
     }
 
     func start() async {

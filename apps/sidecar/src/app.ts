@@ -64,7 +64,9 @@ export class App {
 
   /** 已登录的内容平台 ∩ 用户勾选（未设置时为全部已登录）。 */
   private syncSources(): void {
-    const connected = this.accounts.platforms().filter((p) => p.connected && p.health !== 'expired' && p.sections.includes('content')).map((p) => p.id)
+    const connected = this.accounts.platforms()
+      .filter((p) => p.connected && !p.unavailable && p.health !== 'expired' && p.sections.includes('content'))
+      .map((p) => p.id)
     const chosen = this.store.getSettings().sources.content
     const next = chosen ? connected.filter((p) => chosen.includes(p)) : connected
     if (next.join() === this.enabled.join()) return
