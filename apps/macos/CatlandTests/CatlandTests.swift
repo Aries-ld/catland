@@ -148,37 +148,49 @@ final class RestDaysTests: XCTestCase {
         XCTAssertEqual(d2, 5)
     }
 
-    func testBubbleCopyCategoriesAndContext() {
+    func testPersonaCopyFollowsContext() {
         let base = BubbleCopy.Context(now: day("2026-10-26 15:00"), region: .china, city: "上海", condition: "rain", temperature: 19,
-                                      season: .autumn, connected: true)
-        let chat = BubbleCopy.chat(base)
+                                      season: .autumn, speakers: [.shushu])
+        let chat = BubbleCopy.chat(base, as: .shushu)
         XCTAssertTrue(chat.contains("上海 19°，雨"))
-        XCTAssertTrue(chat.contains("下雨啦，记得早点下班"))
-        XCTAssertTrue(chat.contains("周一啦，摸摸鱼恢复元气"))
-        XCTAssertTrue(chat.contains("秋天的第一杯奶茶喝了吗"))
-        let time = BubbleCopy.time(base)
-        XCTAssertTrue(time.contains("距周末还有 5 天，稳住我们能赢"))
-        XCTAssertTrue(time.contains("距下班还有 3 小时 0 分"))
-        XCTAssertTrue(time.contains { $0.contains("万圣节") })
-        var fri = base; fri.now = day("2026-10-30 18:30")
-        XCTAssertTrue(BubbleCopy.time(fri).contains("下班就是周末，冲鸭！"))
-        XCTAssertTrue(BubbleCopy.time(fri).contains("下班时间到！快跑！"))
+        XCTAssertTrue(chat.contains("下雨了，妆可别花了"))
+        XCTAssertTrue(chat.contains("周一，连口红都提不起劲"))
+        XCTAssertTrue(chat.contains("秋天的第一杯奶茶，喝了吗"))
+        let time = BubbleCopy.time(base, as: .tietie)
+        XCTAssertTrue(time.contains("还有 3 小时 0 分下班，挺住"), "\(time)")
+        XCTAssertTrue(time.contains { $0.contains("万圣节") }, "\(time)")
         var late = base; late.now = day("2026-10-28 23:40")
-        XCTAssertTrue(BubbleCopy.chat(late).contains("夜深了，刷完这条就睡吧"))
+        XCTAssertTrue(BubbleCopy.chat(late, as: .bibi).contains("这么晚了，快睡啦笨蛋"))
     }
 
-    func testRotationInterleavesWithoutRepeats() {
+    func testRotationSpeaksWithNamesAndTakesTurns() {
         let ctx = BubbleCopy.Context(now: day("2026-10-28 10:00"), region: .china, city: "上海", condition: "clear", temperature: 21,
-                                     season: .autumn, connected: true)
+                                     season: .autumn, speakers: [.shushu, .doudou, .bibi, .tietie])
         let a = BubbleCopy.rotation(ctx, seed: 1), b = BubbleCopy.rotation(ctx, seed: 2)
         XCTAssertEqual(a.count, 12)
         XCTAssertEqual(Set(a).count, a.count)
-        XCTAssertTrue(BubbleCopy.tap.contains(a[0]))
         XCTAssertNotEqual(a, b)
-        XCTAssertTrue(a.allSatisfy { $0.count <= 22 }, "气泡文案太长：\(a.filter { $0.count > 22 })")
-        let offline = BubbleCopy.rotation(BubbleCopy.Context(now: day("2026-10-28 10:00"), region: .other, city: "x", condition: nil, temperature: nil, season: .tropical, connected: false), seed: 3)
+        let names = Set(a.compactMap { line in Persona.allCases.first { line.hasPrefix("\($0.name)：") } })
+        XCTAssertEqual(names, [.shushu, .doudou, .bibi, .tietie], "四位猫娘都应该轮到说话")
+        let offline = BubbleCopy.rotation(BubbleCopy.Context(now: day("2026-10-28 10:00"), region: .other, city: "x", condition: nil, temperature: nil,
+                                                             season: .tropical, speakers: []), seed: 3)
         XCTAssertFalse(offline.isEmpty)
+        XCTAssertTrue(offline.allSatisfy { $0.hasPrefix("箱箱：") })
     }
+
+    /// 每位猫娘的所有语料（含带数字的模板）都不超过 22 个字（不含名字），气泡放得下。
+    func testPersonaLinesFitBubble() {
+        for p in Persona.allCases {
+            let l = p.lines
+            var all = l.tap + l.mood + l.weather.values.flatMap { $0 } + l.season.values.flatMap { $0 }
+                + l.daypart.values.flatMap { $0 } + l.weekday.values.flatMap { $0 }
+            all += [l.offWork(12, 59), l.offSoon(59), l.dayProgress(100), l.weekProgress(100), l.holidayToday("劳动节"),
+                    l.holidayTomorrow("劳动节"), l.holidayNear("劳动节", 7), l.holidayFar("劳动节", 365), l.monthEnd(6), l.yearProgress(2026, 100)]
+            let long = all.filter { $0.count > 22 }
+            XCTAssertTrue(long.isEmpty, "\(p.name) 的文案太长：\(long)")
+        }
+    }
+
 }
 
 final class EventSchedulerTests: XCTestCase {

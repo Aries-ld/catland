@@ -45,7 +45,12 @@ final class AppState {
     private var announced: Set<String> = []
     private var eventsTask: Task<Void, Never>?
 
+    /// 说话的猫娘：已接入平台对应的猫娘；一个都没接入时是纸箱猫娘箱箱。
+    var speakers: [Persona] { Persona.speakers(platforms: connectedContentPlatforms.map(\.id)) }
+
     func announce(_ text: String, seconds: Double = 8) {
+        // 主动探头说话也带上名字（随机挑一位在场的猫娘）
+        let text = Persona.allCases.contains { text.hasPrefix("\($0.name)：") } ? text : (speakers.randomElement() ?? .box).say(text)
         AppLog.info("cat announce", ["text": text])
         peekTask?.cancel()
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { peekMessage = text }

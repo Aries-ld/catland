@@ -87,8 +87,9 @@ struct CollapsedView: View {
         let ctx = BubbleCopy.Context(now: env.date, region: RestDays.region(for: state.location), city: state.location.name,
                                      condition: state.weather?.condition, temperature: state.weather?.temperature,
                                      season: SceneSeason.of(env.date, latitude: state.location.latitude),
-                                     connected: !state.connectedContentPlatforms.isEmpty)
-        return events + BubbleCopy.rotation(ctx, seed: state.hoverSession)
+                                     speakers: state.speakers)
+        let host = state.speakers.first ?? .box
+        return events.map(host.say) + BubbleCopy.rotation(ctx, seed: state.hoverSession)
     }
 
     var body: some View {
