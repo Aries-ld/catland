@@ -74,19 +74,25 @@ final class WebLoginController: NSObject, NSWindowDelegate, WKUIDelegate, WKNavi
         let container = NSStackView(views: [chrome, web, importView])
         container.orientation = .vertical
         container.spacing = 0
+        // NSStackView 默认按子视图的固有宽度居中摆放：顶栏、网页、导入页都要撑满整个窗口宽度。
+        container.alignment = .leading
+        container.distribution = .fill
+        for v in [chrome, web, importView] as [NSView] { v.translatesAutoresizingMaskIntoConstraints = false }
         chrome.heightAnchor.constraint(equalToConstant: 90).isActive = true
 
-        // 抖音、快手的网页是宽屏布局，「登录」在右上角，窗口要够宽才看得到。
-        let wide = ["douyin", "kuaishou"].contains(platform.id)
-        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: wide ? 1180 : 520, height: wide ? 800 : 760), styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
+        // 各平台官网都是桌面宽屏布局：给一个正常浏览器大小的窗口（按屏幕可用区域收缩），登录入口和弹窗才完整可见。
+        let visible = NSScreen.main?.visibleFrame.size ?? CGSize(width: 1440, height: 900)
+        let ww = min(1180, visible.width - 120), wh = min(820, visible.height - 80)
+        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: ww, height: wh), styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
         w.title = "登录\(platform.name)"
         w.titlebarAppearsTransparent = true
         w.titleVisibility = .hidden
         w.contentView = container
+        for v in [chrome, web, importView] as [NSView] { v.widthAnchor.constraint(equalTo: container.widthAnchor).isActive = true }
         w.delegate = self
         w.level = .floating
         w.isReleasedWhenClosed = false
-        w.minSize = NSSize(width: 420, height: 560)
+        w.minSize = NSSize(width: 720, height: 560)
         w.center()
         window = w
         NSApp.activate(ignoringOtherApps: true)
@@ -262,17 +268,18 @@ private struct WebLoginChrome: View {
                     Text(model.url.map { $0.path() == "/" ? "" : $0.path() } ?? "").font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
                     Spacer(minLength: 0)
                 }
-                .padding(.horizontal, 10).frame(height: 26)
+                .padding(.horizontal, 10).frame(maxWidth: .infinity).frame(height: 26)
                 .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Color.primary.opacity(0.07)))
                 navButton(model.loading ? "xmark" : "arrow.clockwise", enabled: true, action: onReload)
             }
-            .padding(.horizontal, 10).frame(height: 42)
+            .padding(.horizontal, 10).frame(maxWidth: .infinity).frame(height: 42)
 
             HStack(spacing: 8) {
                 PlatformIcon(platform: platform.id, size: 18)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("在\(platform.name)官方页面登录").font(.system(size: 12, weight: .semibold))
                     Text(Self.hint[platform.id] ?? "登录完成后自动连接并关闭窗口 · 登录态只保存在这台 Mac").font(.system(size: 10)).foregroundStyle(.secondary)
+                        .lineLimit(1).fixedSize(horizontal: true, vertical: false)
                 }
                 Spacer()
                 if model.mode == .web {
@@ -282,7 +289,7 @@ private struct WebLoginChrome: View {
                 }
                 Button("取消", action: onCancel).controlSize(.small)
             }
-            .padding(.horizontal, 12).frame(height: 46)
+            .padding(.horizontal, 12).frame(maxWidth: .infinity).frame(height: 46)
 
             GeometryReader { g in
                 Rectangle().fill(Color.accentColor)
@@ -291,7 +298,10 @@ private struct WebLoginChrome: View {
             }
             .frame(height: 2)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(.bar)
+        // 窗口内容延伸到透明标题栏下：不忽略安全区的话，SwiftUI 会把整块往下推 28pt，最下面那行说明被截掉。
+        .ignoresSafeArea()
     }
 
     private func navButton(_ icon: String, enabled: Bool, action: @escaping () -> Void) -> some View {
@@ -353,6 +363,8 @@ private struct BrowserImportView: View {
                 Button("返回窗口内登录", action: onBackToWindow).buttonStyle(.link).font(.system(size: 11))
             }
             .padding(18)
+            .frame(maxWidth: 640, alignment: .leading)
+            .frame(maxWidth: .infinity)
         }
     }
 
