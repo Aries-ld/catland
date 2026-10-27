@@ -32,6 +32,39 @@ enum SceneSnapshot {
         Preset(file: "event-lightshow", date: "2026-10-28 20:05", condition: "clear", city: .singapore, event: "lightShow"),
     ]
 
+    /// 宣传短片：夜里的上海窗外，四只平台小猫走动、轮流说话，逐帧渲染成 PNG（frame_000.png …），再由脚本合成 GIF / MP4。
+    /// 调试命令：catland-debug film:<输出目录>
+    static func film(to dir: URL, seconds: Double = 9, fps: Double = 12, scale: CGFloat = 2) -> Int {
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd HH:mm"; f.timeZone = .current
+        guard let start = f.date(from: "2026-10-28 21:30") else { return 0 }
+        let savedEgg = Eggs.forced, savedExtra = EventScheduler.extra
+        Eggs.forced = "-"; EventScheduler.extra = []
+        defer { Eggs.forced = savedEgg; EventScheduler.extra = savedExtra }
+        let size = CGSize(width: 720, height: 150), notch = noNotch(size)
+        let lines = ["薯薯：还不点？品味有待提高哦", "bibi：才、才不是想让你点我", "铁铁：老铁，点我，整一个！"]
+        let t0 = start.timeIntervalSinceReferenceDate
+        func view(_ t: TimeInterval) -> some View {
+            let env = SceneEnv(date: Date(timeIntervalSinceReferenceDate: t), condition: "clear", temperature: nil, mouse: 0, location: .shanghai, intensity: 0.7)
+            return ZStack {
+                Canvas { ctx, sz in Presentation.render(SceneCanvas(ctx: ctx, size: sz, p: 1.5, env: env, notch: notch, t: t)) }
+                CatStage(cast: [.shushu, .doudou, .bibi, .tietie], id: "film", pixel: 1.5, bubbles: lines, bubbleEpoch: t0, frozenTime: t)
+            }
+            .frame(width: size.width, height: size.height)
+            .environment(\.displayScale, scale)
+        }
+        // 先让小猫们跑 4 秒，走到各自的位置
+        for k in 0..<120 { _ = ImageRenderer(content: view(t0 - 4 + Double(k) / 30)).cgImage }
+        var n = 0
+        for i in 0..<Int(seconds * fps) {
+            let r = ImageRenderer(content: view(t0 + Double(i) / fps))
+            r.scale = scale
+            guard let cg = r.cgImage, let data = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) else { continue }
+            if (try? data.write(to: dir.appendingPathComponent(String(format: "frame_%03d.png", i)))) != nil { n += 1 }
+        }
+        return n
+    }
+
     /// 渲染全部预设到目录，返回写出的文件。
     static func renderAll(to dir: URL, scale: CGFloat = 2) -> [URL] {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

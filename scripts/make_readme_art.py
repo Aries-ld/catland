@@ -78,7 +78,7 @@ def banner(snaps: Path) -> None:
     icon = Image.open(BRAND / "icon-1024.png").resize((150, 150), Image.LANCZOS)
     title = pixel_text("catland", 18, 6, CREAM + (255,))
     f_tag = ImageFont.truetype(CJK, 30)
-    tag = "灵动岛里，住着一座猫猫岛"
+    tag = "灵动岛里，住着四只猫"
     text_w = max(title.width, int(d.textlength(tag, font=f_tag)))
     x0 = (W - (icon.width + 30 + text_w)) // 2
     y0 = 18 + hero.height + 6

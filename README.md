@@ -1,11 +1,13 @@
 <div align="center">
 
-<img src="assets/brand/banner.png" width="100%" alt="catland：灵动岛里的猫猫岛">
+<img src="assets/brand/banner.png" width="100%" alt="catland：你的灵动岛里，住着四只猫">
 
 <br>
 
-**灵动岛里的猫猫岛**<br>
-四只猫替你出门，把小红书、抖音、B 站、快手上你爱看的东西叼回来。
+### 你的灵动岛里，住着四只猫
+
+它们替你跑遍小红书、抖音、B 站、快手，把你爱看的东西叼回来。<br>
+累了，点一下它们就好。
 
 <br>
 
@@ -29,6 +31,10 @@
 写代码等编译的时候，开会等别人说完的时候，午饭吃完还剩十分钟的时候，我就把鼠标往屏幕顶上推一下，点一下它们。它们带回来的东西就铺开了，我一条一条往下刷。刷够了，点一下别处，小岛收回去，像什么都没发生过。
 
 你也可以养几只。
+
+<div align="center">
+<img src="assets/brand/island.gif" width="100%" alt="岛上的四只猫走来走去，轮流冒出气泡说话">
+</div>
 
 <br>
 

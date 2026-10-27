@@ -90,6 +90,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self.state.sleepOverride = Set(c.dropFirst(6).split(separator: ",").compactMap { Persona(rawValue: String($0)) })
                 case let c where c.hasPrefix("cast:"):
                     self.state.castOverride = c.dropFirst(5).split(separator: ",").compactMap { Persona(rawValue: String($0)) }
+                case let c where c.hasPrefix("film:"):
+                    let n = SceneSnapshot.film(to: URL(fileURLWithPath: String(c.dropFirst(5))))
+                    AppLog.info("film", ["frames": n])
                 case let c where c.hasPrefix("snapshots:"):
                     let files = SceneSnapshot.renderAll(to: URL(fileURLWithPath: String(c.dropFirst(10))))
                     AppLog.info("snapshots", ["count": files.count])
