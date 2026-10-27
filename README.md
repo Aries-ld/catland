@@ -178,6 +178,16 @@ scripts/package-dmg.sh
 - 更多城市的窗外，更多会在夜里发生的事
 - 导出和导入你的本地收藏
 
+## Star History
+
+<a href="https://star-history.com/#Aries-ld/catland&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Aries-ld/catland&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Aries-ld/catland&type=Date" />
+    <img alt="Star History" src="https://api.star-history.com/svg?repos=Aries-ld/catland&type=Date" width="80%" />
+  </picture>
+</a>
+
 ## 谢谢
 
 - [catbus](https://github.com/cv-cat/catbus) 和它的作者 [cv-cat](https://github.com/cv-cat)。catbus 是一辆把各个平台的小猫装在一起的猫巴士，catland 是它们下车以后住的那座小岛。

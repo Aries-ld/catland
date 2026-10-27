@@ -106,6 +106,16 @@ scripts/package-dmg.sh                 # or package a DMG into dist/
 - Platform names and icons belong to their owners and are only used to label where content comes from.
 - catland never likes, comments, follows or posts anything on your behalf.
 
+## Star History
+
+<a href="https://star-history.com/#Aries-ld/catland&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Aries-ld/catland&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Aries-ld/catland&type=Date" />
+    <img alt="Star History" src="https://api.star-history.com/svg?repos=Aries-ld/catland&type=Date" width="80%" />
+  </picture>
+</a>
+
 ## Thanks
 
 [catbus](https://github.com/cv-cat/catbus) by [cv-cat](https://github.com/cv-cat): a cat bus that carries the cats of every platform. catland is the island where they get off.
