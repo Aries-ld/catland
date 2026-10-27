@@ -18,7 +18,7 @@ enum SceneSnapshot {
     }
 
     static let presets: [Preset] = [
-        Preset(file: "hero", date: "2026-10-28 21:30", condition: "clear", bubble: "点我点我，一起摸鱼～", size: CGSize(width: 720, height: 150)),
+        Preset(file: "hero", date: "2026-10-28 21:30", condition: "clear", bubble: "点我，本小姐今天心情好", size: CGSize(width: 720, height: 150)),
         Preset(file: "autumn-afternoon", date: "2026-10-28 15:00", condition: "partly"),
         Preset(file: "dusk", date: "2026-10-28 17:12", condition: "clear"),
         Preset(file: "rain-night", date: "2026-10-28 21:00", condition: "rain", intensity: 0.85),

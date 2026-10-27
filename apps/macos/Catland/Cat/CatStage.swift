@@ -105,7 +105,7 @@ struct CatStage: View {
 
     /// 箱箱的纸箱：画在小奶猫前面，挡住身体下半截，只露出脑袋和爪子扒着箱沿。
     private func drawBox(under s: CatDirector.Snapshot, in ctx: inout GraphicsContext, size: CGSize, px: CGFloat) {
-        let w = 13 * px, h = 6 * px
+        let w = 13 * px, h = 4 * px
         let x = ((s.x - w / 2) / px).rounded() * px, y = size.height - px - h
         let side = Color(red: 0.78, green: 0.58, blue: 0.36), top = Color(red: 0.88, green: 0.70, blue: 0.47)
         let edge = Color(red: 0.45, green: 0.31, blue: 0.18), tape = Color(red: 0.93, green: 0.82, blue: 0.62)
@@ -120,8 +120,8 @@ struct CatStage: View {
         ctx.fill(Path(CGRect(x: x, y: y, width: px, height: h)), with: .color(edge))
         ctx.fill(Path(CGRect(x: x + w - px, y: y, width: px, height: h)), with: .color(edge))
         // 贴在箱子上的猫爪纸条
-        ctx.fill(Path(CGRect(x: x + 2 * px, y: y + 2 * px, width: 3 * px, height: 2 * px)), with: .color(.white.opacity(0.92)))
-        ctx.fill(Path(CGRect(x: x + 3 * px, y: y + 3 * px, width: px, height: px)), with: .color(Color(red: 0.95, green: 0.45, blue: 0.55)))
+        ctx.fill(Path(CGRect(x: x + 2 * px, y: y + px, width: 3 * px, height: 2 * px)), with: .color(.white.opacity(0.92)))
+        ctx.fill(Path(CGRect(x: x + 3 * px, y: y + 2 * px, width: px, height: px)), with: .color(Color(red: 0.95, green: 0.45, blue: 0.55)))
     }
 
     /// 像素风对话气泡：白底、1 像素深色描边、方角，带一个指向猫头的小尾巴。
