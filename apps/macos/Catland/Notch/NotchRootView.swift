@@ -76,6 +76,14 @@ struct CollapsedView: View {
         return CatDen(minX: left, maxX: left + n.notchSize.width, bottom: n.notchSize.height)
     }
 
+    /// 物理刘海挡住的区间：收起态猫娘只在两侧活动；悬停时窗户变高，可以走到刘海下方。
+    private var notchSpan: ClosedRange<CGFloat>? {
+        let n = state.notch
+        guard n.hasNotch, !state.showingRoom else { return nil }
+        let left = (width - n.notchSize.width) / 2
+        return left...(left + n.notchSize.width)
+    }
+
     /// 悬停时轮播：事件预告 / 倒计时排最前，后面是闲聊 / 时间 / 戳我三类交错；每次悬停换一个随机顺序。
     /// 没悬停但小猫主动探出来时，只说那一句。
     private var bubbles: [String] {
@@ -95,12 +103,12 @@ struct CollapsedView: View {
     var body: some View {
         ZStack {
             IslandScene(state: state)
-            CatStage(cats: state.notch.shelf > 0 ? 3 : 2,
-                     hiddenWidth: state.notch.hasNotch && state.notch.shelf == 0 ? state.notch.notchSize.width : 0,
-                     excited: state.showingRoom,
-                     den: denRect,
-                     bubbles: bubbles,
-                     bubbleEpoch: state.hoverStartedAt)
+            // 接入了哪些平台，对应的猫娘就住进来；都没接入时是纸箱猫娘箱箱。
+            CatgirlStage(cast: state.speakers,
+                         notchSpan: notchSpan,
+                         excited: state.showingRoom,
+                         bubbles: bubbles,
+                         bubbleEpoch: state.hoverStartedAt)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

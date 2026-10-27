@@ -1,0 +1,71 @@
+{
+  "cell": 64,
+  "characters": {
+    "shushu": {
+      "idle": {
+        "row": 0,
+        "frames": 8
+      },
+      "walk": {
+        "row": 1,
+        "frames": 8
+      },
+      "sign": {
+        "row": 2,
+        "frames": 8
+      }
+    },
+    "doudou": {
+      "idle": {
+        "row": 0,
+        "frames": 8
+      },
+      "walk": {
+        "row": 1,
+        "frames": 8
+      },
+      "sign": {
+        "row": 2,
+        "frames": 8
+      }
+    },
+    "bibi": {
+      "idle": {
+        "row": 0,
+        "frames": 8
+      },
+      "walk": {
+        "row": 1,
+        "frames": 8
+      },
+      "sign": {
+        "row": 2,
+        "frames": 8
+      }
+    },
+    "tietie": {
+      "idle": {
+        "row": 0,
+        "frames": 8
+      },
+      "walk": {
+        "row": 1,
+        "frames": 8
+      },
+      "sign": {
+        "row": 2,
+        "frames": 8
+      }
+    },
+    "box": {
+      "idle": {
+        "row": 0,
+        "frames": 8
+      },
+      "pop": {
+        "row": 1,
+        "frames": 8
+      }
+    }
+  }
+}

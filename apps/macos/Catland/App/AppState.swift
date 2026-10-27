@@ -46,7 +46,9 @@ final class AppState {
     private var eventsTask: Task<Void, Never>?
 
     /// 说话的猫娘：已接入平台对应的猫娘；一个都没接入时是纸箱猫娘箱箱。
-    var speakers: [Persona] { Persona.speakers(platforms: connectedContentPlatforms.map(\.id)) }
+    var speakers: [Persona] { castOverride ?? Persona.speakers(platforms: connectedContentPlatforms.map(\.id)) }
+    /// 调试：临时指定刘海里出场的角色（catland-debug cast:box / cast:off），不影响真实的平台连接。
+    var castOverride: [Persona]?
 
     func announce(_ text: String, seconds: Double = 8) {
         // 主动探头说话也带上名字（随机挑一位在场的猫娘）

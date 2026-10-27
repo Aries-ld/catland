@@ -51,6 +51,7 @@ enum Presentation {
         let region = RestDays.region(for: c.env.location)
         let live = EventScheduler.active(now: c.env.date, region: region, latitude: c.env.location.latitude)
         CatDirector.shared.watching = live.map { $0.event.canRun(condition: c.cond, intensity: c.intensity) } ?? false
+        CatgirlDirector.shared.watching = CatDirector.shared.watching
         for layer in layers { layer.draw(c) }
     }
 }

@@ -1,0 +1,21 @@
+{
+  "status": "success",
+  "job_id": "job_5b27f9f53dd644838085cec859493a1c",
+  "outputs": [
+    {
+      "type": "media",
+      "path": "assets/art/catgirls/anim/doudou-idle/Idle_loop_she_stands_with_the_microphone_bouncing_lightly_to_a_beat_twin_tails_swaying_star_eyes_sparkling/result_output_url.webp",
+      "mime_type": "image/webp"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/catgirls/anim/doudou-idle/Idle_loop_she_stands_with_the_microphone_bouncing_lightly_to_a_beat_twin_tails_swaying_star_eyes_sparkling/result_output_transparent_output_urls_gif.gif",
+      "mime_type": "image/gif"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/catgirls/anim/doudou-idle/Idle_loop_she_stands_with_the_microphone_bouncing_lightly_to_a_beat_twin_tails_swaying_star_eyes_sparkling/result_output_transparent_output_urls_png.png",
+      "mime_type": "image/png"
+    }
+  ]
+}

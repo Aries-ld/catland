@@ -1,0 +1,21 @@
+{
+  "status": "success",
+  "job_id": "job_384aca91c1bd4549993acb71cafaf2bc",
+  "outputs": [
+    {
+      "type": "media",
+      "path": "assets/art/catgirls/anim/shushu-idle/Idle_loop_she_stands_elegantly_breathing_gently_her_cat_tail_sways_slowly_and_she_gives_a_small_proud_blink/result_output_url.webp",
+      "mime_type": "image/webp"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/catgirls/anim/shushu-idle/Idle_loop_she_stands_elegantly_breathing_gently_her_cat_tail_sways_slowly_and_she_gives_a_small_proud_blink/result_output_transparent_output_urls_gif.gif",
+      "mime_type": "image/gif"
+    },
+    {
+      "type": "media",
+      "path": "assets/art/catgirls/anim/shushu-idle/Idle_loop_she_stands_elegantly_breathing_gently_her_cat_tail_sways_slowly_and_she_gives_a_small_proud_blink/result_output_transparent_output_urls_png.png",
+      "mime_type": "image/png"
+    }
+  ]
+}

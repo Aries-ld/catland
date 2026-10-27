@@ -83,6 +83,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     UserDefaults.standard.set(m == "den" || m == "both", forKey: NotchGeometry.denKey)
                     self.screenChanged()
                 case "den": CatDirector.shared.forceDen = true
+                case "cast:off": self.state.castOverride = nil
+                case let c where c.hasPrefix("cast:"):
+                    self.state.castOverride = c.dropFirst(5).split(separator: ",").compactMap { Persona(rawValue: String($0)) }
                 case let c where c.hasPrefix("snapshots:"):
                     let files = SceneSnapshot.renderAll(to: URL(fileURLWithPath: String(c.dropFirst(10))))
                     AppLog.info("snapshots", ["count": files.count])

@@ -74,6 +74,14 @@
 - **性格**：怯生生又满怀期待的小可怜，等人领回家；说话软糯、句尾爱带「…」。
 - **登场仪式**：第一次接入平台时，她从纸箱里跳出来欢呼，然后对应平台的猫娘登场；之后纸箱猫娘退场（全部断开时回到纸箱）。
 
+## 刘海里的实现
+
+- **动画**：每位猫娘 3 个动作（待机 idle / 走路 walk / 招牌动作 sign），箱箱 2 个（待机 idle / 跳出纸箱 pop），均为 8 帧，Meowa `animate-run` 生成，原始 spritesheet 存在 `assets/art/catgirls/anim/<角色>-<动作>/run1/`。
+- **图集**：`scripts/build_catgirls.py` 切帧、按脚底中点对齐，输出 `apps/macos/Resources/Catgirls/<角色>.png`（每行一个动作、64×64 格子）和 `catgirls.json`。新增动作或角色：生成动画 → 在脚本的 `CHARACTERS` 里登记 → 重跑脚本。
+- **绘制与行为**：`apps/macos/Catland/Cat/CatgirlStage.swift`。1 个美术像素 = 0.5pt（Retina 上 1 个物理像素）。收起态只在刘海两侧活动（偶数位左、奇数位右）；悬停时可以走到刘海下方、一起做招牌动作；有事件时停下来看。气泡由报名字的那位猫娘说。
+- **登场**：从「只有箱箱」变成有猫娘时，箱箱先播 1.6 秒跳出纸箱，然后猫娘们登场。调试：`catland-debug cast:box` / `cast:shushu,bibi` / `cast:off`。
+- **效果截图**：`assets/art/catgirls/notch-states.png`。
+
 ## 语料实现
 
 语料在 `apps/macos/Catland/Scene/PersonaCopy.swift`（每位猫娘的戳我 / 天气 / 季节 / 时段 / 星期 / 心情 / 倒计时模板），由 `BubbleCopy.rotation` 按已接入的平台轮流挑选；测试保证每句不超过 22 个字。
