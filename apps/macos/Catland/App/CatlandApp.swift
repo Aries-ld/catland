@@ -199,7 +199,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     if e.type == .leftMouseDown, self.geometry.activeRect(expanded: false, hovering: self.state.hovering).contains(p) { self.expand(source: "global-click") }
                     return
                 }
-                guard !self.geometry.activeRect(expanded: true).contains(p), !self.state.webLoginActive, !self.pinned else { return }
+                guard !self.geometry.activeRect(expanded: true).contains(p), !self.pinned else { return }
                 self.collapse()
             }
         } as Any)

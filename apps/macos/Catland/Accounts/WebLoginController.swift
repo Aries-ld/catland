@@ -42,6 +42,8 @@ final class WebLoginController: NSObject, NSWindowDelegate, WKUIDelegate, WKNavi
         self.state = state
         self.platform = platform
         state.webLoginActive = true
+        // 登录页是一个正常大小的浏览器窗口：面板收回刘海，别压在登录页上。
+        state.collapsePanel()
 
         let cfg = WKWebViewConfiguration()
         cfg.websiteDataStore = .nonPersistent()

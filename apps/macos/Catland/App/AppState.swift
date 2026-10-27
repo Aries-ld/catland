@@ -109,7 +109,7 @@ final class AppState {
         }
     }
     var commentsOpen = false
-    /// 内嵌网页登录窗口打开时，点击面板外不收起。
+    /// 内嵌网页登录窗口是否打开（打开时面板会自动收起，让出屏幕给登录页）。
     var webLoginActive = false
     var notch = NotchGeometry(screenFrame: .zero, notchSize: CGSize(width: 180, height: 32), hasNotch: false)
     /// 扫码登录进行中：平台 → 二维码 PNG 与最新进度。
@@ -345,6 +345,16 @@ final class AppState {
         catwalk = on
         UserDefaults.standard.set(on, forKey: NotchGeometry.catwalkKey)
         NotificationCenter.default.post(name: .catlandGeometryChanged, object: nil)
+    }
+
+    /// 收起面板回到刘海（例如打开网页登录窗口时，让出屏幕给登录页）。
+    func collapsePanel() {
+        guard expanded else { return }
+        AppLog.info("panel collapsed", ["reason": webLoginActive ? "web login" : "request"])
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.9)) {
+            expanded = false
+            overlay = .none
+        }
     }
 
     /// 老板键：立刻收起、暂停、静音。
