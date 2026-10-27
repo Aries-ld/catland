@@ -98,7 +98,12 @@ struct CardView: View {
                     .transition(.scale(scale: 0.4).combined(with: .opacity))
             }
             if isCurrent && feed.paused && card.isVideo {
-                Image(systemName: "play.fill").font(.system(size: 46)).foregroundStyle(.white.opacity(0.75)).allowsHitTesting(false)
+                // 暂停：播放符号正下方显示「已播放 / 总时长」（和 B 站一样）
+                VStack(spacing: 10) {
+                    Image(systemName: "play.fill").font(.system(size: 46)).foregroundStyle(.white.opacity(0.75))
+                    if let p = feed.players.player(for: card.key) { PausedTime(player: p) }
+                }
+                .allowsHitTesting(false)
             }
             overlayInfo
             // 视频进度条：贴着卡片底边，点击 / 拖动跳转；暂停或悬停时显示「已播 / 总长」
@@ -322,8 +327,25 @@ struct ImageCarousel: View {
     }
 }
 
+/// 暂停时播放符号下方的「已播放 / 总时长」。
+struct PausedTime: View {
+    let player: AVPlayer
+    var body: some View {
+        // 暂停时拖动进度条，时间也要跟着变
+        TimelineView(.periodic(from: .now, by: 0.25)) { _ in
+            let d = player.currentItem?.duration.seconds ?? 0
+            if d.isFinite && d > 0 {
+                Text("\(Format.clock(player.currentTime().seconds)) / \(Format.clock(d))")
+                    .font(.system(size: 13, weight: .semibold, design: .monospaced)).foregroundStyle(.white)
+                    .padding(.horizontal, 10).padding(.vertical, 4)
+                    .background(Capsule().fill(.black.opacity(0.5)))
+            }
+        }
+    }
+}
+
 /// 视频进度条：贴底的细线，鼠标移上去变粗并出现拖动圆点；点击或拖动跳转（和 B 站一样）。
-/// 暂停、悬停或拖动时，在左下角显示「已播放 / 总时长」。
+/// 悬停或拖动时在进度条上方显示跳转位置的时间；暂停时的时间显示在播放符号下方（PausedTime）。
 struct VideoScrubber: View {
     let player: AVPlayer
     let paused: Bool
@@ -336,7 +358,7 @@ struct VideoScrubber: View {
             let p = scrub ?? (d > 0 ? min(1, max(0, player.currentTime().seconds / d)) : 0)
             let active = hovering || scrub != nil
             VStack(alignment: .leading, spacing: 6) {
-                if paused || active, d > 0 {
+                if active, d > 0 {
                     Text("\(Format.clock(p * d)) / \(Format.clock(d))")
                         .font(.system(size: 12, weight: .semibold, design: .monospaced)).foregroundStyle(.white)
                         .padding(.horizontal, 8).padding(.vertical, 3)
