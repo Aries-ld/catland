@@ -5,8 +5,8 @@ enum RestDays {
     typealias Region = Catland.Region
 
     static func region(for loc: SceneLocation, timeZone: TimeZone = .current) -> Region {
-        if loc.skyline == .singapore || timeZone.identifier == "Asia/Singapore" { return .singapore }
-        if loc.skyline == .shanghai || ["Asia/Shanghai", "Asia/Chongqing", "Asia/Urumqi", "Asia/Harbin"].contains(timeZone.identifier) { return .china }
+        if loc.city == .singapore || timeZone.identifier == "Asia/Singapore" { return .singapore }
+        if loc.city == .shanghai || loc.city == .beijing || ["Asia/Shanghai", "Asia/Chongqing", "Asia/Urumqi", "Asia/Harbin"].contains(timeZone.identifier) { return .china }
         return .other
     }
 

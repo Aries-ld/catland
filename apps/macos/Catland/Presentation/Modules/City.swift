@@ -55,7 +55,7 @@ protocol Landmark {
 }
 
 enum Landmarks {
-    static let all: [Landmark] = [SingaporeLandmarks(), ShanghaiLandmarks()]
+    static let all: [Landmark] = [SingaporeLandmarks(), ShanghaiLandmarks(), BeijingLandmarks()]
     static func of(_ s: Skyline) -> Landmark? { all.first { $0.skyline == s } }
 }
 
@@ -129,6 +129,60 @@ struct ShanghaiLandmarks: Landmark {
         c.fill(wx, base - wh, 4, wh, pal.shade.mix(pal.body, 0.5).color)
         c.fill(wx + 1, base - wh + 1, 2, 2, c.dark > 0.5 ? Color(red: 0.6, green: 0.8, blue: 1).opacity(0.7) : c.rgb(0xBFD3E6).color)
         c.litWindows(x: wx, w: 4, top: base - wh + 4, bottom: base, seed: 777, palette: pal)
+    }
+}
+
+/// 北京：左翼中央电视台总部大楼（「大裤衩」：两座倾斜的塔楼在顶部折成直角相连，表面是菱形网格），
+/// 右翼中国尊（上下宽、腰身收窄的「尊」形超高层，顶部微微外扩）和国贸三期。
+struct BeijingLandmarks: Landmark {
+    let skyline = Skyline.beijing
+    func reserved(_ c: SceneCanvas) -> [ClosedRange<Int>] { [(c.landmarkLeft - 1)...(c.landmarkLeft + 15), (c.landmarkRight - 4)...(c.landmarkRight + 9)] }
+
+    func draw(_ c: SceneCanvas, base: Int, palette pal: CityPalette) {
+        // 央视大楼：左塔微微右倾、右塔微微左倾，底部裙楼与顶部 L 形悬挑把两塔连成一个中空的「环」
+        let x = c.landmarkLeft
+        let h = min(c.tall(13), base - c.skyTop - 3)
+        let steel = pal.body.mix(c.rgb(0x9AA7B8), 0.35), steelDark = steel.mix(c.rgb(0x0E1426), 0.2)
+        let lattice = c.dark > 0.5 ? Color(red: 1, green: 0.84, blue: 0.5).opacity(0.75 * c.dark) : steel.mix(c.rgb(0xFFFFFF), 0.3).color
+        let topY = base - h
+        for k in 0..<h {
+            let y = base - 1 - k
+            let lx = x + k * 2 / max(1, h)        // 左塔：越往上越向右
+            c.fill(lx, y, 3, 1, steel.color)
+            if k % 2 == 1 { c.fill(lx + (k / 2) % 3, y, 1, 1, lattice) }
+            if k >= 3 && k < h - 3 {               // 右塔：夹在裙楼与悬挑之间，越往上越向左
+                let rx = x + 10 - k / max(1, h / 2)
+                c.fill(rx, y, 3, 1, steelDark.color)
+                if k % 2 == 0 { c.fill(rx + (k / 2 + 1) % 3, y, 1, 1, lattice) }
+            }
+        }
+        c.fill(x, base - 3, 13, 3, steel.color)                 // 底部裙楼
+        c.fill(x, base - 1, 13, 1, pal.shade.color)
+        c.fill(x + 2, topY, 12, 3, steel.color)                 // 顶部横向悬挑
+        c.fill(x + 11, topY + 3, 3, 3, steel.color)             // 悬挑末端向下折
+        c.fill(x + 2, topY + 2, 12, 1, steelDark.color)
+        for k in stride(from: x + 3, to: x + 14, by: 2) { c.fill(k, topY + 1, 1, 1, lattice) }
+
+        // 中国尊：底座 5 宽，往上收到 4，顶部再放宽到 6
+        let zx = c.landmarkRight - 3
+        let zh = min(c.tall(21), base - c.skyTop - 1)
+        for k in 0..<zh {
+            let r = Double(k) / Double(zh)
+            let w = r < 0.18 ? 5 : (r < 0.78 ? 4 : (r < 0.94 ? 5 : 6))
+            let y = base - 1 - k
+            let off = (6 - w) / 2
+            c.fill(zx + off, y, w, 1, pal.body.color)
+            c.fill(zx + off + w - 1, y, 1, 1, pal.shade.color)
+            if c.dark > 0.5 { if k % 2 == 0 { c.fill(zx + off + 1 + (k / 2) % max(1, w - 2), y, 1, 1, Color(red: 1, green: 0.86, blue: 0.55).opacity(0.8 * c.dark)) } }
+            else if k % 3 == 0 { c.fill(zx + off + 1, y, max(1, w - 2), 1, pal.windowDay.color.opacity(0.6)) }
+        }
+        c.fill(zx + 2, base - zh - 2, 2, 2, pal.body.mix(c.rgb(0xFFFFFF), 0.25).color)
+        if c.dark > 0.5, Int(c.t * 2) % 2 == 0 { c.fill(zx + 2, base - zh - 2, 1, 1, .red) }
+        // 国贸三期：旁边稍矮的方塔，顶部收成尖顶
+        let gx = c.landmarkRight + 4, gh = min(15, zh - 5)
+        c.fill(gx, base - gh, 4, gh, pal.shade.mix(pal.body, 0.55).color)
+        c.fill(gx + 1, base - gh - 2, 2, 2, pal.shade.mix(pal.body, 0.55).color)
+        c.litWindows(x: gx, w: 4, top: base - gh + 2, bottom: base, seed: 909, palette: pal)
     }
 }
 

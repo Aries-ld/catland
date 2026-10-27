@@ -21,6 +21,9 @@ enum SceneSnapshot {
         Preset(file: "hero", date: "2026-10-28 21:30", condition: "clear", bubble: "点我，本小姐今天心情好", size: CGSize(width: 720, height: 150)),
         Preset(file: "autumn-afternoon", date: "2026-10-28 15:00", condition: "partly"),
         Preset(file: "dusk", date: "2026-10-28 17:12", condition: "clear"),
+        Preset(file: "beijing-day", date: "2026-10-28 14:00", condition: "clear", city: .beijing),
+        Preset(file: "beijing-dusk", date: "2026-10-28 17:20", condition: "clear", city: .beijing),
+        Preset(file: "beijing-night", date: "2026-10-28 21:00", condition: "clear", city: .beijing),
         Preset(file: "rain-night", date: "2026-10-28 21:00", condition: "rain", intensity: 0.85),
         Preset(file: "winter-snow", date: "2027-01-15 10:00", condition: "snow", intensity: 0.9),
         Preset(file: "event-sakura", date: "2026-04-11 15:05", condition: "partly", event: "sakuraRain"),
@@ -120,6 +123,3 @@ enum SceneSnapshot {
     }
 }
 
-extension SceneLocation {
-    static let shanghai = SceneLocation(name: "上海", latitude: 31.23, longitude: 121.47, source: .timezone)
-}

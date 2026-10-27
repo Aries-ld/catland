@@ -11,24 +11,40 @@ struct SceneLocation: Equatable {
     let latitude: Double
     let longitude: Double
     let source: Source
-    /// 窗外地标用哪个城市的天际线。
-    var skyline: Skyline { Skyline.nearest(latitude: latitude, longitude: longitude) }
+    /// 真正所在的已知城市（120km 以内）；不在任何已知城市附近时为 nil。节假日地区等按它判断。
+    var city: Skyline? { Skyline.known(latitude: latitude, longitude: longitude)?.city }
+    /// 窗外地标用哪个城市的天际线：在已知城市就用它，否则用随机选定的北京 / 上海。
+    var skyline: Skyline { city ?? Skyline.fallback }
 
     static let singapore = SceneLocation(name: "新加坡", latitude: 1.2903, longitude: 103.8520, source: .timezone)
+    static let shanghai = SceneLocation(name: "上海", latitude: 31.23, longitude: 121.47, source: .timezone)
+    static let beijing = SceneLocation(name: "北京", latitude: 39.90, longitude: 116.40, source: .timezone)
 }
 
-enum Skyline: String {
-    case singapore, shanghai, generic
+/// 有专属地标的城市。新增城市：在这里登记坐标和名字，再在 City.swift 里实现它的 Landmark。
+enum Skyline: String, CaseIterable {
+    case singapore, shanghai, beijing
 
-    private static let cities: [(Skyline, Double, Double)] = [(.singapore, 1.29, 103.85), (.shanghai, 31.23, 121.47)]
+    private static let cities: [(city: Skyline, name: String, lat: Double, lon: Double)] = [
+        (.singapore, "新加坡", 1.29, 103.85), (.shanghai, "上海", 31.23, 121.47), (.beijing, "北京", 39.90, 116.40),
+    ]
 
-    /// 120km 以内的已知城市用它的地标，否则用通用楼群。
-    static func nearest(latitude: Double, longitude: Double) -> Skyline {
-        for (city, lat, lon) in cities {
-            let dLat = (lat - latitude) * 111, dLon = (lon - longitude) * 111 * cos(latitude * .pi / 180)
-            if dLat * dLat + dLon * dLon < 120 * 120 { return city }
+    /// 120km 以内的已知城市。
+    static func known(latitude: Double, longitude: Double) -> (city: Skyline, name: String)? {
+        for c in cities {
+            let dLat = (c.lat - latitude) * 111, dLon = (c.lon - longitude) * 111 * cos(latitude * .pi / 180)
+            if dLat * dLat + dLon * dLon < 120 * 120 { return (c.city, c.name) }
         }
-        return .generic
+        return nil
+    }
+
+    private static let fallbackKey = "fallbackSkyline"
+    /// 不在任何已知城市附近时，窗外用北京或上海的天际线：第一次随机抽一个并记住，之后保持不变（天气和时间仍跟随真实所在地）。
+    static var fallback: Skyline {
+        if let raw = UserDefaults.standard.string(forKey: fallbackKey), let s = Skyline(rawValue: raw), s != .singapore { return s }
+        let pick: Skyline = Bool.random() ? .beijing : .shanghai
+        UserDefaults.standard.set(pick.rawValue, forKey: fallbackKey)
+        return pick
     }
 }
 
@@ -67,7 +83,9 @@ final class LocationProvider: NSObject, CLLocationManagerDelegate {
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let l = locations.last else { return }
         Task { @MainActor in
-            let loc = SceneLocation(name: Self.cityName(for: TimeZone.current) ?? "当前位置", latitude: l.coordinate.latitude,
+            // 城市名：在已知城市附近用它的名字（北京用户的系统时区也是 Asia/Shanghai，不能按时区叫「上海」）
+            let known = Skyline.known(latitude: l.coordinate.latitude, longitude: l.coordinate.longitude)?.name
+            let loc = SceneLocation(name: known ?? Self.cityName(for: TimeZone.current) ?? "当前位置", latitude: l.coordinate.latitude,
                                     longitude: l.coordinate.longitude, source: .system)
             UserDefaults.standard.set([loc.latitude, loc.longitude], forKey: Self.cacheKey)
             AppLog.info("location", ["source": "system", "skyline": loc.skyline.rawValue])
@@ -81,7 +99,8 @@ final class LocationProvider: NSObject, CLLocationManagerDelegate {
 
     private static func cached() -> SceneLocation? {
         guard let v = UserDefaults.standard.array(forKey: cacheKey) as? [Double], v.count == 2 else { return nil }
-        return SceneLocation(name: cityName(for: .current) ?? "当前位置", latitude: v[0], longitude: v[1], source: .system)
+        let known = Skyline.known(latitude: v[0], longitude: v[1])?.name
+        return SceneLocation(name: known ?? cityName(for: .current) ?? "当前位置", latitude: v[0], longitude: v[1], source: .system)
     }
 
     // MARK: - 时区兜底

@@ -112,7 +112,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     let f = ISO8601DateFormatter(); f.formatOptions = [.withFullDate, .withTime, .withColonSeparatorInTime]; f.timeZone = .current
                     self.state.sceneDateOverride = f.date(from: String(c.dropFirst(5)))
                 case let c where c.hasPrefix("intensity:"): self.state.sceneIntensityOverride = Double(c.dropFirst(10))
-                case "city:shanghai": self.state.location = SceneLocation(name: "上海", latitude: 31.23, longitude: 121.47, source: .timezone)
+                case "city:shanghai": self.state.location = .shanghai
+                case "city:beijing": self.state.location = .beijing
                 case "city:singapore": self.state.location = .singapore
                 case "ceiling:on", "ceiling:off":
                     UserDefaults.standard.set(cmd == "ceiling:on", forKey: NotchGeometry.ceilingKey)

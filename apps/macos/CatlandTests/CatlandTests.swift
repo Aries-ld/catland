@@ -8,6 +8,18 @@ final class FormatTests: XCTestCase {
         XCTAssertEqual(Format.count(230_000_000), "2.3亿")
     }
 
+    func testSkylineKnownCitiesAndFallback() {
+        XCTAssertEqual(Skyline.known(latitude: 39.95, longitude: 116.3)?.city, .beijing)
+        XCTAssertEqual(Skyline.known(latitude: 39.95, longitude: 116.3)?.name, "北京")
+        XCTAssertEqual(Skyline.known(latitude: 31.2, longitude: 121.5)?.city, .shanghai)
+        XCTAssertNil(Skyline.known(latitude: 40.71, longitude: -74.0)) // 纽约
+        let ny = SceneLocation(name: "纽约", latitude: 40.71, longitude: -74.0, source: .system)
+        XCTAssertNil(ny.city)
+        XCTAssertTrue([Skyline.beijing, .shanghai].contains(ny.skyline), "不在已知城市时用北京或上海")
+        XCTAssertEqual(ny.skyline, ny.skyline, "随机选定后保持不变")
+        XCTAssertEqual(RestDays.region(for: .beijing, timeZone: TimeZone(identifier: "Asia/Shanghai")!), .china)
+    }
+
     func testClock() {
         XCTAssertEqual(Format.clock(0), "0:00")
         XCTAssertEqual(Format.clock(65.9), "1:05")
