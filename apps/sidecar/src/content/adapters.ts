@@ -68,7 +68,7 @@ export class CatbusAdapter implements PlatformAdapter {
 
   protected toCard(item: Item, override: { video?: VideoSource | null; ttlMs?: number } = {}): FeedCard | null {
     const video = override.video !== undefined ? override.video : pickVideo(item.media, this.headers)
-    const images = item.media.filter((m) => m.type === 'image').map((m) => this.image(m.url, m.width, m.height))
+    const images = item.media.filter((m) => m.type === 'image' && isHttpUrl(m.url)).map((m) => this.image(m.url, m.width, m.height))
     if (!video && images.length === 0) return null
     const now = this.now()
     return {
@@ -196,12 +196,17 @@ function isVisual(item: Item): boolean {
   return item.kind !== 'text' && item.kind !== 'article'
 }
 
+/** 有可直接播放 / 显示的媒体。抖音推荐流里的 media.url 是内部 uri（不是 http 地址），不算，需要再 item get 补全。 */
 function hasPlayable(item: Item): boolean {
-  return item.media.some((m) => m.type === 'video' || m.type === 'image')
+  return item.media.some((m) => (m.type === 'video' || m.type === 'image') && isHttpUrl(m.url))
+}
+
+function isHttpUrl(url: string): boolean {
+  return /^https?:\/\//i.test(url)
 }
 
 function pickVideo(media: Media[], headers: Headers): VideoSource | null {
-  const videos = media.filter((m) => m.type === 'video')
+  const videos = media.filter((m) => m.type === 'video' && isHttpUrl(m.url))
   if (videos.length === 0) return null
   const audio = media.find((m) => m.type === 'audio')
   if (audio) return null // 分离音视频轨 AVPlayer 无法流畅播放，丢弃

@@ -50,11 +50,18 @@ describe('CatbusAdapter', () => {
     expect(card?.video?.headers.Referer).toBe('https://www.douyin.com/')
   })
 
+  it('推荐流里的媒体地址不是 http 地址（抖音给的是内部 uri）时，用 item get 补全', async () => {
+    const c = new StubCatbus(() => item({ media: [media('video', 'https://v26-web.douyinvod.com/x.mp4')] }))
+    const card = await new CatbusAdapter('douyin', deps(c)).resolve(item({ media: [media('video', 'aeb0f54fda681deeb6ab45c94cde9de5')] }))
+    expect(c.calls.map((a) => a[2])).toEqual(['get'])
+    expect(card?.video?.url).toBe('https://v26-web.douyinvod.com/x.mp4')
+  })
+
   it('纯文字和分离音视频轨的内容被过滤', async () => {
     const c = new StubCatbus(() => item())
     const a = new CatbusAdapter('x', deps(c))
     expect(await a.resolve(item({ kind: 'text' }))).toBeNull()
-    expect(await a.resolve(item({ media: [media('video', 'v'), media('audio', 'a')] }))).toBeNull()
+    expect(await a.resolve(item({ media: [media('video', 'https://v'), media('audio', 'https://a')] }))).toBeNull()
   })
 })
 

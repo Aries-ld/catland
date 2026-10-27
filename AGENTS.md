@@ -56,6 +56,7 @@
 - `vendor/` 只读，不修改 catbus 受版本控制的文件。
 - catbus 写操作（点赞、评论、关注、发布）会触发平台风控，默认不调用；遇到 `RISK_CONTROL` 停止，不自动重试。
 - 设计决策记录在 `docs/decisions/`（ADR）。
+- **平台操作收敛到 catbus**：取内容、登录、评论等平台请求一律走 catbus，不自己直连平台接口（自己请求更容易被风控，也会让各平台分支越来越多）。遇到 catbus 能力不够，先和产品负责人确认处理方式，再登记到 `docs/catbus-gaps.md`（现象、影响、当前处理、上游怎么补）；目前唯一的直连例外是 Bilibili 播放地址（匿名访客、不带账号），见该文档。
 - sidecar 调 catbus 只经 `CatbusRunner`（`apps/sidecar/src/catbus/runner.ts`）：用随包的 `catbus-cli`（版本锁定），凭证经 stdin 传、不进 argv 和日志；stdout 只留给 RPC，日志只写文件。
 - 新依赖锁精确版本，且选发布满 7 天的版本。
 - 内容体验对标抖音 / 小红书（手感、布局、时延），指标与预加载策略见 `docs/decisions/0002-content-pipeline-and-preloading.md`；改动内容管线后跑 `npm run smoke:feed` 对照指标。
