@@ -51,7 +51,13 @@ export interface MixerOptions {
   maxRun?: number
   /** 为保证均匀（连续上限、新连接的平台优先）愿意等待的最长时间。 */
   balanceWaitMs?: number
+  /** 风控冷却的起始时长；连续被风控时翻倍，最长 riskCooldownMaxMs。 */
   riskCooldownMs?: number
+  riskCooldownMaxMs?: number
+  /** 每个平台每分钟最多发起的请求数（翻页 + 解析），把单个平台的请求频率压低。 */
+  requestsPerMinute?: number
+  /** 个别平台更保守的上限（如匿名访问的 Bilibili 播放地址）。 */
+  platformRequestsPerMinute?: Record<string, number>
   backoffBaseMs?: number
   backoffMaxMs?: number
   /** 卡片距离过期不足这么久就重新解析，避免交给客户端后才失效。 */
@@ -71,6 +77,12 @@ interface Source {
   failures: number
   lastError: { code: string; message: string } | null
   abort: AbortController
+  /** 最近一分钟内发起请求的时间戳（限速用）。 */
+  requests: number[]
+  /** 连续被风控的次数：决定下一次冷却多久。 */
+  riskStrikes: number
+  /** 冷却结束后的探测期：只放行一个请求，成功才恢复正常供货。 */
+  probing: boolean
 }
 
 const ITEM_MEMORY = 300
@@ -108,7 +120,10 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
       maxConsecutive: opts.maxConsecutive ?? 1,
       maxRun: opts.maxRun ?? 3,
       balanceWaitMs: opts.balanceWaitMs ?? 2_500,
-      riskCooldownMs: opts.riskCooldownMs ?? 10 * 60_000,
+      riskCooldownMs: opts.riskCooldownMs ?? 5 * 60_000,
+      riskCooldownMaxMs: opts.riskCooldownMaxMs ?? 60 * 60_000,
+      requestsPerMinute: opts.requestsPerMinute ?? 30,
+      platformRequestsPerMinute: opts.platformRequestsPerMinute ?? { bilibili: 20 },
       backoffBaseMs: opts.backoffBaseMs ?? 5_000,
       backoffMaxMs: opts.backoffMaxMs ?? 2 * 60_000,
       expiryMarginMs: opts.expiryMarginMs ?? 60_000,
@@ -132,6 +147,7 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
       this.sources.set(a.platform, {
         adapter: a, pending: [], cursor: null, fetching: false, inflight: 0, lastFetchAt: -Infinity, nextResolveAt: 0,
         status: 'active', until: 0, failures: 0, lastError: null, abort: new AbortController(),
+        requests: [], riskStrikes: 0, probing: false,
       })
     }
     this.pump()
@@ -224,7 +240,13 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
     const now = this.now()
     let wakeAt = Infinity
     for (const s of this.sources.values()) {
-      if (s.status !== 'active' && s.status !== 'auth' && now >= s.until) this.setStatus(s, 'active')
+      if (s.status !== 'active' && s.status !== 'auth' && now >= s.until) {
+        if (s.status === 'cooldown') {
+          s.probing = true // 先试探一个请求，确认恢复了再正常供货
+          this.log.info('cooldown over, probing', { platform: s.adapter.platform })
+        }
+        this.setStatus(s, 'active')
+      }
     }
     const list = [...this.sources.values()]
     // 每个平台各有自己的缓冲额度：一个平台快、另一个慢时，快平台不会占满缓冲把慢平台 / 新平台挤掉。
@@ -241,6 +263,12 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
         }
         const load = this.readyCount(s.adapter.platform) + s.inflight
         if (load >= perSource) continue
+        if (s.probing && (s.inflight > 0 || s.fetching)) continue // 探测期只放行一个请求
+        const budgetAt = this.budgetAt(s, now)
+        if (budgetAt > now) {
+          wakeAt = Math.min(wakeAt, budgetAt)
+          continue
+        }
         if (s.pending.length === 0) {
           wakeAt = Math.min(wakeAt, this.maybeFetch(s, now))
           continue
@@ -262,10 +290,12 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
   /** 需要时翻一页；返回下次可以再翻的时间。 */
   private maybeFetch(s: Source, now: number): number {
     if (s.fetching) return Infinity
-    const allowedAt = s.lastFetchAt + this.o.feedMinIntervalMs
+    if (s.probing && s.inflight > 0) return Infinity
+    const allowedAt = Math.max(s.lastFetchAt + this.o.feedMinIntervalMs, this.budgetAt(s, now))
     if (now < allowedAt) return allowedAt
     s.fetching = true
     s.lastFetchAt = now
+    s.requests.push(now)
     const signal = s.abort.signal
     s.adapter
       .fetchFeed(s.cursor, signal)
@@ -295,6 +325,7 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
   private resolveNext(s: Source, now: number): void {
     const item = s.pending.shift()!
     s.nextResolveAt = now + this.o.resolveMinIntervalMs
+    s.requests.push(now)
     this.inflight++
     s.inflight++
     const signal = s.abort.signal
@@ -316,8 +347,20 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
       })
   }
 
+  /** 限速：最近一分钟的请求数达到上限时，返回可以再发请求的时间；否则返回 now。 */
+  private budgetAt(s: Source, now: number): number {
+    const limit = this.o.platformRequestsPerMinute[s.adapter.platform] ?? this.o.requestsPerMinute
+    while (s.requests.length > 0 && s.requests[0]! <= now - 60_000) s.requests.shift()
+    return s.requests.length < limit ? now : s.requests[0]! + 60_000
+  }
+
   private onSuccess(s: Source): void {
     s.failures = 0
+    if (s.probing) {
+      s.probing = false
+      s.riskStrikes = 0
+      this.log.info('recovered from risk control', { platform: s.adapter.platform })
+    }
     if (s.status === 'backoff') this.setStatus(s, 'active')
   }
 
@@ -328,8 +371,14 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
     s.lastError = { code, message: (err as Error).message }
     const ctx = { platform: s.adapter.platform, phase, code, message: (err as Error).message }
     if (code === 'RISK_CONTROL') {
-      this.log.warn('risk control, cooling down', ctx)
-      s.until = this.now() + this.o.riskCooldownMs
+      // 同一次风控里并发请求陆续报错：已经在冷却就不再叠加
+      if (s.status === 'cooldown') return
+      // 用户无感：悄悄停推这个平台；连续被拦时冷却逐次翻倍（5 → 10 → 20 → … 最长 60 分钟）
+      s.riskStrikes++
+      s.probing = false
+      const cool = Math.min(this.o.riskCooldownMs * 2 ** (s.riskStrikes - 1), this.o.riskCooldownMaxMs)
+      this.log.warn('risk control, cooling down', { ...ctx, strikes: s.riskStrikes, coolMs: cool })
+      s.until = this.now() + cool
       this.setStatus(s, 'cooldown')
     } else if (code === 'AUTH_REQUIRED' || code === 'AUTH_EXPIRED') {
       this.log.warn('auth lost, source paused', ctx)

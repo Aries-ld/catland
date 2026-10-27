@@ -199,6 +199,42 @@ describe('FeedMixer', () => {
     m.stop()
   })
 
+  it('限速：每个平台每分钟的请求数不超过上限', async () => {
+    const a = new FakeAdapter('bilibili', 50)
+    const m = mixer({ readyAhead: 40, readyPerSource: 40, resolveConcurrency: 8, platformRequestsPerMinute: { bilibili: 6 } })
+    m.setSources([a])
+    await sleep(60)
+    expect(a.fetches + a.resolves).toBe(6) // 1 次翻页 + 5 次解析，之后要等到下一分钟
+    m.stop()
+  })
+
+  it('风控冷却逐次翻倍；冷却结束先探测一个请求，成功才恢复', async () => {
+    let now = 0
+    const a = new FakeAdapter('bilibili', 10)
+    let blocked = true
+    a.resolveError = () => (blocked ? new CatbusCallError('RISK_CONTROL', 'HTTP 412') : null)
+    const states: string[] = []
+    const m = mixer({ now: () => now, riskCooldownMs: 1_000, resolveConcurrency: 4 })
+    m.on('source', (s) => states.push(`${s.status}@${s.until ?? 0}`))
+    m.setSources([a])
+    await sleep(20)
+    expect(states.at(-1)).toBe('cooldown@1000') // 第 1 次：冷却 1s
+    now = 1_000
+    void m.next(1) // 触发补货：冷却结束进入探测
+    await sleep(20)
+    expect(states.at(-1)).toBe('cooldown@3000') // 探测又被拦：冷却翻倍到 2s
+    blocked = false
+    now = 3_000
+    const before = a.resolves
+    void m.next(1)
+    await sleep(5)
+    expect(a.resolves - before).toBeGreaterThanOrEqual(1)
+    await sleep(30)
+    expect(m.sourceStates()[0]!.status).toBe('active')
+    expect((await m.next(3)).length).toBeGreaterThan(0) // 探测成功后正常供货
+    m.stop()
+  })
+
   it('风控只冷却该平台，其他平台照常供货，并通知状态', async () => {
     const a = new FakeAdapter('xhs')
     const b = new FakeAdapter('bilibili')

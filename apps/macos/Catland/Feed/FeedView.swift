@@ -12,7 +12,11 @@ struct FeedView: View {
             ZStack {
                 Color(white: 0.04)
                 if feed.cards.isEmpty {
-                    StatusView(text: feed.loading ? "小猫正在搬运内容…" : "暂时没有新内容", detail: feed.loading ? nil : "稍后再来，或在设置里多勾选几个信息源")
+                    if state.allSourcesResting {
+                        StatusView(text: "各平台都在歇口气", detail: "刷得有点猛啦，稍后会自动恢复，先喝口水吧")
+                    } else {
+                        StatusView(text: feed.loading ? "小猫正在搬运内容…" : "暂时没有新内容", detail: feed.loading ? nil : "稍后再来，或在设置里多勾选几个信息源")
+                    }
                 }
                 ForEach(visible, id: \.card.key) { entry in
                     CardView(state: state, card: entry.card, isCurrent: entry.offset == 0, size: geo.size)

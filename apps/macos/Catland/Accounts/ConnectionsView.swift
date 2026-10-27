@@ -45,6 +45,7 @@ struct PlatformTile: View {
     private var statusText: String {
         if platform.unavailable != nil { return "暂未开放" }
         if platform.loginInProgress { return "登录中…" }
+        if platform.connected, state.sourceStatus[platform.id] == "cooldown" { return "休息中 · 稍后自动恢复" }
         if !platform.connected { return platform.primaryLogin == "qrcode" ? "扫码登录" : "网页登录" }
         switch platform.health {
         case "expired": return "已失效，点击重连"

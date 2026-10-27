@@ -114,6 +114,14 @@ final class AppState {
     var notch = NotchGeometry(screenFrame: .zero, notchSize: CGSize(width: 180, height: 32), hasNotch: false)
     /// 扫码登录进行中：平台 → 二维码 PNG 与最新进度。
     var qrLogin: (platform: String, png: Data?, message: String?)?
+    /// 各平台内容源的状态（active / backoff / cooldown / auth），来自 sidecar 的 feed.source 通知。
+    var sourceStatus: [String: String] = [:]
+    /// 已连接的内容平台全都在风控冷却：刷刷页给一句温和说明（单个平台冷却时用户无感）。
+    var allSourcesResting: Bool {
+        let ids = connectedContentPlatforms.map(\.id).filter(isSourceEnabled)
+        return !ids.isEmpty && ids.allSatisfy { sourceStatus[$0] == "cooldown" }
+    }
+
     /// 扫码登录被平台风控拦下（如抖音 2046「请前往 App 完成验证」）：引导改用浏览器登录后导入。
     var qrRiskBlocked = false
     var toast: String?
@@ -163,9 +171,9 @@ final class AppState {
             }
         case "feed.source":
             if let s = try? dec.decode(SourceState.self, from: params) {
-                let name = PlatformBrand.shortName(s.platform)
-                if s.status == "cooldown" { showToast("\(name) 触发风控，先歇 10 分钟") }
-                if s.status == "auth" { showToast("\(name) 登录已失效，请重新连接") }
+                sourceStatus[s.platform] = s.status
+                // 风控冷却对用户无感：只是暂时不推这个平台，到点自动探测恢复；只有登录失效需要用户处理。
+                if s.status == "auth" { showToast("\(PlatformBrand.shortName(s.platform)) 登录已失效，请重新连接") }
             }
         default: break
         }
