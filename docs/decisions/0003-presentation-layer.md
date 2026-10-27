@@ -40,7 +40,7 @@ apps/macos/Catland/Presentation/
 | 新图层 | 实现 `SceneLayer`，在 `Presentation.layers` 登记 |
 | 新天气 | `WeatherStyle.table` 加一行；需要专属画面时加一个 `WeatherEffect` 到 `WeatherEffects.all`；sidecar 的 `classify` / `classifyWmo` 产出该 condition |
 | 调整季节表现 | `SeasonStyle.of` 改对应季节 |
-| 新城市地标 | 实现 `Landmark` 加进 `Landmarks.all`；`Skyline` 里登记城市坐标 |
+| 新城市地标 | 实现 `Landmark` 加进 `Landmarks.all`；`Skyline` 里登记城市坐标和名字（现有新加坡、上海、北京；不在这些城市 120km 内时，窗外随机选定北京或上海并记住，天气和时间仍跟随真实所在地） |
 | 新节日 | `HolidayCatalog.all` 加 `HolidayDef`（日期、地区、是否放假、装饰窗口与绘制） |
 | 新彩蛋 | 实现 `SceneEgg` 加进 `Eggs.all` |
 | 新事件 | 实现 `SceneEvent`（排期 `start(on:)`、天气门槛 `canRun`、`draw`、预告 / 进行中 / 取消文案）加进 `Events.all` |
