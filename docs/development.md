@@ -19,6 +19,12 @@ scripts/package-dmg.sh x86_64     # 指定架构
 
 产物在 `dist/`：`catland-<版本>-macos-<架构>.dmg` 与 `.sha256`。App 内自带锁定版本的官方 Node、sidecar 与 catbus，用户无需安装任何依赖。签名为 ad-hoc（未公证）。
 
+## 阶段验收（每个阶段结束时做）
+
+- 平台实测：每个已接入的平台走一遍「连接 → 刷刷 → 评论 → 断开」，记录结果；目前待实测：快手、微博、TikTok、X（浏览器导入）。
+- 交互回归：刘海悬停 / 点击展开、翻页、点赞收藏评论（含视频卡片）、连接面板、设置、收藏页。
+- 打包：`scripts/package-dmg.sh`，挂载 DMG 拷出 App 启动一次，确认使用的是内置 Node、能刷出内容。
+
 ## 品牌素材
 
 - `scripts/make_icons.py`：App 图标（`apps/macos/Resources/AppIcon.icns`、`assets/brand/icon-1024.png`）与菜单栏模板图。
