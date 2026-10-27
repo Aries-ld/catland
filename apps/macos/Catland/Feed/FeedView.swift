@@ -97,6 +97,11 @@ struct CardView: View {
                 Image(systemName: "play.fill").font(.system(size: 46)).foregroundStyle(.white.opacity(0.75)).allowsHitTesting(false)
             }
             overlayInfo
+            // 视频进度条：贴着卡片底边，点击 / 拖动跳转；暂停或悬停时显示「已播 / 总长」
+            if card.isVideo, isCurrent, let p = feed.players.player(for: card.key) {
+                VideoScrubber(player: p, paused: feed.paused)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+            }
         }
         .onHover { hovering = $0 }
     }
@@ -171,7 +176,6 @@ struct CardView: View {
                             .lineLimit(expandedText ? 12 : 2)
                             .onTapGesture { withAnimation(.easeOut(duration: 0.2)) { expandedText.toggle() } }
                     }
-                    if card.isVideo, isCurrent, let p = feed.players.player(for: card.key) { ProgressLine(player: p) }
                 }
                 Spacer(minLength: 0)
                 actions
@@ -314,20 +318,59 @@ struct ImageCarousel: View {
     }
 }
 
-/// 视频进度条（每 0.25s 采样一次）。
-struct ProgressLine: View {
+/// 视频进度条：贴底的细线，鼠标移上去变粗并出现拖动圆点；点击或拖动跳转（和 B 站一样）。
+/// 暂停、悬停或拖动时，在左下角显示「已播放 / 总时长」。
+struct VideoScrubber: View {
     let player: AVPlayer
+    let paused: Bool
+    @State private var hovering = false
+    @State private var scrub: Double?   // 拖动中的位置（0…1），松手后才真正跳转
+
     var body: some View {
         TimelineView(.periodic(from: .now, by: 0.25)) { _ in
-            let d = player.currentItem?.duration.seconds ?? 0
-            let t = player.currentTime().seconds
-            let p = d.isFinite && d > 0 ? min(1, max(0, t / d)) : 0
-            GeometryReader { g in
-                Capsule().fill(.white.opacity(0.25)).overlay(alignment: .leading) { Capsule().fill(.white.opacity(0.9)).frame(width: g.size.width * p) }
+            let d = duration
+            let p = scrub ?? (d > 0 ? min(1, max(0, player.currentTime().seconds / d)) : 0)
+            let active = hovering || scrub != nil
+            VStack(alignment: .leading, spacing: 6) {
+                if paused || active, d > 0 {
+                    Text("\(Format.clock(p * d)) / \(Format.clock(d))")
+                        .font(.system(size: 12, weight: .semibold, design: .monospaced)).foregroundStyle(.white)
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(Capsule().fill(.black.opacity(0.55)))
+                        .padding(.leading, 12)
+                        .transition(.opacity)
+                }
+                GeometryReader { g in
+                    let w = g.size.width
+                    ZStack(alignment: .leading) {
+                        Rectangle().fill(.white.opacity(0.25))
+                        Rectangle().fill(Color(red: 1, green: 0.42, blue: 0.62)).frame(width: w * p)
+                    }
+                    .frame(height: active ? 5 : 2)
+                    .overlay(alignment: .leading) {
+                        if active { Circle().fill(.white).frame(width: 12, height: 12).shadow(radius: 2).offset(x: w * p - 6) }
+                    }
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .contentShape(Rectangle())
+                    .gesture(DragGesture(minimumDistance: 0)
+                        .onChanged { v in scrub = min(1, max(0, v.location.x / max(w, 1))) }
+                        .onEnded { v in
+                            let f = min(1, max(0, v.location.x / max(w, 1)))
+                            if d > 0 { player.seek(to: CMTime(seconds: f * d, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: CMTime(seconds: 0.2, preferredTimescale: 600)) }
+                            scrub = nil
+                        })
+                }
+                .frame(height: 16) // 点击区域比线条高，好点中
             }
-            .frame(height: 2)
+            .animation(.easeOut(duration: 0.15), value: active)
+            .animation(.easeOut(duration: 0.15), value: paused)
         }
-        .frame(maxWidth: 260)
+        .onHover { hovering = $0 }
+    }
+
+    private var duration: Double {
+        let d = player.currentItem?.duration.seconds ?? 0
+        return d.isFinite && d > 0 ? d : 0
     }
 }
 
@@ -396,6 +439,13 @@ enum Format {
         if t.isEmpty { return x }
         if x.isEmpty || x.hasPrefix(t) { return x.isEmpty ? t : x }
         return "\(t)\n\(x)"
+    }
+
+    /// 播放时间：1:05、12:30、1:02:03。
+    static func clock(_ seconds: Double) -> String {
+        let t = max(0, Int(seconds.rounded(.down)))
+        let h = t / 3600, m = t % 3600 / 60, s = t % 60
+        return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
     }
 
     static func count(_ n: Int) -> String {

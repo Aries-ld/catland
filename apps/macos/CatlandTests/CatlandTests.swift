@@ -8,6 +8,13 @@ final class FormatTests: XCTestCase {
         XCTAssertEqual(Format.count(230_000_000), "2.3亿")
     }
 
+    func testClock() {
+        XCTAssertEqual(Format.clock(0), "0:00")
+        XCTAssertEqual(Format.clock(65.9), "1:05")
+        XCTAssertEqual(Format.clock(850), "14:10")
+        XCTAssertEqual(Format.clock(3723), "1:02:03")
+    }
+
     func testCaptionDedupesTitle() {
         XCTAssertEqual(Format.caption(title: "美女", text: "美女 大长腿 #美女[话题]#"), "美女 大长腿 #美女#")
         XCTAssertEqual(Format.caption(title: "标题", text: "正文"), "标题\n正文")
