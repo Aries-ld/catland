@@ -53,6 +53,7 @@ final class ImageLoader {
             }
             self?.memory.setObject(img, forKey: src.url as NSString)
             self?.inflight[src.url] = nil
+            CoverAspects.shared.record(src.url, size: img.size) // 封面瀑布流按真实宽高比排版
             return img
         }
         inflight[src.url] = t

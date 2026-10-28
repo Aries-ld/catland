@@ -165,21 +165,12 @@ struct SearchView: View {
     private var results: some View {
         let list = search.visibleHits
         let width = (NotchGeometry.expandedSize.width - 16 - 24 - 8) / 2
-        let columns = Self.masonry(list, width: width)
         return ScrollView {
             // 外层也要惰性：普通 VStack 里底部的「加载更多」一创建就会 onAppear，没滑到底就开始翻页
             LazyVStack(spacing: 10) {
                 if search.searching { CatsOut(state: state, compact: true) }
-                HStack(alignment: .top, spacing: 8) {
-                    ForEach(0..<2, id: \.self) { c in
-                        LazyVStack(spacing: 10) {
-                            ForEach(columns[c]) { hit in
-                                SearchTile(hit: hit, width: width)
-                                    .onTapGesture { search.play(hit) }
-                            }
-                        }
-                        .frame(width: width)
-                    }
+                CoverMasonry(items: list.map(CoverItem.init), columnWidth: width) { item in
+                    if let hit = list.first(where: { $0.key == item.id }) { search.play(hit) }
                 }
                 // 滑到底才加载下一页（第一页都回来之后）
                 if search.hasMore && !search.searching {
@@ -190,73 +181,6 @@ struct SearchView: View {
             .padding(.horizontal, 12)
             .padding(.bottom, 12)
         }
-    }
-
-    /// 按估算高度分到较短的一列（瀑布流）。
-    static func masonry(_ hits: [SearchHit], width: CGFloat) -> [[SearchHit]] {
-        var cols: [[SearchHit]] = [[], []]
-        var heights: [CGFloat] = [0, 0]
-        for h in hits {
-            let c = heights[0] <= heights[1] ? 0 : 1
-            cols[c].append(h)
-            heights[c] += SearchTile.coverHeight(h, width: width) + 54
-        }
-        return cols
-    }
-}
-
-/// 一条搜索结果：封面（左上角平台图标、视频右下角时长）+ 两行标题 + 作者与点赞。
-struct SearchTile: View {
-    let hit: SearchHit
-    let width: CGFloat
-    @State private var hovering = false
-
-    static func coverHeight(_ h: SearchHit, width: CGFloat) -> CGFloat {
-        let ratio = min(max(1 / h.aspect, 0.62), 1.34) // 横图不至于太扁，竖图不至于太长
-        return (width * ratio).rounded()
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            ZStack {
-                RemoteImage(source: hit.cover)
-                    .frame(width: width, height: Self.coverHeight(hit, width: width))
-                    .clipped()
-                PlatformIcon(platform: hit.platform, size: 16)
-                    .padding(6)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                if let d = hit.duration, hit.kind == "video" {
-                    Text(Format.clock(d))
-                        .font(.system(size: 10, weight: .semibold, design: .rounded)).foregroundStyle(.white)
-                        .padding(.horizontal, 5).padding(.vertical, 2)
-                        .background(Capsule().fill(.black.opacity(0.55)))
-                        .padding(6)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                } else if hit.kind == "video" {
-                    Image(systemName: "play.fill").font(.system(size: 9)).foregroundStyle(.white)
-                        .padding(5).background(Circle().fill(.black.opacity(0.5))).padding(6)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                }
-            }
-            .frame(width: width, height: Self.coverHeight(hit, width: width))
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(.white.opacity(hovering ? 0.35 : 0), lineWidth: 1))
-            Text(Format.caption(title: hit.title, text: nil).isEmpty ? "（无标题）" : Format.caption(title: hit.title, text: nil))
-                .font(.system(size: 12)).foregroundStyle(.white.opacity(0.9))
-                .lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
-            HStack(spacing: 4) {
-                Text(hit.author?.name ?? "").lineLimit(1)
-                Spacer(minLength: 4)
-                if let likes = hit.stats.likes ?? hit.stats.views {
-                    Image(systemName: hit.stats.likes != nil ? "heart" : "play").font(.system(size: 9))
-                    Text(Format.count(likes))
-                }
-            }
-            .font(.system(size: 10)).foregroundStyle(.white.opacity(0.45))
-        }
-        .frame(width: width)
-        .contentShape(Rectangle())
-        .onHover { hovering = $0 }
     }
 }
 

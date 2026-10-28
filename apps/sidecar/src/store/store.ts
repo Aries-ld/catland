@@ -20,6 +20,8 @@ export interface CardSnapshot {
   author: FeedCard['author']
   cover: string | null
   createdAt: string | null
+  /** 视频时长（秒），封面上显示；图文 / 旧数据为 null。 */
+  duration?: number | null
 }
 
 export interface SavedEntry {
@@ -63,7 +65,7 @@ export function defaultDataDir(): string {
 export function snapshot(card: FeedCard): CardSnapshot {
   return {
     key: card.key, platform: card.platform, id: card.id, url: card.url, kind: card.kind, title: card.title, text: card.text,
-    author: card.author, cover: card.cover?.url ?? null, createdAt: card.createdAt,
+    author: card.author, cover: card.cover?.url ?? null, createdAt: card.createdAt, duration: card.video?.duration ?? null,
   }
 }
 

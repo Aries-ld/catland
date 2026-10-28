@@ -176,6 +176,8 @@ struct CardSnapshot: Codable, Hashable {
     let text: String?
     let author: UserRef?
     let cover: String?
+    /// 视频时长（秒）；旧的收藏没有。
+    let duration: Double?
 }
 
 struct SavedEntry: Codable, Hashable {

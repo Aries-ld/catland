@@ -86,6 +86,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 case "cats:dump": AppLog.info("cats", CatDirector.shared.debugDump())
                 case "search:close": self.state.closeSearch()
                 case "render:cities": SceneSnapshot.renderCities()
+                case let c where c.hasPrefix("render:covers:"):
+                    // 后台搜一个词（不弹面板），封面加载完后离屏渲染瀑布流，检查封面比例和时长标注
+                    let search = self.state.search
+                    search.query = String(c.dropFirst(14))
+                    search.submit(platforms: self.state.searchPlatforms)
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .seconds(6))
+                        let items = search.hits.prefix(16).map(CoverItem.init)
+                        for i in items { if let s = i.cover { _ = await ImageLoader.shared.load(s).value } }
+                        let w = (NotchGeometry.expandedSize.width - 16 - 24 - 8) / 2
+                        let view = CoverMasonry(items: Array(items), columnWidth: w) { _ in }
+                            .padding(12).frame(width: 400).background(Color(white: 0.04)).environment(\.colorScheme, .dark)
+                        let r = ImageRenderer(content: view); r.scale = 2
+                        if let cg = r.cgImage, let d = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) { try? d.write(to: URL(fileURLWithPath: "/tmp/covers.png")) }
+                        search.clearResults()
+                    }
                 case "render:onboarding":
                     // 离屏渲染欢迎页和 3 步高亮讲解（不弹面板、不改引导进度），检查版式
                     @MainActor func save(_ v: some View, _ name: String) {

@@ -145,10 +145,9 @@ struct SavedView: View {
                     Text(kind == "like" ? "还没有点赞，刷到喜欢的按 L" : "还没有收藏，刷到想留的按 S").font(.system(size: 12)).foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ScrollView {
-                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                            ForEach(entries, id: \.card.key) { e in
-                                SavedTile(entry: e) { state.playSaved(e, title: kind == "like" ? "我的点赞" : "我的收藏") }
-                            }
+                        // 和搜索结果同一套封面瀑布流
+                        CoverMasonry(items: entries.map(CoverItem.init), columnWidth: (NotchGeometry.expandedSize.width - 28 - 8) / 2) { item in
+                            if let e = entries.first(where: { $0.card.key == item.id }) { state.playSaved(e, title: kind == "like" ? "我的点赞" : "我的收藏") }
                         }
                     }
                 }
@@ -160,40 +159,6 @@ struct SavedView: View {
         .task(id: kind) {
             let page: SavedPage? = try? await state.sidecar.call("interact.list", ["kind": kind, "limit": 100])
             entries = page?.entries ?? []
-        }
-    }
-}
-
-struct SavedTile: View {
-    let entry: SavedEntry
-    /// 点开：在 catland 里直接播放（不跳到网页）。
-    let open: () -> Void
-    /// 封面：优先用存在本机的（平台地址会过期），没有再用原地址。
-    private var cover: ImageSource? {
-        (entry.localCover ?? entry.card.cover).map { ImageSource(url: $0, headers: [:], width: nil, height: nil) }
-    }
-    var body: some View {
-        Button(action: open) {
-            ZStack(alignment: .bottomLeading) {
-                // 先定格子尺寸，再把封面铺在里面裁切：只限高度时，横版封面会按比例撑宽、盖到旁边的卡片上。
-                Color.clear
-                    .frame(maxWidth: .infinity, minHeight: 150, maxHeight: 150)
-                    .overlay(RemoteImage(source: cover))
-                    .clipped()
-                LinearGradient(colors: [.clear, .black.opacity(0.7)], startPoint: .center, endPoint: .bottom)
-                VStack(alignment: .leading, spacing: 3) {
-                    PlatformBadge(platform: entry.card.platform)
-                    Text(entry.card.title ?? entry.card.text ?? "").font(.system(size: 11)).lineLimit(2).foregroundStyle(.white)
-                }
-                .padding(8)
-            }
-            .frame(maxWidth: .infinity, minHeight: 150, maxHeight: 150)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        }
-        .buttonStyle(PressStyle())
-        .contextMenu {
-            Button("在浏览器中打开原帖") { if let u = URL(string: entry.card.url) { NSWorkspace.shared.open(u) } }
         }
     }
 }

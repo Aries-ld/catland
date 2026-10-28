@@ -56,7 +56,7 @@ describe('Store', () => {
     expect(s.states(['xhs:1'])['xhs:1']).toEqual({ liked: false, collected: true })
     const { entries } = s.listSaved('like')
     expect(entries).toHaveLength(1)
-    expect(entries[0]!.card).toEqual({ key: 'bilibili:2', platform: 'bilibili', id: '2', url: 'https://e/2', kind: 'video', title: 't2', text: null, author: null, cover: 'https://c/2', createdAt: null })
+    expect(entries[0]!.card).toEqual({ key: 'bilibili:2', platform: 'bilibili', id: '2', url: 'https://e/2', kind: 'video', title: 't2', text: null, author: null, cover: 'https://c/2', createdAt: null, duration: 1 })
     expect(JSON.stringify(entries)).not.toContain('https://v/')
     expect(s.states([])).toEqual({})
   })
