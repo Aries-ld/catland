@@ -28,14 +28,6 @@ struct SettingsView: View {
                             }
                         }
                     }
-                    section("小猫") {
-                        PillToggle(isOn: state.catwalk, action: { state.setCatwalk(!state.catwalk) }) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("刘海下方小猫步道").font(.system(size: 12))
-                                Text("刘海处没有屏幕像素；打开后小猫能从刘海下方走过，会遮住其下约 15pt").font(.system(size: 10)).foregroundStyle(.secondary)
-                            }
-                        }
-                    }
                     section("快捷键") {
                         shortcut("⌥ `", "呼出 / 收起")
                         shortcut("⌥ Esc", "老板键：立刻收起并暂停")

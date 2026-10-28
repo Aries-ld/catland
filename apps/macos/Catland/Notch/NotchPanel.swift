@@ -12,8 +12,8 @@ struct NotchGeometry: Equatable {
     var shelf: CGFloat = 0
 
     static let shelfHeight: CGFloat = 15
-    static let catwalkKey = "catwalk"
-    static var catwalkEnabled: Bool { UserDefaults.standard.object(forKey: catwalkKey) as? Bool ?? true }
+    /// 小猫步道（刘海下方让小猫能走过的一条窄带）：固定开启，不再提供设置项。
+    static let catwalkEnabled = true
     /// 天花板模式：刘海融进整条黑色天花板，窗户在下方，步道需要更高才放得下窗外的楼。
     static let ceilingKey = "notchCeiling"
     static var ceilingEnabled: Bool { UserDefaults.standard.object(forKey: ceilingKey) as? Bool ?? false }

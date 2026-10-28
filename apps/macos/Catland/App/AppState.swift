@@ -421,7 +421,6 @@ final class AppState {
         }
     }
 
-    var catwalk = NotchGeometry.catwalkEnabled
 
     // MARK: - 猫咪之家（时间 / 天气）
 
@@ -491,13 +490,6 @@ final class AppState {
         } catch {
             AppLog.warn("weather failed", ["err": error.localizedDescription])
         }
-    }
-
-    /// 刘海下方小猫步道开关：存在本机 UserDefaults，改完重算刘海几何。
-    func setCatwalk(_ on: Bool) {
-        catwalk = on
-        UserDefaults.standard.set(on, forKey: NotchGeometry.catwalkKey)
-        NotificationCenter.default.post(name: .catlandGeometryChanged, object: nil)
     }
 
     /// 收起面板回到刘海（例如打开网页登录窗口时，让出屏幕给登录页）。
