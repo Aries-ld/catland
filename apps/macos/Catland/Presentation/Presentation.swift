@@ -28,8 +28,9 @@ protocol SceneLayer {
 enum Presentation {
     /// 唯一的图层注册表。顺序由 stage 决定，同一 stage 内按登记顺序。
     static let layers: [SceneLayer] = ordered([
-        SkyLayer(), CelestialLayer(), CloudsLayer(), FlyersLayer(),
-        FarCityLayer(), NearCityLayer(), WaterLayer(), MetroLayer(),
+        SkyLayer(), CelestialLayer(), CloudsLayer(), CityElementsLayer(stage: .flyers),
+        HorizonGlowLayer(), FarCityLayer(), NearCityLayer(), NeonSignsLayer(),
+        WaterLayer(), WaterReflectionLayer(), CityElementsLayer(stage: .water), MetroLayer(),
         TreesLayer(), StreetLampsLayer(), SeasonParticlesLayer(),
         WeatherLayer(),
         FrameLayer(), FrostLayer(), SeasonOrnamentLayer(), CeilingLayer(),

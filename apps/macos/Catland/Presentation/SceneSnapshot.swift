@@ -132,7 +132,20 @@ enum SceneSnapshot {
                 var notch = NotchGeometry(screenFrame: CGRect(x: 0, y: 0, width: 1512, height: 982), notchSize: notchSize, hasNotch: true, shelf: NotchGeometry.shelfHeight)
                 notch.tunnel = true
                 for (when, date) in [("day", "2026-10-28 14:00"), ("night", "2026-10-28 21:00")] {
-                    guard let d = f.date(from: date) else { continue }
+                    guard let d0 = f.date(from: date) else { continue }
+                    // 挑一个动态元素（地铁 / 游船 / 飞机 / 鸟群）尽量都在画面两侧的时刻，草稿里才看得到它们
+                    let windows: [(period: Double, run: Double, offset: Double)] = [(50, 7, 0), (80, 40, 23), (60, 18, 7), (75, 14, 31)]
+                    func score(_ t: Double) -> Int {
+                        windows.filter { w in
+                            let local = (t + w.offset).truncatingRemainder(dividingBy: w.period)
+                            guard local < w.run else { return false }
+                            let p = local / w.run
+                            return (0.12...0.3).contains(p) || (0.7...0.88).contains(p)
+                        }.count
+                    }
+                    let base0 = d0.timeIntervalSinceReferenceDate
+                    let best = stride(from: 0.0, to: 1800, by: 0.5).max { score(base0 + $0) < score(base0 + $1) } ?? 0
+                    let d = d0.addingTimeInterval(best)
                     let env = SceneEnv(date: d, condition: "clear", temperature: nil, mouse: 0, location: loc, intensity: 0.7)
                     let t = d.timeIntervalSinceReferenceDate
                     let view = ZStack(alignment: .top) {

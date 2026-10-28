@@ -42,8 +42,8 @@
 - 现有 10 种花色 × 12 个动作：idle walk look sit groom yawn nap loaf stretch hop play roll。动作带 intro / 循环段 / outro 与权重，由 `CatDirector`（`CatStage.swift`）随机编排。
 - 新增动作：在 `PixelCatArt.actions` 里加一组 Frame；跑 Swift 测试（尺寸、可渲染）并生成预览图人工把关后再提交。
 - 刘海下方「小猫步道」（默认开，设置里可关）：物理刘海没有像素，步道让小猫能从刘海下方走过。
-- **表现层**（刘海里的落地窗场景：天空、城市、天气、季节、节日、彩蛋、事件、室内）在 `apps/macos/Catland/Presentation/`，结构、原则与扩展清单见 `docs/decisions/0003-presentation-layer.md`。新增内容走对应注册表（`Presentation.layers` / `WeatherEffects.all` / `SeasonStyle.of` / `Landmarks.all` / `HolidayCatalog.all` / `Eggs.all` / `Events.all`），模块之间不互相调用，只读 `SceneCanvas`。
-- 刘海创意（默认都开）：**猫洞**（猫走到刘海下方跳进去，洞口垂尾巴 / 扒爪子 / 飘 z，过一阵跳下来；`CatDirector` 的 toDen → climbing → inDen → dropping）和**地铁隧道**（刘海 = 隧道口，MRT 小列车每 50 秒穿过，`MetroLayer`）。切换：`catland-debug notch:den|tunnel|both|beam`，`catland-debug den` 强制一只猫进洞。
+- **表现层**（刘海里的落地窗场景：天空、城市、天气、季节、节日、彩蛋、事件、室内）在 `apps/macos/Catland/Presentation/`，结构、原则与扩展清单见 `docs/decisions/0003-presentation-layer.md`。新增内容走对应注册表（`Presentation.layers` / `WeatherEffects.all` / `SeasonStyle.of` / `CityPacks.all`（城市场景包：地标、动态元素、夜景霓虹，`Presentation/Cities/<城市>.swift`） / `HolidayCatalog.all` / `Eggs.all` / `Events.all`），模块之间不互相调用，只读 `SceneCanvas`。
+- 刘海创意（默认都开）：**猫洞**（猫走到刘海下方跳进去，洞口垂尾巴 / 扒爪子 / 飘 z，过一阵跳下来；`CatDirector` 的 toDen → climbing → inDen → dropping）和**地铁隧道**（刘海 = 隧道口，桥上跑什么由城市场景包决定：上海 / 新加坡是地铁，北京是长安街车流，`MetroLayer`）。切换：`catland-debug notch:den|tunnel|both|beam`，`catland-debug den` 强制一只猫进洞。
 - 所在地：Mac 系统定位（CoreLocation，与 VPN / IP 无关），未授权时按系统时区估计（`LocationProvider`）。太阳、天气、地标、节日地区都跟随所在地。
 - 事件：每次 10 分钟；开始前 6 小时 / 1 小时 / 10 分钟小猫主动探出刘海预告，悬停气泡最前面显示倒计时；开始时天气不允许就取消；进行中小猫坐着抬头看（`watch`）。
 - 气泡语料在 `apps/macos/Catland/Scene/BubbleCopy.swift`：受众是打工人，做陪伴——不说教、不打鸡血，站在打工人这边，小红书风（可爱、有梗）。三类交错（闲聊 / 时间 / 戳我），每句停 5 秒，每次悬停从第一句开始；单句不超过 22 个字。

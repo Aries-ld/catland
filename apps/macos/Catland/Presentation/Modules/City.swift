@@ -55,44 +55,8 @@ protocol Landmark {
 }
 
 enum Landmarks {
-    static let all: [Landmark] = [SingaporeLandmarks(), ShanghaiLandmarks(), BeijingLandmarks()]
-    static func of(_ s: Skyline) -> Landmark? { all.first { $0.skyline == s } }
-}
-
-/// 新加坡：左翼金沙酒店（三塔 + 顶上的船），右翼摩天轮（夜里灯光沿圆环流动变色）。
-struct SingaporeLandmarks: Landmark {
-    let skyline = Skyline.singapore
-    func reserved(_ c: SceneCanvas) -> [ClosedRange<Int>] { [(c.landmarkLeft - 1)...(c.landmarkLeft + 13), (c.landmarkRight - 9)...(c.landmarkRight + 9)] }
-
-    func draw(_ c: SceneCanvas, base: Int, palette pal: CityPalette) {
-        let mbsX = c.landmarkLeft
-        let mbsH = min(c.tall(14), base - c.skyTop - 3)
-        for i in 0..<3 {
-            let tx = mbsX + i * 4
-            c.fill(tx, base - mbsH, 3, mbsH, pal.body.color); c.fill(tx + 2, base - mbsH, 1, mbsH, pal.shade.color)
-            c.litWindows(x: tx, w: 3, top: base - mbsH + 2, bottom: base, seed: UInt64(500 + i), palette: pal)
-        }
-        let deck = pal.body.mix(c.rgb(0xFFFFFF), 0.2).color
-        c.fill(mbsX - 1, base - mbsH - 1, 14, 1, deck); c.fill(mbsX + 11, base - mbsH - 2, 3, 1, deck)
-        if c.dark > 0.5 { c.fill(mbsX, base - mbsH - 1, 12, 1, Color(red: 0.6, green: 0.8, blue: 1).opacity(0.6 * c.dark)) }
-
-        let fx = c.landmarkRight
-        let r = min(c.tall(6), max(3, (base - c.skyTop - 4) / 3))
-        let cy = base - r - 3
-        let ring = c.rgb(0xE8EDF2).mix(c.rgb(0x6A7798), c.dark * 0.6).color
-        let shift = Int(c.t * 4)
-        for (i, pt) in c.ringPoints(r).enumerated() {
-            var col = ring
-            if c.dark > 0.5 {
-                let palette: [UInt32] = [0xFF6FB5, 0x6DD3FF, 0xB98CFF, 0xFFD84A]
-                col = c.rgb(palette[((i + shift) / 3) % palette.count]).color.opacity(0.6 + 0.4 * c.dark)
-            }
-            c.fill(fx + pt.0, cy + pt.1, 1, 1, col)
-        }
-        let spoke = ring.opacity(0.45)
-        for k in 1..<r { c.fill(fx + k, cy, 1, 1, spoke); c.fill(fx - k, cy, 1, 1, spoke); c.fill(fx, cy + k, 1, 1, spoke); c.fill(fx, cy - k, 1, 1, spoke) }
-        for k in 0..<(base - cy) { c.fill(fx - 1 - k / 2, cy + k, 1, 1, pal.shade.color); c.fill(fx + 1 + k / 2, cy + k, 1, 1, pal.shade.color) }
-    }
+    /// 地标来自各城市的场景包（Presentation/Cities/）。
+    static func of(_ s: Skyline) -> Landmark? { CityPacks.of(s)?.landmark }
 }
 
 // MARK: - 地标绘制工具
@@ -221,302 +185,23 @@ struct FineGrid {
     func lit(_ col: Color, _ a: Double = 1) -> Color { col.opacity(a * min(1, max(0, (c.dark - 0.35) / 0.35))) }
 }
 
-// MARK: - 上海：左翼东方明珠，右翼陆家嘴三件套
-
-/// 上海：左翼东方明珠——细长塔身：三根斜撑托起大球，三根立柱（中间留缝）连到小球，再往上是太空舱和细长天线；
-/// 球是立体着色（左上受光），夜里从里往外发出粉紫色的光、带一圈光晕。
-/// 右翼陆家嘴三件套（从左到右、由后往前）：金茂（宝塔式逐层收进，夜里整栋金色泛光、每层下暗上亮）、
-/// 环球金融中心（两侧往上收成刀锋、顶部梯形「开瓶器」镂空，夜里镂空一圈冷白光）、
-/// 上海中心（圆润收分 + 沿扭转缝的一条线，夜里楼体暗、扭转缝是一条白色细光、顶冠发光）。
-struct ShanghaiLandmarks: Landmark {
-    let skyline = Skyline.shanghai
-    func reserved(_ c: SceneCanvas) -> [ClosedRange<Int>] { [(c.markL - 7)...(c.markL + 7), (c.markR - 12)...(c.markR + 12)] }
-
-    func draw(_ c: SceneCanvas, base: Int, palette pal: CityPalette) {
-        let g = FineGrid(c: c)
-        pearl(g, base: g.base(base))
-        lujiazui(g, base: g.base(base))
-    }
-
-    /// 立体球：左上受光；夜里从中心往外发光。
-    private func sphere(_ g: FineGrid, cx: Int, cy: Int, r: Int, breathe: Double) {
-        let c = g.c
-        let mid = g.dn(0xD64C78, 0x2A1220), hi = g.dn(0xF7B3C8, 0x40202E), lo = g.dn(0x9C2D52, 0x180A12)
-        let glowA = c.dark > 0.35 ? min(1, (c.dark - 0.35) / 0.35) : 0
-        if glowA > 0 { // 光晕
-            for dy in -(r + 3)...(r + 3) { for dx in -(r + 3)...(r + 3) {
-                let d = sqrt(Double(dx * dx + dy * dy))
-                if d > Double(r) + 0.5 && d <= Double(r) + 3 { g.fill(cx + dx, cy + dy, 1, 1, Color(red: 1, green: 0.35, blue: 0.75).opacity(0.10 * glowA * (Double(r) + 3.5 - d) / 3)) }
-            } }
-        }
-        for dy in -r...r { for dx in -r...r {
-            let d2 = Double(dx * dx + dy * dy)
-            guard d2 <= Double(r * r) + Double(r) * 0.6 else { continue }
-            let shade = Double(-dx - dy) / Double(2 * r)
-            var col = mid.mix(hi, max(0, shade) * 0.9).mix(lo, max(0, -shade) * 0.8)
-            if dy == 0 || dy == 1 { col = col.mix(g.rgb(0xF4E6EE), 0.35 * (1 - c.dark)) } // 球上一圈玻璃窗带
-            g.fill(cx + dx, cy + dy, 1, 1, col.color)
-            if glowA > 0 {
-                let k = 1 - sqrt(d2) / Double(r + 1)
-                let night = g.rgb(0x8A1E6A).mix(g.rgb(0xFF5FB0), k).mix(g.rgb(0xFFE8F6), pow(k, 3) * 0.7 * breathe)
-                g.fill(cx + dx, cy + dy, 1, 1, night.color.opacity(glowA))
-                if dy == 0 { g.fill(cx + dx, cy + dy, 1, 1, Color.white.opacity(0.55 * glowA)) }
-            }
-        } }
-    }
-
-    private func pearl(_ g: FineGrid, base: Int) {
-        let c = g.c
-        let x = g.f(c.markL)
-        let H = min(64, base - g.top)
-        let rLow = H >= 50 ? 5 : (H >= 38 ? 4 : 3), rUp = H >= 50 ? 4 : (H >= 38 ? 3 : 2)
-        let spread = g.sw(7, g.scale(forHeight: H), min: 4)
-        let legH = Int(Double(H) * 0.13), antH = Int(Double(H) * 0.2)
-        let colH = max(4, H - legH - (2 * rLow + 1) - (2 * rUp + 1) - 2 - 3 - antH + 2)
-        let steel = g.dn(0xD2D9E2, 0x2A3042), steelDark = g.dn(0x96A2B3, 0x1C2030)
-        let breathe = 0.75 + 0.25 * sin(c.t * 1.2)
-        // 三根斜撑（左右两根往中间收，中间一根直立）
-        let legTop = base - legH
-        for k in 0..<legH {
-            let dx = spread - (k * (spread - 2)) / max(1, legH - 1)
-            g.fill(x - dx, base - 1 - k, 1, 1, steelDark.color); g.fill(x + dx, base - 1 - k, 1, 1, steelDark.color)
-        }
-        g.fill(x, legTop, 1, legH, steel.color)
-        let lowY = legTop - rLow + 1
-        // 三根立柱（中间留缝），夜里柱身一串柔和的白灯
-        let colBottom = lowY - rLow, colTop = colBottom - colH
-        for (i, cx) in [x - 2, x, x + 2].enumerated() {
-            g.fill(cx, colTop, 1, colH, (i == 1 ? steel : steelDark).color)
-            for k in stride(from: 1, to: colH, by: 3) { g.fill(cx, colBottom - k, 1, 1, g.lit(Color(red: 1, green: 0.9, blue: 0.97), 0.7)) }
-        }
-        sphere(g, cx: x, cy: lowY, r: rLow, breathe: breathe)
-        let upY = colTop - rUp + 1
-        sphere(g, cx: x, cy: upY, r: rUp, breathe: breathe)
-        // 短柱 + 太空舱 + 天线
-        let capTop = upY - rUp - 2
-        g.fill(x - 1, capTop, 1, 2, steelDark.color); g.fill(x + 1, capTop, 1, 2, steelDark.color)
-        g.fill(x - 1, capTop - 2, 3, 2, g.dn(0xD64C78, 0x2A1220).color)
-        g.fill(x - 1, capTop - 2, 3, 2, g.lit(Color(red: 1, green: 0.7, blue: 0.9)))
-        g.fill(x, capTop - 2 - antH, 1, antH, g.dn(0xEEF2F6, 0x40465C).color)
-        if c.dark > 0.5, Int(c.t * 1.5) % 2 == 0 { g.fill(x, capTop - 3 - antH, 1, 1, Color(red: 1, green: 0.2, blue: 0.2)) }
-    }
-
-    private func lujiazui(_ g: FineGrid, base: Int) {
-        let c = g.c
-        let R = g.f(c.markR)
-        let H = min(58, base - g.top)
-        let k = g.scale(forHeight: H)
-        jinMao(g, cx: R - g.sw(11, k), base: base, h: Int(Double(H) * 0.68), s: k)
-        swfc(g, cx: R - 1, base: base, h: Int(Double(H) * 0.82), s: k)
-        shanghaiTower(g, cx: R + g.sw(10, k), base: base, h: H, s: k)
-    }
-
-    /// 金茂：13 层宝塔式收进，每段顶部一道外挑的檐；顶上小冠 + 细尖顶。夜里整栋金色泛光，每段下暗上亮。
-    private func jinMao(_ g: FineGrid, cx: Int, base: Int, h: Int, s: Double) {
-        let c = g.c
-        let bodyH = Int(Double(h) * 0.82)
-        var y = base, w = g.sw(9, s, min: 6)
-        let segs = [0.30, 0.18, 0.13, 0.10, 0.08, 0.07, 0.06, 0.05, 0.03]
-        for f in segs {
-            let sh = max(2, Int(Double(bodyH) * f))
-            for k in 0..<sh {
-                let frac = Double(k) / Double(max(1, sh - 1))
-                let day = g.dn(0x625C54, 0x1E1C22).mix(g.rgb(0x8A8478), (1 - c.dark) * 0.25 * frac)
-                g.fill(cx - w / 2, y - 1 - k, w, 1, day.color)
-                g.fill(cx - w / 2, y - 1 - k, 1, 1, day.mix(g.rgb(0xFFFFFF), 0.18 * (1 - c.dark)).color)
-                g.fill(cx - w / 2, y - 1 - k, w, 1, g.lit(g.rgb(0x7A4E14).mix(g.rgb(0xFFC85A), 0.35 + 0.65 * frac).color, 0.95))
-            }
-            y -= sh
-            g.fill(cx - w / 2 - 1, y, w + 2, 1, g.dn(0xC2BCB0, 0x2A2830).color) // 外挑的檐
-            g.fill(cx - w / 2 - 1, y, w + 2, 1, g.lit(Color(red: 1, green: 0.9, blue: 0.62)))
-            w = max(3, w - 1)
-        }
-        // 小冠 + 尖顶
-        g.fill(cx - 1, y - 3, 3, 3, g.dn(0x8A8478, 0x22202A).color)
-        g.fill(cx - 1, y - 3, 3, 3, g.lit(Color(red: 1, green: 0.85, blue: 0.5)))
-        g.fill(cx, y - 3 - (h - bodyH), 1, h - bodyH, g.dn(0xD8D2C6, 0x3A3640).color)
-        g.fill(cx, y - 3 - (h - bodyH), 1, h - bodyH, g.lit(Color(red: 1, green: 0.93, blue: 0.75), 0.9))
-    }
-
-    /// 环球金融中心：方形底座，两侧往上收成刀锋，顶部梯形「开瓶器」镂空；左面受光。夜里楼体暗，镂空一圈冷白光，两侧棱线淡淡的光。
-    private func swfc(_ g: FineGrid, cx: Int, base: Int, h: Int, s: Double) {
-        let c = g.c
-        let top = base - h
-        for k in 0..<h {
-            let r = Double(k) / Double(h)
-            let w = max(5, Int(((9 - 3 * r) * s).rounded()))
-            let x0 = cx - w / 2
-            let light = g.dn(0xA9BCCD, 0x1C2636), dark = g.dn(0x7D93AA, 0x141C2A)
-            g.fill(x0, base - 1 - k, w / 2, 1, light.color)
-            g.fill(x0 + w / 2, base - 1 - k, w - w / 2, 1, dark.color)
-            if k % 2 == 0 { g.fill(x0 + 1, base - 1 - k, w - 2, 1, light.mix(g.rgb(0xFFFFFF), 0.12 * (1 - c.dark)).color.opacity(0.5)) }
-            // 夜里两侧棱线
-            g.fill(x0, base - 1 - k, 1, 1, g.lit(Color(red: 0.75, green: 0.88, blue: 1), 0.35 + 0.4 * r))
-            g.fill(x0 + w - 1, base - 1 - k, 1, 1, g.lit(Color(red: 0.75, green: 0.88, blue: 1), 0.25 + 0.4 * r))
-        }
-        // 「开瓶器」：顶部下方 2 行起，梯形镂空（上宽下窄），露出后面的天空
-        let hole: [(Int, Int)] = s < 0.8 ? [(top + 2, 3), (top + 3, 3), (top + 4, 2), (top + 5, 1)] : [(top + 2, 4), (top + 3, 4), (top + 4, 3), (top + 5, 2)]
-        let sky = c.sky.top.mix(c.sky.horizon, 0.3).color
-        for (y, w) in hole { g.fill(cx - w / 2, y, w, 1, sky) }
-        // 夜里：镂空一圈冷白光 + 顶边
-        let ring = Color(red: 0.82, green: 0.93, blue: 1)
-        for (y, w) in hole { g.fill(cx - w / 2 - 1, y, 1, 1, g.lit(ring)); g.fill(cx - w / 2 + w, y, 1, 1, g.lit(ring)) }
-        g.fill(cx - 2, top + 1, 4, 1, g.lit(ring)); g.fill(cx - 1, top + 6, 2, 1, g.lit(ring))
-        g.fill(cx - 3, top, 6, 1, g.lit(ring, 0.8))
-    }
-
-    /// 上海中心：圆润收分（不是三角形）+ 一条从右下绕到左上的扭转缝，顶冠略向一侧斜切。
-    /// 夜里楼体暗，扭转缝是一条白色细光，零星窗灯，顶冠一圈白光。
-    private func shanghaiTower(_ g: FineGrid, cx: Int, base: Int, h: Int, s: Double) {
-        let c = g.c
-        for k in 0..<h {
-            let r = Double(k) / Double(h)
-            let w = max(4, Int(((r < 0.12 ? 11 : 11 - 4.5 * pow((r - 0.12) / 0.88, 1.15)) * s).rounded()))
-            let x0 = cx - w / 2
-            let y = base - 1 - k
-            for i in 0..<w {
-                let t = Double(i) / Double(max(1, w - 1))
-                let col = g.dn(0x9CC0CF, 0x13202A).mix(g.dn(0x5E8698, 0x0C161E), t)
-                g.fill(x0 + i, y, 1, 1, col.color)
-            }
-            // 扭转缝：从右下绕到左上
-            let notch = x0 + Int(Double(w - 1) * (1 - r))
-            g.fill(notch, y, 1, 1, g.dn(0x3F6273, 0x0A1218).color)
-            g.fill(notch, y, 1, 1, g.lit(Color(red: 0.92, green: 0.97, blue: 1), 0.95))
-            if k % 3 == 1 { g.fill(x0 + (k * 7) % max(1, w), y, 1, 1, g.lit(Color(red: 0.85, green: 0.92, blue: 1), 0.35)) }
-        }
-        // 顶冠：向一侧斜切，夜里发光
-        let topY = base - h, tw = max(4, Int((6 * s).rounded()))
-        g.fill(cx - tw / 2, topY - 1, tw - 1, 1, g.dn(0x9CC0CF, 0x13202A).color)
-        g.fill(cx - tw / 2, topY - 2, max(2, tw / 2), 1, g.dn(0x9CC0CF, 0x13202A).color)
-        for (dy, w) in [(-2, max(2, tw / 2)), (-1, tw - 1), (0, tw)] { g.fill(cx - tw / 2, topY + dy, w, 1, g.lit(Color(red: 0.85, green: 0.94, blue: 1), 0.85)) }
-    }
-}
-
-// MARK: - 北京：左翼天坛祈年殿（古），右翼 CBD 央视大楼 + 中国尊（今）
-
-/// 北京：左翼天坛祈年殿（三层汉白玉台基、红柱圆殿、三重蓝色攒尖顶、金顶，宽而不高，不会被拉成宝塔），夜里金色泛光；
-/// 右翼 CBD：央视大楼（「大裤衩」：两座斜塔在底部裙楼和顶部悬挑处连成中空的环，立面斜网格）+ 中国尊（上下宽、腰身收、顶部外扩的「尊」形）。
-/// 夜里央视大楼网格亮暖灯，中国尊尊口一圈白金色光、立面灯光往上流动。
-struct BeijingLandmarks: Landmark {
-    let skyline = Skyline.beijing
-    func reserved(_ c: SceneCanvas) -> [ClosedRange<Int>] { [(c.markL - 11)...(c.markL + 11), (c.markR - 13)...(c.markR + 11)] }
-
-    /// 三重圆伞形屋顶（亮色顶面 + 深色檐口线、檐角微翘），层间是红色鼓座，下面红柱圆殿和三层汉白玉台基。宽而矮，不会像宝塔。
-    static let temple = PixelSprite(rows: [
-        "          G          ",
-        "         YGY         ",
-        "        bBBBb        ",
-        "      dDDDDDDDd      ",
-        "        RYRYR        ",
-        "       bBBBBBb       ",
-        "      bBBBBBBBb      ",
-        "    dDDDDDDDDDDDd    ",
-        "      RYRYRYRYR      ",
-        "     bBBBBBBBBBb     ",
-        "    bBBBBBBBBBBBb    ",
-        "  dDDDDDDDDDDDDDDDd  ",
-        "    RrRrRrRrRrRrR    ",
-        " WWWWWWWWWWWWWWWWWWW ",
-        "WMWMWMWMWMWMWMWMWMWMW",
-        "WWWWWWWWWWWWWWWWWWWWW",
-    ])
-
-    /// 央视大楼按「大裤衩」画：顶上一条粗腰带（悬挑），两条腿向外叉开，中间是空的，底部一条裙楼把环收住；右边是中国尊。
-
-    func draw(_ c: SceneCanvas, base: Int, palette pal: CityPalette) {
-        let night = c.night
-        let warm = Color(red: 1, green: 0.8, blue: 0.42)
-        // 祈年殿：夜里打金色泛光，保留本色
-        Self.temple.draw(c, centerX: c.markL, base: base, color: { ch, _, _, _ in
-            switch ch {
-            case "G": return warm
-            case "B": return night ? c.rgb(0x3E66BE).color : c.dayNight(0x2F5AAE, 0x1A2A50)
-            case "b": return night ? c.rgb(0x7A9CE0).color : c.dayNight(0x6E92D8, 0x24386A)   // 屋顶受光的一侧
-            case "D": return night ? c.rgb(0x1C3264).color : c.dayNight(0x1A2F5E, 0x0E1630)   // 檐口深色线
-            case "d": return night ? warm : c.dayNight(0xE0B04A, 0x3A2E14)                    // 微翘的檐角（金色）
-            case "R": return night ? c.rgb(0xE0573A).color : c.dayNight(0xB8322A, 0x3E1616)
-            case "r": return night ? c.rgb(0xFFB070).color : c.dayNight(0x8A2420, 0x2A1010)
-            case "Y": return night ? warm : c.dayNight(0xE0B04A, 0x4A3A1A)
-            case "W": return night ? c.rgb(0xF4E2BC).color : c.dayNight(0xEDEBE4, 0x4A5068)
-            case "w": return night ? c.rgb(0xD8C49C).color : c.dayNight(0xCFCBC0, 0x3A3F54)
-            case "M": return night ? c.rgb(0xFFF0D0).color : c.dayNight(0xFFFFFF, 0x50566E)
-            default: return nil
-            }
-        }, glow: { ch, edge in night && edge ? warm.opacity(0.16) : nil })
-
-        // CBD（细网格）：央视大楼 + 中国尊
-        let g = FineGrid(c: c), fb = g.base(base), R = g.f(c.markR)
-        let H = min(58, fb - g.top), k = g.scale(forHeight: H)
-        cctv(g, cx: R - g.sw(7, k), base: fb, h: Int(Double(H) * 0.62), s: k)
-        zun(g, cx: R + g.sw(10, k), base: fb, h: H, s: k)
-    }
-
-    /// 央视大楼：两座粗壮的塔楼（略向内倾）在底部裙楼和顶部 L 形悬挑处连成环，中间的洞不大；悬挑向右伸出、末端下折。
-    /// 白天是银灰玻璃 + 一组方向的深色斜撑（不规则的菱形网格，不是棋盘）；
-    /// 夜里楼体深灰，只有斜撑交点亮起稀疏的银白小点，楼体边缘一圈很淡的轮廓光——柔和、不碎。
-    private func cctv(_ g: FineGrid, cx: Int, base: Int, h: Int, s: Double) {
-        let c = g.c
-        let W = g.sw(20, s, min: 13), legW = g.sw(7, s, min: 4), x0 = cx - W / 2 - 1
-        let bandH = max(5, h / 4), podH = max(3, h / 6)
-        var solid = Set<Int>()
-        func key(_ x: Int, _ y: Int) -> Int { x * 10_000 + y }
-        for k in 0..<h {
-            let y = base - 1 - k
-            if k < podH { for i in 0..<W { solid.insert(key(x0 + i, y)) }; continue }               // 底部裙楼
-            if k >= h - bandH { for i in 2..<(W + 3) { solid.insert(key(x0 + i, y)) }; continue } // 顶部悬挑，向右多伸出 3 格
-            let lean = (k - podH) * 2 / max(1, h - podH - bandH)
-            for i in 0..<legW { solid.insert(key(x0 + lean + i, y)) }                           // 左塔，向右内倾
-            for i in 0..<legW { solid.insert(key(x0 + W - legW - lean + i, y)) }                // 右塔，向左内倾
-        }
-        for k in 0..<4 { for i in W..<(W + 3) { solid.insert(key(x0 + i, base - h + bandH + k)) } } // 悬挑末端下折
-        let glass = g.dn(0x8E9BAC, 0x1C222E), glassDark = g.dn(0x6E7B8E, 0x151A24), brace = g.dn(0x4A5466, 0x141820)
-        for kk in solid {
-            let x = kk / 10_000, y = kk % 10_000
-            let edge = [(-1, 0), (1, 0), (0, -1), (0, 1)].contains { !solid.contains(key(x + $0.0, y + $0.1)) }
-            let braceA = (x + y) % 6 == 0, braceB = (x - y + 600) % 9 == 0
-            var col = (x - x0) < W / 2 + 1 ? glass : glassDark
-            if braceA || braceB { col = col.mix(brace, 0.55) }
-            g.fill(x, y, 1, 1, col.color)
-            if braceA && braceB { g.fill(x, y, 1, 1, g.lit(Color(red: 0.88, green: 0.92, blue: 1), 0.9)) }   // 夜里：斜撑交点的小灯
-            else if braceA { g.fill(x, y, 1, 1, g.lit(Color(red: 0.75, green: 0.82, blue: 0.95), 0.12)) }
-            if edge { g.fill(x, y, 1, 1, g.lit(Color(red: 0.8, green: 0.86, blue: 1), 0.28)) }               // 夜里：很淡的轮廓光
-        }
-    }
-
-    /// 中国尊：立面像古代礼器「尊」——底部略外撇，往上收到约六成高度的腰部，再向上放大，顶部平展、略窄于底部。
-    /// 白天是浅蓝灰玻璃 + 很淡的楼层横线；夜里楼体暗，两侧棱线和正中的转角线是三条白色细光（真实的竖向轮廓照明），
-    /// 零星暖色窗灯，顶冠一圈白光 + 航标灯。
-    private func zun(_ g: FineGrid, cx: Int, base: Int, h: Int, s: Double) {
-        let c = g.c
-        var rng = SeededRandom(seed: 77)
-        for k in 0..<h {
-            let r = Double(k) / Double(h)
-            let wd: Double = r < 0.04 ? 12 : (r < 0.6 ? 12 - 3.5 * pow((r - 0.04) / 0.56, 0.9) : (r < 0.97 ? 8.5 + 2.5 * pow((r - 0.6) / 0.37, 1.4) : 11.5))
-            let w = max(5, Int((wd * s).rounded())), x0 = cx - w / 2, y = base - 1 - k
-            for i in 0..<w {
-                let t = Double(i) / Double(max(1, w - 1))
-                var col = g.dn(0xA8BBCF, 0x141A26).mix(g.dn(0x7488A0, 0x0E131C), t)
-                if k % 3 == 0 { col = col.mix(g.rgb(0x5A6A80), 0.18 * (1 - c.dark)) }   // 楼层横线
-                g.fill(x0 + i, y, 1, 1, col.color)
-            }
-            // 夜里：两侧棱线 + 正中转角线
-            let line = Color(red: 0.96, green: 0.95, blue: 0.9)
-            g.fill(x0, y, 1, 1, g.lit(line, 0.55 + 0.35 * r))
-            g.fill(x0 + w - 1, y, 1, 1, g.lit(line, 0.45 + 0.35 * r))
-            g.fill(cx, y, 1, 1, g.lit(line, 0.35 + 0.45 * r))
-            // 零星暖色窗灯
-            if k % 2 == 1, rng.next() % 100 < 22 { g.fill(x0 + 1 + Int(rng.next() % UInt64(max(1, w - 2))), y, 1, 1, g.lit(Color(red: 1, green: 0.82, blue: 0.5), 0.5)) }
-        }
-        let topY = base - h, cw = g.sw(12, s, min: 7)
-        g.fill(cx - cw / 2, topY - 1, cw, 1, g.dn(0xC2CEDA, 0x202838).color)
-        g.fill(cx - cw / 2, topY - 1, cw, 1, g.lit(Color(red: 1, green: 0.97, blue: 0.9)))
-        for dx in 0..<cw { g.fill(cx - cw / 2 + dx, topY - 2, 1, 1, g.lit(Color(red: 1, green: 0.97, blue: 0.9), 0.18)) }
-        if c.dark > 0.5, Int(c.t * 1.5) % 2 == 0 { g.fill(cx, topY - 3, 1, 1, Color(red: 1, green: 0.2, blue: 0.2)) }
-    }
-}
-
 // MARK: - 图层
+
+extension SceneCanvas {
+    /// 近景楼群的位置（避开地标的预留区）。楼群图层和霓虹招牌共用，保证招牌挂在楼上。
+    var nearBuildings: [(x: Int, w: Int, h: Int)] {
+        let reserved = Landmarks.of(env.location.skyline)?.reserved(self) ?? []
+        var rng = SeededRandom(seed: 88)
+        var out: [(x: Int, w: Int, h: Int)] = []
+        var x = -2 + parallax(3)
+        while x < cols + 2 {
+            let w = 3 + Int(rng.next() % 4), h = tall(4 + Int(rng.next() % 8))
+            if !reserved.contains(where: { $0.overlaps(x...(x + w)) }) { out.append((x, w, h)) }
+            x += w + Int(rng.next() % 3)
+        }
+        return out
+    }
+}
 
 struct FarCityLayer: SceneLayer {
     let id = "farCity"
@@ -546,14 +231,8 @@ struct NearCityLayer: SceneLayer {
         let base = c.cityBase
         let pal = CityPalette(c)
         let landmark = Landmarks.of(c.env.location.skyline)
-        let reserved = landmark?.reserved(c) ?? []
-        var rng = SeededRandom(seed: 88)
-        var x = -2 + c.parallax(3)
-        while x < c.cols + 2 {
-            let w = 3 + Int(rng.next() % 4), h = c.tall(4 + Int(rng.next() % 8))
-            if !reserved.contains(where: { $0.overlaps(x...(x + w)) }) { c.building(x: x, w: w, h: h, base: base, palette: pal, rng: &rng) }
-            x += w + Int(rng.next() % 3)
-        }
+        var rng = SeededRandom(seed: 89)
+        for b in c.nearBuildings { c.building(x: b.x, w: b.w, h: b.h, base: base, palette: pal, rng: &rng) }
         landmark?.draw(c, base: base, palette: pal)
     }
 }
@@ -578,7 +257,7 @@ struct WaterLayer: SceneLayer {
     }
 }
 
-/// 刘海 = 隧道口：两侧混凝土洞口，刘海底边下方是贯穿全宽的高架桥；MRT 小列车每 50 秒穿过一次。
+/// 刘海 = 隧道口：两侧混凝土洞口，刘海底边下方是贯穿全宽的高架桥；桥上跑的车由城市场景包决定。
 struct MetroLayer: SceneLayer {
     let id = "metro"
     let stage = SceneStage.transit
@@ -593,28 +272,8 @@ struct MetroLayer: SceneLayer {
         for x in stride(from: 6 + c.parallax(3), to: c.cols, by: 22) where !nc.contains(x) {
             c.fill(x, bridgeY + 2, 2, max(0, c.cityBase - bridgeY - 2), concreteDark.color.opacity(0.85))
         }
-        let period = 50.0, run = 7.0
-        let n = Int(c.t / period), local = c.t.truncatingRemainder(dividingBy: period)
-        if local < run {
-            let leftToRight = n % 2 == 0
-            let cars = 3, carW = 12, gap = 1
-            let trainW = cars * carW + (cars - 1) * gap
-            let prog = local / run
-            let x0 = leftToRight ? Int(Double(c.cols + trainW) * prog) - trainW : c.cols - Int(Double(c.cols + trainW) * prog)
-            let top = trackRow - 4
-            let shell = c.rgb(0xF2F4F7).mix(c.rgb(0x8A93A8), c.dark * 0.6)
-            let window = c.dark > 0.5 ? Color(red: 1, green: 0.86, blue: 0.55) : c.rgb(0x2A3346).color
-            for k in 0..<cars {
-                let cx = x0 + k * (carW + gap)
-                c.fill(cx, top, carW, 4, shell.color)
-                c.fill(cx, top + 2, carW, 1, c.rgb(0xE5322D).color)
-                for wx in stride(from: cx + 1, to: cx + carW - 1, by: 3) { c.fill(wx, top + 1, 2, 1, window) }
-                c.fill(cx, top + 4, carW, 1, concreteDark.color)
-            }
-            let head = leftToRight ? x0 + trainW : x0 - 1
-            c.fill(head, top + 2, 1, 1, Color(red: 1, green: 0.95, blue: 0.7).opacity(c.dark > 0.4 ? 1 : 0.7))
-            if c.dark > 0.4 { c.fill(leftToRight ? head + 1 : head - 4, top + 2, 4, 1, Color(red: 1, green: 0.95, blue: 0.7).opacity(0.25)) }
-        }
+        // 桥上跑什么由城市场景包决定（上海 / 新加坡是地铁，北京是长安街车流）
+        CityPacks.of(c.env.location.skyline)?.elements.filter { $0.stage == .transit }.forEach { $0.draw(c) }
         for side in [nc.lowerBound - 2, nc.upperBound + 1] {
             c.fill(side, trackRow - 6, 2, 7, concrete.color)
             c.fill(side + (side < nc.lowerBound ? 1 : 0), trackRow - 5, 1, 6, concreteDark.color)

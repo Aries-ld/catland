@@ -92,21 +92,3 @@ struct CloudsLayer: SceneLayer {
     }
 }
 
-/// 白天偶尔飞过一只鸟，夜里飞机闪着红灯划过（约每 40 秒一次）。
-struct FlyersLayer: SceneLayer {
-    let id = "flyers"
-    let stage = SceneStage.flyers
-    func draw(_ c: SceneCanvas) {
-        let period = 40.0, phase = c.t.truncatingRemainder(dividingBy: period) / 12
-        guard phase < 1, !c.raining else { return }
-        let x = Int(Double(c.cols + 10) * phase) - 5, y = c.skyTop + 2 + Int(c.t / period) % 4
-        if c.dark > 0.5 {
-            c.fill(x, y, 3, 1, Color(white: 0.55))
-            if Int(c.t * 2) % 2 == 0 { c.fill(x + 3, y, 1, 1, .red) }
-        } else {
-            let flap = Int(c.t * 6) % 2 == 0
-            let col = Color(white: 0.2).opacity(0.8)
-            c.fill(x, y + (flap ? 0 : 1), 1, 1, col); c.fill(x + 1, y + 1, 1, 1, col); c.fill(x + 2, y + (flap ? 0 : 1), 1, 1, col)
-        }
-    }
-}
