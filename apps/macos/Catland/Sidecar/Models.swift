@@ -181,6 +181,8 @@ struct CardSnapshot: Codable, Hashable {
 struct SavedEntry: Codable, Hashable {
     let card: CardSnapshot
     let at: String
+    /// 存在本机的封面（file://）；平台的封面地址会过期，优先用它。
+    let localCover: String?
 }
 
 struct SavedPage: Codable {

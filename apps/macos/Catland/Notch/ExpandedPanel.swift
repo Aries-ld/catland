@@ -81,16 +81,9 @@ struct ExpandedPanel: View {
             }
             .help("一次搜遍几个平台（⌘F）")
             iconButton("heart.text.square", active: state.overlay == .saved) { toggleOverlay(.saved) }
-            Button { toggleOverlay(.connections) } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "plus").font(.system(size: 10, weight: .bold))
-                    Text("连接 \(state.connectedContentPlatforms.count)").font(.system(size: 11, weight: .medium))
-                }
-                .foregroundStyle(state.overlay == .connections ? .black : .white.opacity(0.85))
-                .padding(.horizontal, 9).frame(height: 24)
-                .background(Capsule().fill(state.overlay == .connections ? Color.white : .white.opacity(0.12)))
-            }
-            .buttonStyle(PressStyle())
+            // 连接平台：和收藏、设置一样的图标按钮，不抢视觉；悬停显示已连接几个
+            iconButton("person.crop.circle.badge.plus", active: state.overlay == .connections) { toggleOverlay(.connections) }
+                .help("连接平台（已连接 \(state.connectedContentPlatforms.count) 个）")
             iconButton("slider.horizontal.3", active: state.overlay == .settings) { toggleOverlay(.settings) }
         }
         .padding(.horizontal, 18)
@@ -98,6 +91,7 @@ struct ExpandedPanel: View {
     }
 
     private func toggleOverlay(_ o: AppState.Overlay) {
+        state.stopSaved()
         state.overlay = state.overlay == o ? .none : o
         state.overlay == .none ? state.feed.resume() : state.feed.pauseAll()
     }

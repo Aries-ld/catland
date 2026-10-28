@@ -137,6 +137,18 @@ export class Store implements SeenStore {
     this.db.prepare('INSERT INTO saved (kind, key, card, at) VALUES (?, ?, ?, ?) ON CONFLICT (kind, key) DO NOTHING').run(kind, card.key, JSON.stringify(card), this.now())
   }
 
+  /** 重新解析后更新快照（标题、封面地址等），点赞 / 收藏 / 历史里都更新。 */
+  updateSnapshot(card: CardSnapshot): void {
+    const json = JSON.stringify(card)
+    this.db.prepare('UPDATE saved SET card = ? WHERE key = ?').run(json, card.key)
+    this.db.prepare('UPDATE history SET card = ? WHERE key = ?').run(json, card.key)
+  }
+
+  /** 这条还在不在任何一个收藏夹里（都取消后可以删掉本地封面）。 */
+  isSaved(key: string): boolean {
+    return this.db.prepare('SELECT 1 FROM saved WHERE key = ? LIMIT 1').get(key) !== undefined
+  }
+
   unsave(kind: Collection, key: string): void {
     this.db.prepare('DELETE FROM saved WHERE kind = ? AND key = ?').run(kind, key)
   }

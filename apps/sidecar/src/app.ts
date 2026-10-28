@@ -1,14 +1,17 @@
 /** App：组装各服务，维护「信息源 = 已登录 ∩ 用户勾选」的联动，并把能力注册成 RPC 方法。 */
 import { AccountService, type BrowserCookie, type CatbusClient } from './accounts/service.ts'
 import { getPlatform } from './accounts/catalog.ts'
-import { createAdapter } from './content/adapters.ts'
+import { createAdapter, MEDIA_HEADERS } from './content/adapters.ts'
 import { CommentService } from './content/comments.ts'
 import { FeedMixer } from './content/mixer.ts'
 import { SearchService } from './content/search.ts'
 import type { FeedCard, PlatformAdapter } from './content/types.ts'
 import type { Logger } from './log.ts'
 import { bool, oneOf, optInt, optStr, ParamError, RpcServer, str } from './rpc/server.ts'
-import { snapshot, type CardSnapshot, type Settings, Store } from './store/store.ts'
+import { CoverCache } from './store/covers.ts'
+import { defaultDataDir, snapshot, type CardSnapshot, type Settings, Store } from './store/store.ts'
+import type { Item } from './catbus/types.ts'
+import { join } from 'node:path'
 import { WeatherService } from './weather/weather.ts'
 
 export const VERSION = '0.0.1'
@@ -23,6 +26,7 @@ export interface AppDeps {
   adapterFor?: (platform: string) => PlatformAdapter
   mixer?: FeedMixer
   weather?: WeatherService
+  covers?: CoverCache
 }
 
 export class App {
@@ -31,6 +35,7 @@ export class App {
   readonly store: Store
   private readonly comments: CommentService
   private readonly search: SearchService
+  private readonly covers: CoverCache
   private readonly weather: WeatherService
   private readonly log: Logger
   private readonly adapterFor: (platform: string) => PlatformAdapter
@@ -48,6 +53,7 @@ export class App {
     this.mixer = deps.mixer ?? new FeedMixer({ logger: deps.logger, seen: deps.store })
     this.adapterFor = deps.adapterFor ?? ((p) => createAdapter(p, { catbus: deps.catbus, logger: deps.logger }))
     this.search = new SearchService({ logger: deps.logger, adapterFor: (p) => this.adapter(p), mixer: this.mixer })
+    this.covers = deps.covers ?? new CoverCache({ dir: join(defaultDataDir(), 'covers'), logger: deps.logger })
   }
 
   async start(): Promise<void> {
@@ -106,6 +112,18 @@ export class App {
       if (hit) return hit.card
     }
     return this.store.listHistory({ limit: 200 }).entries.find((e) => e.card.key === key)?.card
+  }
+
+  private backfilling = false
+
+  private async backfillCovers(cards: CardSnapshot[]): Promise<void> {
+    if (this.backfilling || cards.length === 0) return
+    this.backfilling = true
+    try {
+      for (const c of cards.slice(0, 50)) await this.covers.save(c.key, c.cover, MEDIA_HEADERS[c.platform])
+    } finally {
+      this.backfilling = false
+    }
   }
 
   register(rpc: RpcServer): void {
@@ -192,8 +210,15 @@ export class App {
       .register('interact.set', (p) => {
         const key = str(p, 'key')
         const kind = oneOf(p, 'kind', ['like', 'collect'] as const)
-        if (bool(p, 'on')) this.store.save(kind, this.lookup(key))
-        else this.store.unsave(kind, key)
+        if (bool(p, 'on')) {
+          const card = this.lookup(key)
+          this.store.save(kind, card)
+          // 封面地址会过期：点赞 / 收藏时把封面存到本机
+          if (!this.covers.localUrl(key)) void this.covers.save(key, card.cover, MEDIA_HEADERS[card.platform])
+        } else {
+          this.store.unsave(kind, key)
+          if (!this.store.isSaved(key)) this.covers.remove(key)
+        }
         return this.store.states([key])[key]
       })
       .register('interact.states', (p) => {
@@ -201,9 +226,29 @@ export class App {
         if (!Array.isArray(keys) || !keys.every((k) => typeof k === 'string') || keys.length > 200) throw new ParamError('keys must be string[] (≤ 200)')
         return this.store.states(keys)
       })
-      .register('interact.list', (p) =>
-        this.store.listSaved(oneOf(p, 'kind', ['like', 'collect'] as const), { limit: optInt(p, 'limit', 1, 200), before: optInt(p, 'before', 0, Number.MAX_SAFE_INTEGER) }),
-      )
+      .register('interact.list', (p) => {
+        const page = this.store.listSaved(oneOf(p, 'kind', ['like', 'collect'] as const), { limit: optInt(p, 'limit', 1, 200), before: optInt(p, 'before', 0, Number.MAX_SAFE_INTEGER) })
+        const entries = page.entries.map((e) => ({ ...e, localCover: this.covers.localUrl(e.card.key) }))
+        // 以前收藏、还没存过封面的：后台按原地址补存（地址还没过期的能存上；过期的等点开时用新地址补）
+        void this.backfillCovers(entries.filter((e) => !e.localCover).map((e) => e.card))
+        return { ...page, entries }
+      })
+      // 点开一条点赞 / 收藏：按快照重新解析出可播放媒体（地址一定重新取），并顺手更新本地封面
+      .register('saved.resolve', async (p) => {
+        const snap = this.lookup(str(p, 'key'))
+        if (!getPlatform(snap.platform)) return null
+        const item: Item = {
+          id: snap.id, kind: snap.kind, url: snap.url, title: snap.title, text: snap.text, author: snap.author,
+          created_at: snap.createdAt, cover: snap.cover, media: [],
+          stats: { views: null, likes: null, comments: null, collects: null, shares: null }, price: null, status: null,
+        }
+        const card = await this.adapter(snap.platform).resolve(item, undefined, true)
+        if (!card) return null
+        this.remember(card)
+        this.store.updateSnapshot(snapshot(card))
+        if (card.cover) void this.covers.save(card.key, card.cover.url, card.cover.headers)
+        return { ...card, ...this.store.states([card.key])[card.key]! }
+      })
 
       .register('history.list', (p) => this.store.listHistory({ limit: optInt(p, 'limit', 1, 200), before: optInt(p, 'before', 0, Number.MAX_SAFE_INTEGER) }))
       .register('history.clear', () => {

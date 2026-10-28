@@ -1,5 +1,9 @@
 import { PassThrough } from 'node:stream'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { CoverCache } from '../src/store/covers.ts'
 import { App } from '../src/app.ts'
 import type { CatbusClient } from '../src/accounts/service.ts'
 import { CatbusCallError, type CatbusResult, type RunOptions } from '../src/catbus/runner.ts'
@@ -122,7 +126,7 @@ class StubAdapter implements PlatformAdapter {
   async resolve(it: Item): Promise<FeedCard> {
     return {
       key: cardKey(this.platform, it.id), platform: this.platform, id: it.id, url: it.url, kind: 'video', title: it.title, text: null, author: null, createdAt: null,
-      cover: null, stats: it.stats, video: { url: 'https://v.mp4', headers: {}, width: 1, height: 1, duration: 1 }, images: [], resolvedAt: Date.now(), expiresAt: Date.now() + 3600_000,
+      cover: { url: `https://img/${it.id}.jpg`, headers: {}, width: null, height: null }, stats: it.stats, video: { url: 'https://v.mp4', headers: {}, width: 1, height: 1, duration: 1 }, images: [], resolvedAt: Date.now(), expiresAt: Date.now() + 3600_000,
     }
   }
 }
@@ -132,7 +136,9 @@ async function startApp() {
   const catbus = new FakeCatbus()
   const store = new Store({ path: ':memory:' })
   const mixer = new FeedMixer({ logger, seen: store, feedMinIntervalMs: 0, resolveMinIntervalMs: 0 })
-  const app = new App({ catbus, logger, store, mixer, adapterFor: (p) => new StubAdapter(p) })
+  // 封面缓存写到临时目录，假的下载：不碰真实数据目录、不联网
+  const covers = new CoverCache({ dir: mkdtempSync(join(tmpdir(), 'catland-covers-')), logger, fetch: async () => new Response(new Uint8Array([1, 2, 3])) })
+  const app = new App({ catbus, logger, store, mixer, covers, adapterFor: (p) => new StubAdapter(p) })
   const rpc = new RpcServer({ logger })
   app.register(rpc)
   await app.start()
@@ -177,8 +183,23 @@ describe('App via RPC', () => {
     expect(await client.ok('interact.set', { key, kind: 'like', on: false })).toEqual({ liked: false, collected: true })
     expect((await client.ok('interact.states', { keys: [key, 'x:none'] }))[key]).toEqual({ liked: false, collected: true })
     expect(catbus.calls.some((c) => /\b(like|collect)\b/.test(c))).toBe(false)
+    // 封面存到本机：列表里带 localCover；两个都取消后删掉
+    await new Promise((r) => setTimeout(r, 10))
+    expect((await client.ok('interact.list', { kind: 'collect' })).entries[0].localCover).toMatch(/^file:\/\//)
     expect((await client.call('interact.set', { key: 'nope:1', kind: 'like', on: true })).error.code).toBe(RPC_ERRORS.INVALID_PARAMS)
     expect((await client.call('interact.set', { key, kind: 'digg', on: true })).error.code).toBe(RPC_ERRORS.INVALID_PARAMS)
+    app.stop()
+  })
+
+  it('点开一条收藏：重新解析出可播放的卡片（不跳到网页），状态照常', async () => {
+    const { app, client } = await startApp()
+    const { cards } = await client.ok('feed.next', { count: 1, waitMs: 1000 })
+    const key = cards[0].key
+    await client.ok('interact.set', { key, kind: 'collect', on: true })
+    const card = await client.ok('saved.resolve', { key })
+    expect(card).toMatchObject({ key, kind: 'video', collected: true, liked: false })
+    expect(card.video.url).toBe('https://v.mp4')
+    expect((await client.call('saved.resolve', { key: 'nope:1' })).error.code).toBe(RPC_ERRORS.INVALID_PARAMS)
     app.stop()
   })
 
@@ -223,5 +244,22 @@ describe('App via RPC', () => {
     expect(cards.map((c: FeedCard) => c.key)).not.toContain('xhs:0')
     expect(cards.map((c: FeedCard) => c.key)).not.toContain('bilibili:0')
     app.stop()
+  })
+})
+
+describe('CoverCache', () => {
+  it('saves a cover to disk, skips dead links, and removes it', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'catland-covers-'))
+    const covers = new CoverCache({
+      dir, logger: createMemoryLogger(),
+      fetch: async (url) => (String(url).includes('dead') ? new Response('', { status: 403 }) : new Response(new Uint8Array([9, 9]))),
+    })
+    expect(await covers.save('xhs:1', 'https://img/ok.jpg')).toBe(true)
+    expect(covers.localUrl('xhs:1')).toMatch(/^file:\/\/.+\.img$/)
+    expect(await covers.save('xhs:2', 'https://img/dead.jpg')).toBe(false)
+    expect(covers.localUrl('xhs:2')).toBeNull()
+    expect(await covers.save('xhs:3', null)).toBe(false)
+    covers.remove('xhs:1')
+    expect(covers.localUrl('xhs:1')).toBeNull()
   })
 })

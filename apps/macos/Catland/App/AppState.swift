@@ -16,8 +16,15 @@ final class AppState {
     let feed: FeedController
     /// 跨平台搜索（搜索页 + 搜索结果的播放器）。
     let search: SearchController
-    /// 当前在播的那一套卡片：正在看搜索结果时是搜索的播放器，否则是推荐流。
-    var activeFeed: FeedController { search.playing ? search.player : feed }
+    /// 点赞 / 收藏页里点开的帖子：在 catland 里直接播放，上下划看整个列表（不跳到网页）。
+    let libraryPlayer: FeedController
+    private(set) var savedPlaying = false
+    private(set) var savedPlayingTitle = ""
+    private var savedOffset = 0
+    private(set) var savedCount = 0
+    var savedPlayIndex: Int { libraryPlayer.index + savedOffset }
+    /// 当前在播的那一套卡片：点赞 / 收藏 → 搜索结果 → 推荐流。
+    var activeFeed: FeedController { savedPlaying ? libraryPlayer : (search.playing ? search.player : feed) }
     private let log = Logger(subsystem: "app.catland", category: "app")
 
     var phase: Phase = .starting
@@ -153,6 +160,7 @@ final class AppState {
     init() {
         feed = FeedController(sidecar: sidecar)
         search = SearchController(sidecar: sidecar)
+        libraryPlayer = FeedController(sidecar: sidecar)
     }
 
     /// 能搜索的平台：正常连接（登录没失效）的内容平台。
@@ -173,6 +181,39 @@ final class AppState {
                 try? await Task.sleep(for: .seconds(30 * 60))
             }
         }
+    }
+
+    /// 在点赞 / 收藏列表里点开一条：从它开始，在 catland 里上下划着看（每次解析接下来 2 条，地址重新取）。
+    func playSaved(_ entries: [SavedEntry], from start: Int, title: String) {
+        guard entries.indices.contains(start) else { return }
+        feed.pauseAll()
+        savedOffset = start
+        savedCount = entries.count
+        savedPlayingTitle = title
+        var next = start
+        let sidecar = self.sidecar
+        libraryPlayer.reset {
+            var out: [FeedCard] = []
+            while out.count < 2, next < entries.count {
+                let key = entries[next].card.key
+                next += 1
+                if let card: FeedCard = try? await sidecar.call("saved.resolve", ["key": key]) { out.append(card) }
+            }
+            return out
+        } refresher: { key in
+            try? await sidecar.call("saved.resolve", ["key": key])
+        }
+        libraryPlayer.muted = settings.muted
+        savedPlaying = true
+        Task { await libraryPlayer.prime() }
+    }
+
+    func stopSaved() {
+        guard savedPlaying else { return }
+        libraryPlayer.pauseAll()
+        libraryPlayer.reset(loader: nil, refresher: nil)
+        savedPlaying = false
+        commentsOpen = false
     }
 
     /// 打开搜索页：暂停推荐流。
@@ -212,6 +253,7 @@ final class AppState {
             settings = hello.settings
             feed.muted = settings.muted
             search.player.muted = settings.muted
+            libraryPlayer.muted = settings.muted
             phase = .ready
             startWeather()
             startEventWatcher()
@@ -324,6 +366,7 @@ final class AppState {
         settings.muted = muted
         feed.muted = muted
         search.player.muted = muted
+        libraryPlayer.muted = muted
         Task { let _: Settings? = try? await sidecar.call("settings.update", ["muted": muted]) }
     }
 
@@ -448,6 +491,7 @@ final class AppState {
         overlay = .none
         feed.pauseAll()
         search.player.pauseAll()
+        libraryPlayer.pauseAll()
     }
 }
 

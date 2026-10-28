@@ -185,10 +185,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             panel.ignoresMouseEvents = false
             panel.makeKey()
             // 搜索页开着但没在播：不恢复推荐流
-            if !state.search.active || state.search.playing { state.activeFeed.resume() }
+            if state.savedPlaying || (state.overlay == .none && (!state.search.active || state.search.playing)) { state.activeFeed.resume() }
         } else {
             state.feed.pauseAll()
             state.search.player.pauseAll()
+            state.libraryPlayer.pauseAll()
             panel.resignKey()
             updateMouse(NSEvent.mouseLocation)
         }
@@ -253,7 +254,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return nil
         } as Any)
         monitors.append(NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel]) { [weak self] e in
-            guard let self, self.state.expanded, e.window === self.panel, self.state.overlay == .none, !self.state.commentsOpen else { return e }
+            // 点赞 / 收藏里点开帖子播放时，滚轮也能翻页
+            guard let self, self.state.expanded, e.window === self.panel, self.state.overlay == .none || self.state.savedPlaying, !self.state.commentsOpen else { return e }
             // 搜索结果瀑布流自己滚动；只有在播搜索结果时才按页翻
             if self.state.search.active && !self.state.search.playing { return e }
             return self.pager.handle(e) ? nil : e
@@ -308,14 +310,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         switch Int(e.keyCode) {
         case kVK_Escape:
             if state.commentsOpen { state.commentsOpen = false }
-            else if state.overlay != .none { state.overlay = .none }
+            else if state.savedPlaying { withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) { state.stopSaved() } }
+            else if state.overlay != .none { state.overlay = .none; state.feed.resume() }
             else if state.search.playing { withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) { state.search.stopPlaying() } }
             else if state.search.active { state.closeSearch() }
             else { collapse() }
             return true
         case _ where browsingResults: return false
-        case kVK_DownArrow, kVK_ANSI_J: if state.overlay == .none, !state.commentsOpen { page(1) }; return true
-        case kVK_UpArrow, kVK_ANSI_K: if state.overlay == .none, !state.commentsOpen { page(-1) }; return true
+        case kVK_DownArrow, kVK_ANSI_J: if state.overlay == .none || state.savedPlaying, !state.commentsOpen { page(1) }; return true
+        case kVK_UpArrow, kVK_ANSI_K: if state.overlay == .none || state.savedPlaying, !state.commentsOpen { page(-1) }; return true
         case kVK_LeftArrow: feed.carousel(-1); return true
         case kVK_RightArrow: feed.carousel(1); return true
         case kVK_Space: feed.togglePause(); return true

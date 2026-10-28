@@ -105,6 +105,30 @@ struct SavedView: View {
     var body: some View {
         ZStack {
             Color(white: 0.07)
+            if state.savedPlaying {
+                // 点开的帖子在这里直接播放，上下划看整个列表
+                VStack(spacing: 0) {
+                    HStack {
+                        Button { withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) { state.stopSaved() } } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "chevron.left").font(.system(size: 11, weight: .semibold))
+                                Text(state.savedPlayingTitle).font(.system(size: 13, weight: .medium))
+                            }
+                            .foregroundStyle(.white.opacity(0.9))
+                            .padding(.horizontal, 10).frame(height: 28)
+                            .background(Capsule().fill(.white.opacity(0.12)))
+                            .contentShape(Capsule())
+                        }
+                        .buttonStyle(PressStyle())
+                        Spacer()
+                        Text("\(min(state.savedPlayIndex + 1, state.savedCount)) / \(state.savedCount)")
+                            .font(.system(size: 12, weight: .medium, design: .rounded)).foregroundStyle(.white.opacity(0.5))
+                    }
+                    .padding(.horizontal, 12).frame(height: 40)
+                    FeedView(state: state, feed: state.libraryPlayer)
+                }
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+            } else {
             VStack(alignment: .leading, spacing: 12) {
                 Picker("", selection: $kind) {
                     Text("点赞").tag("like")
@@ -116,13 +140,17 @@ struct SavedView: View {
                 } else {
                     ScrollView {
                         LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                            ForEach(entries, id: \.card.key) { e in SavedTile(entry: e) }
+                            ForEach(Array(entries.enumerated()), id: \.element.card.key) { i, e in
+                                SavedTile(entry: e) { state.playSaved(entries, from: i, title: kind == "like" ? "我的点赞" : "我的收藏") }
+                            }
                         }
                     }
                 }
             }
             .padding(14)
+            }
         }
+        .animation(.spring(response: 0.3, dampingFraction: 0.9), value: state.savedPlaying)
         .task(id: kind) {
             let page: SavedPage? = try? await state.sidecar.call("interact.list", ["kind": kind, "limit": 100])
             entries = page?.entries ?? []
@@ -132,15 +160,19 @@ struct SavedView: View {
 
 struct SavedTile: View {
     let entry: SavedEntry
+    /// 点开：在 catland 里直接播放（不跳到网页）。
+    let open: () -> Void
+    /// 封面：优先用存在本机的（平台地址会过期），没有再用原地址。
+    private var cover: ImageSource? {
+        (entry.localCover ?? entry.card.cover).map { ImageSource(url: $0, headers: [:], width: nil, height: nil) }
+    }
     var body: some View {
-        Button {
-            if let u = URL(string: entry.card.url) { NSWorkspace.shared.open(u) }
-        } label: {
+        Button(action: open) {
             ZStack(alignment: .bottomLeading) {
                 // 先定格子尺寸，再把封面铺在里面裁切：只限高度时，横版封面会按比例撑宽、盖到旁边的卡片上。
                 Color.clear
                     .frame(maxWidth: .infinity, minHeight: 150, maxHeight: 150)
-                    .overlay(RemoteImage(source: entry.card.cover.map { ImageSource(url: $0, headers: [:], width: nil, height: nil) }))
+                    .overlay(RemoteImage(source: cover))
                     .clipped()
                 LinearGradient(colors: [.clear, .black.opacity(0.7)], startPoint: .center, endPoint: .bottom)
                 VStack(alignment: .leading, spacing: 3) {
@@ -154,5 +186,8 @@ struct SavedTile: View {
             .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(PressStyle())
+        .contextMenu {
+            Button("在浏览器中打开原帖") { if let u = URL(string: entry.card.url) { NSWorkspace.shared.open(u) } }
+        }
     }
 }
