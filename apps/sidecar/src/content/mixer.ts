@@ -399,6 +399,23 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
   }
 
   /**
+   * 调试：让所有启用的平台假装进入风控冷却 ms 毫秒（不请求平台），并清空已备好的卡片，
+   * 用来验证「休息站」卡片、小岛打盹、倒计时结束后自动恢复的整条链路（catland-debug feed:rest:<秒>）。
+   */
+  simulateCooldown(ms: number): void {
+    const until = this.now() + ms
+    for (const s of this.sources.values()) {
+      if (s.status === 'auth') continue
+      s.until = until
+      s.probing = false
+      this.setStatus(s, 'cooldown')
+    }
+    this.ready = []
+    this.log.info('simulated cooldown', { ms })
+    this.schedule(until)
+  }
+
+  /**
    * 现在为什么没货、什么时候能恢复（推荐流空了时给 App 选「在路上」还是「休息站」卡片）：
    * 每个启用的平台取「冷却结束 / 额度窗口滑过」的时间，取最早的那个；两分钟内能恢复算 waiting，否则 resting。
    */

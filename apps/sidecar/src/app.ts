@@ -176,6 +176,11 @@ export class App {
         return card
       })
       .register('feed.sources', () => ({ enabled: this.enabled, states: this.mixer.sourceStates() }))
+      // 调试：所有平台假装冷却 N 秒（只给调试版的 catland-debug feed:rest:<秒> 用，不请求平台）
+      .register('debug.simulateCooldown', (p) => {
+        this.mixer.simulateCooldown((optInt(p, 'seconds', 10, 3600) ?? 150) * 1000)
+        return this.mixer.availability()
+      })
       .register('feed.view', (p) => {
         this.store.recordView(this.lookup(str(p, 'key')), optInt(p, 'dwellMs', 0, 24 * 3600_000) ?? 0)
         return null

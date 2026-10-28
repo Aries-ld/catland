@@ -87,6 +87,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 case "search:close": self.state.closeSearch()
                 case "render:cities": SceneSnapshot.renderCities()
                 case "feed:pause": self.state.feed.debugPause()
+                case let c where c.hasPrefix("feed:rest"):
+                    // 所有平台假装冷却 N 秒（默认 150 秒，超过 2 分钟才算「休息站」），验证休息站卡片和倒计时
+                    let seconds = Int(c.split(separator: ":").last ?? "") ?? 150
+                    Task { @MainActor in
+                        if let a: Availability = try? await self.state.sidecar.call("debug.simulateCooldown", ["seconds": seconds]) {
+                            self.state.feed.debugRest(a)
+                        }
+                    }
                 case "render:pause":
                     // 离屏渲染猫猫卡的三种状态：在路上 / 搬到了 / 休息站
                     let size = CGSize(width: 384, height: 600)

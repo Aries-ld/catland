@@ -366,4 +366,17 @@ describe('FeedMixer', () => {
     expect(av.state).toBe('resting')
     expect(av.resumeAt).toBe(3_600_000)
   })
+
+  it('模拟冷却：所有平台进入 cooldown、availability 变成 resting，到点后恢复', async () => {
+    let now = 0
+    const a = new FakeAdapter('xhs')
+    const m = new FeedMixer({ logger: createMemoryLogger(), now: () => now })
+    m.setSources([a])
+    m.simulateCooldown(150_000)
+    expect(m.statusOf('xhs')).toBe('cooldown')
+    expect(m.availability()).toEqual({ state: 'resting', resumeAt: 150_000 })
+    now = 151_000
+    expect(m.statusOf('xhs')).toBe('active')
+    m.stop()
+  })
 })

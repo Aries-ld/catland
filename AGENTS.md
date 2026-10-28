@@ -83,6 +83,7 @@ npm run smoke:rpc                                   # 以子进程启动 sidecar
 apps/macos/scripts/run.sh                           # 生成工程 + 构建 + 启动调试版
 cd apps/macos && xcodebuild -project Catland.xcodeproj -scheme Catland -derivedDataPath build/DerivedData test
 apps/macos/build/catland-debug <pin|unpin|toggle|next|prev|right|pause|comments|connections|settings|saved|close|boss>  # 仅调试版：驱动界面
+apps/macos/build/catland-debug feed:rest:150       # 所有平台假装冷却 150 秒（不请求平台），验证「休息站」卡片和倒计时；feed:pause 插一张「在路上」卡
 apps/macos/build/shot-window /tmp/x.png             # 只截 catland 自己的窗口（不拍用户其他应用）
 # App 日志：~/Library/Logs/catland/app.log；sidecar 日志：~/Library/Logs/catland/sidecar.log
 

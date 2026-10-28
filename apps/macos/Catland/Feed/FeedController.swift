@@ -220,6 +220,18 @@ final class FeedController {
     static let releaseBatch = 3
     static let releaseAfter: TimeInterval = 20
 
+    /// 调试：sidecar 已经让所有平台假装冷却（catland-debug feed:rest:<秒>），这里立刻停到「休息站」卡片上。
+    func debugRest(_ a: Availability) {
+        if let pi = cards.firstIndex(where: \.isPause) {
+            cards.remove(at: pi)
+            if index >= pi { index = max(0, index - 1) }
+            pause = nil
+            pauseTask?.cancel()
+        }
+        lastAvailability = a
+        enterPause()
+    }
+
     /// 停在猫猫卡上时：一直等新内容（sidecar 那边按平台预算排队），攒够一批（或等了 20 秒）再提示往下滑。
     private func waitForContent() async {
         let started = Date()
