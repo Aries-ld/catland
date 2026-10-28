@@ -19,8 +19,12 @@ struct SearchHeader: View {
                     .font(.system(size: 13))
                     .focused($focused)
                     .onSubmit { search.submit(platforms: state.searchPlatforms) }
+                    // 关键词删光：回到搜索首页（结果丢掉）
+                    .onChange(of: search.query) { _, q in
+                        if q.trimmingCharacters(in: .whitespaces).isEmpty && !search.submitted.isEmpty { search.clearResults() }
+                    }
                 if !search.query.isEmpty {
-                    Button { search.query = ""; focused = true } label: {
+                    Button { search.query = ""; search.clearResults(); focused = true } label: {
                         Image(systemName: "xmark.circle.fill").font(.system(size: 12)).foregroundStyle(.white.opacity(0.4))
                     }
                     .buttonStyle(.plain)
@@ -152,49 +156,8 @@ struct SearchView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - 刚打开：最近搜索 + 猫们会去哪儿找
-
     private var start: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                if !search.recent.isEmpty {
-                    HStack {
-                        Text("最近搜索").font(.system(size: 12, weight: .medium)).foregroundStyle(.white.opacity(0.5))
-                        Spacer()
-                        Button("清空") { search.clearRecent() }.buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(.white.opacity(0.4))
-                    }
-                    FlowLayout(spacing: 8) {
-                        ForEach(search.recent, id: \.self) { q in
-                            Button {
-                                search.useRecent(q)
-                                search.submit(platforms: state.searchPlatforms)
-                            } label: {
-                                Text(q).font(.system(size: 12)).foregroundStyle(.white.opacity(0.85))
-                                    .padding(.horizontal, 11).frame(height: 26)
-                                    .background(Capsule().fill(.white.opacity(0.08)))
-                                    .contentShape(Capsule())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-                Text(state.searchPlatforms.isEmpty ? "先连接一个平台，猫才能出门帮你找" : "猫们会去这些地方帮你找")
-                    .font(.system(size: 12, weight: .medium)).foregroundStyle(.white.opacity(0.5))
-                ForEach(state.searchPlatforms, id: \.self) { p in
-                    HStack(spacing: 10) {
-                        if let persona = Persona.forPlatform(p) { CatSprite(skin: persona.skin, action: "idle", scale: 2.5) }
-                        PlatformIcon(platform: p, size: 16)
-                        Text("\(Persona.forPlatform(p)?.name ?? "") · \(PlatformBrand.shortName(p))").font(.system(size: 13))
-                        Spacer()
-                        if p == "kuaishou" { Text("只按关键词").font(.system(size: 10)).foregroundStyle(.white.opacity(0.35)) }
-                    }
-                    .padding(.horizontal, 12).frame(height: 46)
-                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.white.opacity(0.05)))
-                }
-                Text("按回车开始搜索").font(.system(size: 11)).foregroundStyle(.white.opacity(0.3))
-            }
-            .padding(14)
-        }
+        ScrollView { SearchHome(state: state) }
     }
 
     // MARK: - 结果：两列瀑布流
@@ -382,4 +345,131 @@ struct FlowLayout: Layout {
             row = max(row, s.height)
         }
     }
+}
+
+/// 搜索首页（没输入关键词时）：历史记录 + 猜你想搜 + 猫们会去哪儿找；和小红书的搜索首页一致。
+struct SearchHome: View {
+    let state: AppState
+    private var search: SearchController { state.search }
+
+    // MARK: - 搜索首页：历史记录 + 猜你想搜 + 猫们会去哪儿找（和小红书一致）
+
+    var body: some View {
+            VStack(alignment: .leading, spacing: 14) {
+                if !search.recent.isEmpty { history }
+                suggestions
+                if state.searchPlatforms.isEmpty {
+                    VStack(spacing: 10) {
+                        Text("先连接一个平台，猫才能出门帮你找").font(.system(size: 12)).foregroundStyle(.white.opacity(0.55))
+                        Button {
+                            state.closeSearch()
+                            state.overlay = .connections
+                        } label: {
+                            Text("去连接平台").font(.system(size: 13, weight: .semibold)).foregroundStyle(.black)
+                                .padding(.horizontal, 18).frame(height: 32)
+                                .background(Capsule().fill(.white))
+                                .contentShape(Capsule())
+                        }
+                        .buttonStyle(PressStyle())
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                } else {
+                    sectionTitle("猫们会去这些地方帮你找")
+                    ForEach(state.searchPlatforms, id: \.self) { p in
+                        HStack(spacing: 10) {
+                            if let persona = Persona.forPlatform(p) { CatSprite(skin: persona.skin, action: "idle", scale: 2.5) }
+                            PlatformIcon(platform: p, size: 16)
+                            Text("\(Persona.forPlatform(p)?.name ?? "") · \(PlatformBrand.shortName(p))").font(.system(size: 13))
+                            Spacer()
+                            if p == "kuaishou" { Text("只按关键词").font(.system(size: 10)).foregroundStyle(.white.opacity(0.35)) }
+                        }
+                        .padding(.horizontal, 12).frame(height: 46)
+                        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.white.opacity(0.05)))
+                    }
+                }
+            }
+            .padding(14)
+    }
+
+    private func sectionTitle(_ t: String) -> some View {
+        Text(t).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white.opacity(0.85))
+    }
+
+    /// 历史记录：点词直接搜；垃圾桶进入编辑（每个词出现 ×、可「全部删除」，点「完成」退出）；也可以右键删除单个。
+    private var history: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                sectionTitle("历史记录")
+                Spacer()
+                if search.editingRecent {
+                    Button("全部删除") { search.clearRecent() }.buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(.white.opacity(0.55))
+                    Text("|").font(.system(size: 11)).foregroundStyle(.white.opacity(0.2))
+                    Button("完成") { search.editingRecent = false }.buttonStyle(.plain).font(.system(size: 12, weight: .medium)).foregroundStyle(.pink)
+                } else {
+                    Button { search.editingRecent = true } label: {
+                        Image(systemName: "trash").font(.system(size: 12)).foregroundStyle(.white.opacity(0.45))
+                            .frame(width: 24, height: 24).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("编辑历史记录")
+                }
+            }
+            FlowLayout(spacing: 8) {
+                ForEach(search.recent, id: \.self) { q in
+                    Button {
+                        if search.editingRecent { search.removeRecent(q) } else {
+                            search.useRecent(q)
+                            search.submit(platforms: state.searchPlatforms)
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(q).lineLimit(1)
+                            if search.editingRecent { Image(systemName: "xmark").font(.system(size: 9, weight: .semibold)).foregroundStyle(.white.opacity(0.5)) }
+                        }
+                        .font(.system(size: 12)).foregroundStyle(.white.opacity(0.85))
+                        .padding(.horizontal, 11).frame(height: 26)
+                        .background(Capsule().fill(.white.opacity(0.08)))
+                        .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu { Button("删除") { search.removeRecent(q) } }
+                }
+            }
+        }
+    }
+
+    /// 猜你想搜：本地示例词（按季节、时段），「换一换」轮换；不请求平台。
+    private var suggestions: some View {
+        let words = search.suggestions(season: SceneSeason.of(Date(), latitude: state.location.latitude))
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                sectionTitle("猜你想搜")
+                Spacer()
+                Button { search.suggestionRound += 1 } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "arrow.triangle.2.circlepath").font(.system(size: 10))
+                        Text("换一换").font(.system(size: 12))
+                    }
+                    .foregroundStyle(.white.opacity(0.45))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            LazyVGrid(columns: [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)], alignment: .leading, spacing: 12) {
+                ForEach(words, id: \.self) { w in
+                    Button {
+                        search.query = w
+                        search.submit(platforms: state.searchPlatforms)
+                    } label: {
+                        Text(w).font(.system(size: 13)).foregroundStyle(.white.opacity(0.85)).lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(state.searchPlatforms.isEmpty)
+                }
+            }
+        }
+    }
+
 }

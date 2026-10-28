@@ -85,6 +85,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 case "den": CatDirector.shared.forceDen = true
                 case "cats:dump": AppLog.info("cats", CatDirector.shared.debugDump())
                 case "search:close": self.state.closeSearch()
+                case let c where c.hasPrefix("render:search"):
+                    // 离屏渲染搜索首页（不弹出面板），用于检查版式；render:search-edit 渲染编辑历史记录的样子
+                    let editing = c.hasSuffix("-edit")
+                    self.state.search.editingRecent = editing
+                    let view = SearchHome(state: self.state)
+                        .frame(width: 384, height: 620, alignment: .top).background(Color(white: 0.04)).environment(\.colorScheme, .dark)
+                    let r = ImageRenderer(content: view); r.scale = 2
+                    if let cg = r.cgImage, let data = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
+                        try? data.write(to: URL(fileURLWithPath: editing ? "/tmp/search-home-edit.png" : "/tmp/search-home.png"))
+                    }
+                    self.state.search.editingRecent = false
                 case let c where c.hasPrefix("search:filter:"):
                     let f = String(c.dropFirst(14)); self.state.search.filter = f == "all" ? nil : f
                 case "search:next": self.page(1)
@@ -169,6 +180,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func expandedChanged() {
+        state.searchPanelChanged(expanded: state.expanded)
         if state.expanded {
             panel.ignoresMouseEvents = false
             panel.makeKey()

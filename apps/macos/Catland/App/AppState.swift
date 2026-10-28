@@ -168,6 +168,14 @@ final class AppState {
         search.open()
     }
 
+    /// 面板收起 / 展开时的搜索会话：收起只算暂停；隔超过 30 分钟再展开，结束这次搜索、回到推荐流。
+    func searchPanelChanged(expanded: Bool) {
+        guard search.active else { return }
+        if !expanded { search.collapsedAt = Date(); return }
+        if let t = search.collapsedAt, Date().timeIntervalSince(t) > SearchController.staleAfter { closeSearch() }
+        search.collapsedAt = nil
+    }
+
     /// 关闭搜索页：回到推荐流，接着刚才那条播。
     func closeSearch() {
         search.close()

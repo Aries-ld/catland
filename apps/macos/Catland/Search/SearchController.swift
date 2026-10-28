@@ -64,13 +64,43 @@ final class SearchController {
     }
     var allUnavailable: Bool { !states.isEmpty && states.values.allSatisfy { $0.status == .resting || $0.status == .auth || $0.status == .failed } }
 
+    /// 收起面板的时间：搜索中途收起只算暂停，再展开时回到原处；隔太久就回推荐流。
+    var collapsedAt: Date?
+    static let staleAfter: TimeInterval = 30 * 60
+    /// 最近搜索的编辑状态（点垃圾桶进入，每个词出现 ×）。
+    var editingRecent = false
+    /// 「猜你想搜」换一换的轮次。
+    var suggestionRound = 0
+
     func open() {
         active = true
+        collapsedAt = nil
     }
 
+    /// 退出搜索（取消 / Esc）：这次搜索会话结束，下次进来是干净的搜索首页。
     func close() {
         stopPlaying()
         active = false
+        query = ""
+        clearResults()
+        editingRecent = false
+        collapsedAt = nil
+    }
+
+    /// 回到搜索首页：丢掉结果，还没返回的请求作废（搜索框清空、删光关键词时）。
+    func clearResults() {
+        generation += 1
+        submitted = ""
+        filter = nil
+        platforms = []
+        states = [:]
+        hits = []
+        queues = [:]
+        reserve = [:]
+        prefetching = []
+        wantMore = []
+        lastPlatform = nil
+        run = 0
     }
 
     /// 回车：对每个已连接平台各发一次搜索（只取第一页）。
@@ -125,8 +155,39 @@ final class SearchController {
 
     func clearRecent() {
         recent = []
+        editingRecent = false
         UserDefaults.standard.removeObject(forKey: Self.recentKey)
     }
+
+    func removeRecent(_ q: String) {
+        recent.removeAll { $0 == q }
+        UserDefaults.standard.set(recent, forKey: Self.recentKey)
+        if recent.isEmpty { editingRecent = false }
+    }
+
+    /// 猜你想搜：本地按季节、时段挑的示例词（不请求平台），「换一换」轮换。
+    func suggestions(now: Date = Date(), season: SceneSeason) -> [String] {
+        let hour = Calendar.current.component(.hour, from: now)
+        var pool = Self.everyday
+        pool += Self.bySeason[season] ?? []
+        pool += hour >= 17 ? Self.evening : (hour < 11 ? Self.morning : Self.daytime)
+        pool = pool.filter { !recent.contains($0) }
+        guard !pool.isEmpty else { return [] }
+        let start = (suggestionRound * 8) % pool.count
+        return (0..<min(8, pool.count)).map { pool[(start + $0) % pool.count] }
+    }
+
+    private static let everyday = ["咖啡拉花", "健身计划", "极简穿搭", "周末去哪", "猫咪日常", "Mac 效率工具", "收纳技巧", "新手化妆"]
+    private static let morning = ["快手早餐", "通勤歌单", "晨间护肤"]
+    private static let daytime = ["工位好物", "午饭吃什么", "办公室拉伸"]
+    private static let evening = ["一人食晚餐", "睡前放松", "下饭综艺", "夜跑路线"]
+    private static let bySeason: [SceneSeason: [String]] = [
+        .spring: ["春日穿搭", "赏花攻略", "野餐装备"],
+        .summer: ["露营装备", "防晒推荐", "夏日饮品"],
+        .autumn: ["秋冬穿搭", "徒步路线", "秋天第一杯奶茶"],
+        .winter: ["火锅底料", "滑雪入门", "冬季护肤"],
+        .tropical: ["海岛旅行", "防晒推荐", "冰饮做法"],
+    ]
 
     /// 点开一条结果：从它开始，在当前筛选结果里上下划着看。
     func play(_ hit: SearchHit) {
