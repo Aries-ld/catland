@@ -52,6 +52,14 @@ struct SettingsView: View {
                         shortcut("空格", "暂停 / 播放")
                         shortcut("L / S / C / M", "点赞 / 收藏 / 评论 / 静音")
                     }
+                    section("新手引导") {
+                        Button("重新看一遍新手引导") {
+                            state.overlay = .none
+                            state.feed.resume()
+                            state.onboarding.replay()
+                        }
+                        .controlSize(.small)
+                    }
                     section("隐私") {
                         Text("所有数据（点赞、收藏、历史、登录态）只保存在这台电脑上。").font(.system(size: 11)).foregroundStyle(.secondary)
                         Button("清空浏览历史") { Task { _ = try? await state.sidecar.callRaw("history.clear"); state.showToast("已清空浏览历史") } }.controlSize(.small)

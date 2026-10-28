@@ -103,6 +103,8 @@ struct CollapsedView: View {
                      den: denRect,
                      bubbles: bubbles,
                      bubbleEpoch: state.hoverStartedAt)
+            // 还没接平台：小岛轻轻发光，提示点进来
+            if state.onboardingHint { OnboardingGlow() }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -112,5 +114,18 @@ extension PlatformBrand {
     static func swiftColor(_ id: String) -> Color {
         let c = color(id)
         return Color(red: c.r, green: c.g, blue: c.b)
+    }
+}
+
+/// 新手提示：小岛边缘一圈呼吸的粉色光。
+struct OnboardingGlow: View {
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30)) { tl in
+            let phase = (sin(tl.date.timeIntervalSinceReferenceDate * 2.2) + 1) / 2
+            NotchShape(bottomRadius: 10)
+                .stroke(Color.pink.opacity(0.35 + 0.45 * phase), lineWidth: 2)
+                .shadow(color: .pink.opacity(0.6 * phase), radius: 6)
+        }
+        .allowsHitTesting(false)
     }
 }

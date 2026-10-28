@@ -14,6 +14,10 @@ final class AppState {
 
     let sidecar = SidecarClient()
     let feed: FeedController
+    /// 新手引导（第一次接平台、开刷时的 3 步高亮讲解）。
+    let onboarding = Onboarding()
+    /// 还没接任何平台、也没看过引导：小岛发光、箱箱招手。
+    var onboardingHint: Bool { !onboarding.done && !platforms.isEmpty && connectedContentPlatforms.isEmpty }
     /// 跨平台搜索（搜索页 + 搜索结果的播放器）。
     let search: SearchController
     /// 点赞 / 收藏页里点开的帖子：在 catland 里直接播放（不跳到网页），往下刷进入全局推荐流。
@@ -165,6 +169,17 @@ final class AppState {
         connectedContentPlatforms.filter { $0.health != "expired" && sourceStatus[$0.id] != "auth" }.map(\.id)
     }
 
+    /// 第一次启动、还没接平台：箱箱在小岛里招手（3 秒后冒一次气泡，还没点开的话 90 秒后再冒一次）。
+    private func startOnboardingHint() {
+        Task { [weak self] in
+            for delay in [3.0, 90.0] {
+                try? await Task.sleep(for: .seconds(delay))
+                guard let self, self.onboardingHint, !self.expanded else { return }
+                self.announce("箱箱：我在这儿…点我一下，带你认识大家", seconds: 12)
+            }
+        }
+    }
+
     private var hotTask: Task<Void, Never>?
 
     /// 后台定时把 sidecar 缓存里的热搜同步过来（启动后 15 秒一次，之后每 30 分钟），打开搜索页时直接用。
@@ -220,6 +235,7 @@ final class AppState {
         commentsOpen = false
         feed.pauseAll()
         search.open()
+        onboarding.advance(from: 1)
     }
 
     /// 面板收起 / 展开时的搜索会话：收起只算暂停；隔超过 30 分钟再展开，结束这次搜索、回到推荐流。
@@ -274,6 +290,7 @@ final class AppState {
             if method == "app.ready" {
                 Task { await feed.prime() }
                 startHotRefresh()
+                startOnboardingHint()
             }
         case "accounts.login":
             if let e = try? dec.decode(LoginEvent.self, from: params), qrLogin?.platform == e.platform {
@@ -295,7 +312,9 @@ final class AppState {
     /// 更新平台列表；新连上内容平台而刷刷页还空着时（比如第一次连接），立刻拉首屏，不用等用户手动划。
     private func setPlatforms(_ list: [PlatformState]) {
         let before = Set(connectedContentPlatforms.map(\.id))
+        let firstLoad = platforms.isEmpty
         platforms = list
+        if firstLoad { onboarding.noteFirstPlatforms(connected: !connectedContentPlatforms.isEmpty) }
         let added = Set(connectedContentPlatforms.map(\.id)).subtracting(before)
         guard !added.isEmpty else { return }
         if feed.cards.isEmpty {
@@ -485,6 +504,7 @@ final class AppState {
 
     /// 老板键：立刻收起、暂停、静音。
     func bossKey() {
+        onboarding.advance(from: 2)
         expanded = false
         overlay = .none
         feed.pauseAll()

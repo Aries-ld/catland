@@ -85,6 +85,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 case "den": CatDirector.shared.forceDen = true
                 case "cats:dump": AppLog.info("cats", CatDirector.shared.debugDump())
                 case "search:close": self.state.closeSearch()
+                case "render:onboarding":
+                    // 离屏渲染欢迎页和 3 步高亮讲解（不弹面板、不改引导进度），检查版式
+                    @MainActor func save(_ v: some View, _ name: String) {
+                        let r = ImageRenderer(content: v.frame(width: 384, height: 660).background(Color(white: 0.04)).environment(\.colorScheme, .dark)); r.scale = 2
+                        if let cg = r.cgImage, let d = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) { try? d.write(to: URL(fileURLWithPath: "/tmp/\(name).png")) }
+                    }
+                    save(OnboardingWelcome(state: self.state, scrollable: false), "ob-welcome")
+                    let cover = Image(nsImage: NSImage(contentsOfFile: "/tmp/catland-snaps/feed-sakura.png") ?? NSImage())
+                    for step in 0..<Onboarding.total {
+                        let mock = VStack(spacing: 0) {
+                            HStack(spacing: 14) {
+                                Text("视频").font(.system(size: 14, weight: .semibold)); Text("电商").foregroundStyle(.secondary); Spacer()
+                                Image(systemName: "magnifyingglass").frame(width: 28, height: 28).coachAnchor(.search)
+                                Image(systemName: "heart.text.square").frame(width: 28, height: 28)
+                                Image(systemName: "person.crop.circle.badge.plus").frame(width: 28, height: 28)
+                                Image(systemName: "slider.horizontal.3").frame(width: 28, height: 28)
+                            }
+                            .padding(.horizontal, 14).frame(height: 40)
+                            cover.resizable().aspectRatio(contentMode: .fill).frame(width: 368, height: 604).clipShape(RoundedRectangle(cornerRadius: 18)).coachAnchor(.card)
+                            Spacer(minLength: 0)
+                        }
+                        .overlayPreferenceValue(CoachAnchorKey.self) { CoachMarksOverlay(state: self.state, anchors: $0, forcedStep: step) }
+                        save(mock, "ob-step\(step)")
+                    }
+                case "onboarding:reset": UserDefaults.standard.removeObject(forKey: Onboarding.doneKey); self.state.onboarding.replay()
+                case "onboarding:next": self.state.onboarding.next()
                 case let c where c.hasPrefix("render:search"):
                     // 离屏渲染搜索首页（不弹出面板），用于检查版式；render:search-edit 渲染编辑历史记录的样子
                     let editing = c.hasSuffix("-edit")
@@ -308,6 +334,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let feed = state.activeFeed
         let browsingResults = state.search.active && !state.search.playing
         switch Int(e.keyCode) {
+        case kVK_Escape where state.onboarding.step != nil:
+            withAnimation { state.onboarding.skip() }
+            return true
         case kVK_Escape:
             if state.commentsOpen { state.commentsOpen = false }
             else if state.savedPlaying { withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) { state.stopSaved() } }

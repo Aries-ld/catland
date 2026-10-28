@@ -47,8 +47,18 @@ struct ExpandedPanel: View {
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.88), value: state.overlay)
         .animation(.spring(response: 0.3, dampingFraction: 0.9), value: state.search.active)
+        // 新手引导：开刷且有内容时开始讲；高亮的目标位置由 coachAnchor 标出
+        .overlayPreferenceValue(CoachAnchorKey.self) { anchors in
+            if state.onboarding.step != nil && state.overlay == .none && !state.search.active {
+                CoachMarksOverlay(state: state, anchors: anchors)
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: state.onboarding.step)
+        .onAppear(perform: startOnboarding)
+        .onChange(of: state.feed.cards.count) { _, _ in startOnboarding() }
+        .onChange(of: state.feed.index) { _, _ in state.onboarding.advance(from: 0) }
         .onAppear {
-            guard !searchTipShown, !state.searchPlatforms.isEmpty else { return }
+            guard !searchTipShown, !state.searchPlatforms.isEmpty, state.onboarding.done else { return }
             searchTipShown = true
             withAnimation { showSearchTip = true }
             Task { try? await Task.sleep(for: .seconds(6)); withAnimation { showSearchTip = false } }
@@ -80,6 +90,7 @@ struct ExpandedPanel: View {
                 state.openSearch()
             }
             .help("一次搜遍几个平台（⌘F）")
+            .coachAnchor(.search)
             iconButton("heart.text.square", active: state.overlay == .saved) { toggleOverlay(.saved) }
             // 连接平台：和收藏、设置一样的图标按钮，不抢视觉；悬停显示已连接几个
             iconButton("person.crop.circle.badge.plus", active: state.overlay == .connections) { toggleOverlay(.connections) }
@@ -88,6 +99,11 @@ struct ExpandedPanel: View {
         }
         .padding(.horizontal, 18)
         .frame(height: 40)
+    }
+
+    private func startOnboarding() {
+        guard !state.feed.cards.isEmpty, state.overlay == .none, !state.search.active, !state.connectedContentPlatforms.isEmpty else { return }
+        state.onboarding.startIfNeeded()
     }
 
     private func toggleOverlay(_ o: AppState.Overlay) {
@@ -121,9 +137,13 @@ struct ExpandedPanel: View {
             StatusView(text: "本地服务启动失败", detail: msg)
         case .ready:
             if state.connectedContentPlatforms.isEmpty && !state.platforms.isEmpty {
-                StatusView(text: "还没有连接任何平台", detail: "连接小红书、B 站、X 等账号后就能开刷", action: ("连接平台", { state.overlay = .connections }))
+                if state.onboarding.done {
+                    StatusView(text: "还没有连接任何平台", detail: "连接小红书、B 站、快手等账号后就能开刷", action: ("连接平台", { state.overlay = .connections }))
+                } else {
+                    OnboardingWelcome(state: state)
+                }
             } else {
-                FeedView(state: state, feed: state.feed)
+                FeedView(state: state, feed: state.feed).coachAnchor(.card)
             }
         }
     }
