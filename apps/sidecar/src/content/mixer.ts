@@ -399,6 +399,24 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
   }
 
   /**
+   * 现在为什么没货、什么时候能恢复（推荐流空了时给 App 选「在路上」还是「休息站」卡片）：
+   * 每个启用的平台取「冷却结束 / 额度窗口滑过」的时间，取最早的那个；两分钟内能恢复算 waiting，否则 resting。
+   */
+  availability(): { state: 'ok' | 'waiting' | 'resting'; resumeAt: number | null } {
+    if (this.ready.length > 0) return { state: 'ok', resumeAt: null }
+    const now = this.now()
+    const times: number[] = []
+    for (const s of this.sources.values()) {
+      if (s.status === 'auth') continue
+      const cooled = s.status === 'active' ? now : Math.max(now, s.until)
+      times.push(Math.max(cooled, this.budgetAt(s, now)))
+    }
+    if (times.length === 0) return { state: 'waiting', resumeAt: null }
+    const resumeAt = Math.min(...times)
+    return { state: resumeAt - now > 120_000 ? 'resting' : 'waiting', resumeAt }
+  }
+
+  /**
    * 搜索也走同一个平台预算：返回还要等多少毫秒，并把这次请求记上。
    * 平台没在推荐流里（没勾选）时单独记账，规则相同。
    */

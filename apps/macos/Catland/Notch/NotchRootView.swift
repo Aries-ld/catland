@@ -89,7 +89,12 @@ struct CollapsedView: View {
                                      season: SceneSeason.of(env.date, latitude: state.location.latitude),
                                      speakers: state.speakers, sleeping: state.sleepingCats)
         let host = state.speakers.first { !state.sleepingCats.contains($0) } ?? state.speakers.first ?? .box
-        return events.map(host.say) + BubbleCopy.rotation(ctx, seed: state.hoverSession)
+        // 推荐流在「休息站」：悬停第一句是还要歇多久
+        var rest: [String] = []
+        if let p = state.feed.pause, p.mode == .resting, !p.arrived, let r = p.resumeAt, r > env.date {
+            rest = [p.speaker.say("还要歇 \(EventScheduler.countdown(r.timeIntervalSince(env.date)))，先去忙吧")]
+        }
+        return rest + events.map(host.say) + BubbleCopy.rotation(ctx, seed: state.hoverSession)
     }
 
     var body: some View {

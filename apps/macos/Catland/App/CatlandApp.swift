@@ -86,6 +86,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 case "cats:dump": AppLog.info("cats", CatDirector.shared.debugDump())
                 case "search:close": self.state.closeSearch()
                 case "render:cities": SceneSnapshot.renderCities()
+                case "feed:pause": self.state.feed.debugPause()
+                case "render:pause":
+                    // 离屏渲染猫猫卡的三种状态：在路上 / 搬到了 / 休息站
+                    let size = CGSize(width: 384, height: 600)
+                    let states: [(String, PauseInfo)] = [
+                        ("waiting", PauseInfo(mode: .waiting, resumeAt: nil, speaker: .shushu, cats: [.shushu], single: true, line: 0)),
+                        ("arrived", PauseInfo(mode: .waiting, resumeAt: nil, arrived: true, speaker: .shushu, cats: [.shushu], single: true, line: 0)),
+                        ("resting", PauseInfo(mode: .resting, resumeAt: Date().addingTimeInterval(754), speaker: .tietie, cats: [.shushu, .doudou, .tietie, .bibi], single: false, line: 0)),
+                    ]
+                    for (name, info) in states {
+                        let r = ImageRenderer(content: PauseCardView(pause: info, size: size).clipShape(RoundedRectangle(cornerRadius: 18))); r.scale = 2
+                        if let cg = r.cgImage, let d = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) { try? d.write(to: URL(fileURLWithPath: "/tmp/pause-\(name).png")) }
+                    }
                 case let c where c.hasPrefix("render:covers:"):
                     // 后台搜一个词（不弹面板），封面加载完后离屏渲染瀑布流，检查封面比例和时长标注
                     let search = self.state.search

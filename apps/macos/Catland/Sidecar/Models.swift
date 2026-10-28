@@ -97,6 +97,13 @@ struct SearchResult: Codable {
 struct FeedNext: Codable {
     let cards: [FeedCard]
     let sources: [String]
+    /// 没货时：waiting（马上有）/ resting（要歇一阵），resumeAt 是预计恢复的时间（毫秒时间戳）。
+    let availability: Availability?
+}
+
+struct Availability: Codable {
+    let state: String
+    let resumeAt: Double?
 }
 
 struct Account: Codable, Hashable {

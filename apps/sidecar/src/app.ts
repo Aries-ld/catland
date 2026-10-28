@@ -168,7 +168,7 @@ export class App {
         const cards = await this.mixer.next(optInt(p, 'count', 1, 10) ?? 1, { waitMs: optInt(p, 'waitMs', 0, 15_000) ?? 0 })
         cards.forEach((c) => this.remember(c))
         const states = this.store.states(cards.map((c) => c.key))
-        return { cards: cards.map((c) => ({ ...c, ...states[c.key]! })), sources: this.enabled }
+        return { cards: cards.map((c) => ({ ...c, ...states[c.key]! })), sources: this.enabled, availability: cards.length > 0 ? { state: 'ok', resumeAt: null } : this.mixer.availability() }
       })
       .register('feed.refresh', async (p) => {
         const card = await this.mixer.refresh(str(p, 'key'))

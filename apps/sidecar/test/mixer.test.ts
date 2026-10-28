@@ -353,4 +353,17 @@ describe('FeedMixer', () => {
     m.setSources([a])
     m.stop()
   })
+
+  it('availability：额度用完要等很久时是 resting，并给出恢复时间', () => {
+    let now = 0
+    const a = new FakeAdapter('xhs')
+    const m = new FeedMixer({ logger: createMemoryLogger(), now: () => now, platformRequestsPerMinute: { xhs: 1000 }, platformRequestsPerHour: { xhs: 2 } })
+    m.setSources([a])
+    m.stop()
+    expect(m.availability().state).toBe('waiting')
+    m.acquire('xhs'); m.acquire('xhs')
+    const av = m.availability()
+    expect(av.state).toBe('resting')
+    expect(av.resumeAt).toBe(3_600_000)
+  })
 })

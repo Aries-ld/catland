@@ -22,7 +22,13 @@ struct FeedView: View {
                     }
                 }
                 ForEach(visible, id: \.card.key) { entry in
-                    CardView(state: state, feed: feed, card: entry.card, isCurrent: entry.offset == 0, size: geo.size)
+                    Group {
+                        if entry.card.isPause, let p = feed.pause {
+                            PauseCardView(pause: p, size: geo.size)
+                        } else {
+                            CardView(state: state, feed: feed, card: entry.card, isCurrent: entry.offset == 0, size: geo.size)
+                        }
+                    }
                         .frame(width: geo.size.width, height: geo.size.height)
                         .offset(y: CGFloat(entry.offset) * geo.size.height)
                         .zIndex(entry.offset == 0 ? 1 : 0)

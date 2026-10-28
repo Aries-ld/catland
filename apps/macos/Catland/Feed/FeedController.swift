@@ -32,6 +32,12 @@ final class FeedController {
     private var loader: (() async -> [FeedCard])?
     private var refresher: ((String) async -> FeedCard?)?
     private var exhausted = false
+    /// 推荐流暂时没货时插入的猫猫卡（PauseCard.swift）。
+    private(set) var pause: PauseInfo?
+    private var pauseTask: Task<Void, Never>?
+    private var lastAvailability: Availability?
+    private var lastSources: [String] = []
+    private var pauseCount = 0
 
     init(sidecar: SidecarClient) {
         self.sidecar = sidecar
@@ -46,6 +52,8 @@ final class FeedController {
         cards = []
         index = 0
         carouselIndex = 0
+        pause = nil
+        pauseTask?.cancel()
         paused = false
         exhausted = false
         retried = []
@@ -72,8 +80,13 @@ final class FeedController {
     }
 
     func next() {
+        // 停在猫猫卡上：新内容到了才能往下划
+        if current?.isPause == true, pause?.arrived != true { return }
         guard index + 1 < cards.count else {
-            Task { await fetchMore(wait: 5_000); if index + 1 < cards.count { next() } }
+            Task {
+                await fetchMore(wait: 1_500)
+                if index + 1 < cards.count { next() } else if loader == nil { enterPause() }
+            }
             return
         }
         reportView()
@@ -94,6 +107,12 @@ final class FeedController {
     }
 
     private func afterMove() {
+        // 划过了已经就绪的猫猫卡：把它从队列里拿掉
+        if let pi = cards.firstIndex(where: \.isPause), pi < index, pause?.arrived == true {
+            cards.remove(at: pi)
+            index -= 1
+            pause = nil
+        }
         viewStartedAt = Date()
         paused = false
         carouselIndex = 0
@@ -119,6 +138,7 @@ final class FeedController {
     }
 
     func setInteract(_ card: FeedCard, kind: String, on: Bool) async {
+        guard !card.isPause else { return }
         AppLog.info("interact", ["key": card.key, "kind": kind, "on": on, "video": card.isVideo])
         guard let i = cards.firstIndex(where: { $0.key == card.key }) else { return }
         if kind == "like" { cards[i].liked = on } else { cards[i].collected = on }
@@ -150,6 +170,8 @@ final class FeedController {
         do {
             let t0 = Date()
             let r: FeedNext = try await sidecar.call("feed.next", ["count": 6, "waitMs": wait])
+            lastAvailability = r.availability
+            lastSources = r.sources
             let known = Set(cards.map(\.key))
             cards.append(contentsOf: r.cards.filter { !known.contains($0.key) })
             AppLog.info("feed.next", ["got": r.cards.count, "total": cards.count, "index": index, "ms": Int(Date().timeIntervalSince(t0) * 1000), "kinds": r.cards.map { "\($0.platform):\($0.kind):\($0.cover != nil)" }])
@@ -157,6 +179,53 @@ final class FeedController {
             trimHistory()
         } catch {
             log.error("feed.next failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// 没货了：在队尾插一张猫猫卡并停在上面，后台继续等新内容（按限速规则，不额外加请求）。
+    private func enterPause() {
+        guard current?.isPause != true, !cards.contains(where: \.isPause) else { return }
+        let cats = lastSources.compactMap(Persona.forPlatform)
+        pauseCount += 1
+        pause = PauseInfo(mode: lastAvailability?.state == "resting" ? .resting : .waiting,
+                          resumeAt: lastAvailability?.resumeAt.map { Date(timeIntervalSince1970: $0 / 1000) },
+                          speaker: cats.isEmpty ? .box : cats[pauseCount % cats.count], cats: cats.isEmpty ? [.box] : cats,
+                          single: lastSources.count == 1, line: pauseCount)
+        AppLog.info("feed pause", ["mode": lastAvailability?.state ?? "waiting", "sources": lastSources])
+        reportView()
+        cards.append(.pause())
+        index = cards.count - 1
+        viewStartedAt = Date()
+        players.pauseAll()
+        pauseTask?.cancel()
+        pauseTask = Task { [weak self] in await self?.waitForContent() }
+    }
+
+    /// 调试：立刻插一张猫猫卡（catland-debug feed:pause），验证新内容到了会提示往下滑。
+    func debugPause() {
+        lastAvailability = Availability(state: "waiting", resumeAt: nil)
+        enterPause()
+    }
+
+    /// 停在猫猫卡上时：一直等新内容（sidecar 那边按平台预算排队），到了就提示往下滑。
+    private func waitForContent() async {
+        while !Task.isCancelled, pause != nil, pause?.arrived == false {
+            guard let r: FeedNext = try? await sidecar.call("feed.next", ["count": 4, "waitMs": 12_000]) else {
+                try? await Task.sleep(for: .seconds(5)); continue
+            }
+            if !r.cards.isEmpty {
+                let known = Set(cards.map(\.key))
+                cards.append(contentsOf: r.cards.filter { !known.contains($0.key) })
+                pause?.arrived = true
+                AppLog.info("feed pause: content arrived", ["got": r.cards.count])
+                preload()
+                return
+            }
+            if let a = r.availability {
+                pause?.mode = a.state == "resting" ? .resting : .waiting
+                pause?.resumeAt = a.resumeAt.map { Date(timeIntervalSince1970: $0 / 1000) }
+            }
+            if pause?.mode == .resting { try? await Task.sleep(for: .seconds(10)) }
         }
     }
 
@@ -184,7 +253,7 @@ final class FeedController {
     }
 
     private func reportView() {
-        guard let c = current else { return }
+        guard let c = current, !c.isPause else { return }
         let dwell = Int(Date().timeIntervalSince(viewStartedAt) * 1000)
         Task { _ = try? await sidecar.callRaw("feed.view", ["key": c.key, "dwellMs": dwell]) }
     }
