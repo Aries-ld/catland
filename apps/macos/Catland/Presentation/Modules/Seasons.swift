@@ -180,8 +180,12 @@ struct SeasonOrnamentLayer: SceneLayer {
         let lit = 1 - c.dark * 0.25
         func col(_ hex: UInt32) -> Color { c.rgb(hex).mix(c.rgb(0x1A1A24), 1 - lit).color }
         let right = c.cols - 1
-        // 镜像绘制：左上角 (x) 与右上角 (right - x)
-        func both(_ x: Int, _ y: Int, _ w: Int = 1, _ h: Int = 1, _ color: Color) { c.fill(x, y, w, h, color); c.fill(right - x - w + 1, y, w, h, color) }
+        // 镜像绘制：左上角 (x) 与右上角 (right - x)。只占窗角 7 格以内，别挡住两侧的地标（楼顶、天线）。
+        func both(_ x: Int, _ y: Int, _ w: Int = 1, _ h: Int = 1, _ color: Color) {
+            let w = min(w, 7 - x)
+            guard w > 0 else { return }
+            c.fill(x, y, w, h, color); c.fill(right - x - w + 1, y, w, h, color)
+        }
         let sway = Int((sin(c.t * 1.2) * 0.6).rounded())
         switch c.seasonStyle.ornament {
         case .blossomBranch(let palette), .maple(let palette):

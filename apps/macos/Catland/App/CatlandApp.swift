@@ -85,6 +85,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 case "den": CatDirector.shared.forceDen = true
                 case "cats:dump": AppLog.info("cats", CatDirector.shared.debugDump())
                 case "search:close": self.state.closeSearch()
+                case "render:cities": SceneSnapshot.renderCities()
                 case "render:onboarding":
                     // 离屏渲染欢迎页和 3 步高亮讲解（不弹面板、不改引导进度），检查版式
                     @MainActor func save(_ v: some View, _ name: String) {

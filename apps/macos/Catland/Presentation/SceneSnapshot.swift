@@ -119,6 +119,38 @@ enum SceneSnapshot {
         return renderFrame(env: env, size: size, bubble: bubble, scale: scale, to: url)
     }
 
+    /// 城市场景草稿：按真机刘海几何（收起 258×47、悬停 282×75，物理刘海 180×32 画成黑块），白天 / 夜里各一张。
+    /// 调试命令：catland-debug render:cities → /tmp/city-<城市>-<collapsed|hover>-<day|night>.png
+    static func renderCities(scale: CGFloat = 3) {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd HH:mm"; f.timeZone = .current
+        let savedEgg = Eggs.forced, savedExtra = EventScheduler.extra
+        Eggs.forced = "-"; EventScheduler.extra = []
+        defer { Eggs.forced = savedEgg; EventScheduler.extra = savedExtra }
+        let notchSize = CGSize(width: 180, height: 32)
+        for (city, loc) in [("shanghai", SceneLocation.shanghai), ("beijing", SceneLocation.beijing)] {
+            for (state, size) in [("collapsed", CGSize(width: 258, height: 47)), ("hover", CGSize(width: 282, height: 75))] {
+                var notch = NotchGeometry(screenFrame: CGRect(x: 0, y: 0, width: 1512, height: 982), notchSize: notchSize, hasNotch: true, shelf: NotchGeometry.shelfHeight)
+                notch.tunnel = true
+                for (when, date) in [("day", "2026-10-28 14:00"), ("night", "2026-10-28 21:00")] {
+                    guard let d = f.date(from: date) else { continue }
+                    let env = SceneEnv(date: d, condition: "clear", temperature: nil, mouse: 0, location: loc, intensity: 0.7)
+                    let t = d.timeIntervalSinceReferenceDate
+                    let view = ZStack(alignment: .top) {
+                        Canvas { ctx, sz in Presentation.render(SceneCanvas(ctx: ctx, size: sz, p: 1.5, env: env, notch: notch, t: t)) }
+                        UnevenRoundedRectangle(cornerRadii: .init(bottomLeading: 10, bottomTrailing: 10)).fill(Color.black)
+                            .frame(width: notchSize.width, height: notchSize.height)
+                    }
+                    .frame(width: size.width, height: size.height)
+                    .clipShape(UnevenRoundedRectangle(cornerRadii: .init(bottomLeading: 12, bottomTrailing: 12)))
+                    let r = ImageRenderer(content: view); r.scale = scale
+                    if let cg = r.cgImage, let data = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
+                        try? data.write(to: URL(fileURLWithPath: "/tmp/city-\(city)-\(state)-\(when).png"))
+                    }
+                }
+            }
+        }
+    }
+
     private static func noNotch(_ size: CGSize) -> NotchGeometry {
         NotchGeometry(screenFrame: CGRect(origin: .zero, size: size), notchSize: CGSize(width: 0, height: 30), hasNotch: false)
     }
