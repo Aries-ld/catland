@@ -1,14 +1,40 @@
-// 展开面板：顶部板块切换（视频 / 电商）+ 右上角入口（收藏、连接、设置），下面是当前板块内容与浮层。
+// 展开面板：顶部板块切换（视频 / 电商）+ 右上角入口（搜索、收藏、连接、设置），下面是当前板块内容与浮层。
+// 打开搜索后顶栏变成搜索框、内容区变成搜索页（ADR 0004）。
 import SwiftUI
 
 struct ExpandedPanel: View {
     let state: AppState
+    /// 搜索功能的一次性提示气泡（升级后第一次展开时出现）。
+    @AppStorage("searchTipShown") private var searchTipShown = false
+    @State private var showSearchTip = false
 
     var body: some View {
         VStack(spacing: 0) {
-            header
+            Group {
+                if state.search.active {
+                    if state.search.playing { SearchPlayerHeader(state: state) } else { SearchHeader(state: state) }
+                } else {
+                    header
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                if showSearchTip && !state.search.active {
+                    Text("新：一次搜遍四个平台")
+                        .font(.system(size: 11, weight: .medium)).foregroundStyle(.black)
+                        .padding(.horizontal, 9).padding(.vertical, 5)
+                        .background(Capsule().fill(.white))
+                        .offset(x: -96, y: 38)
+                        .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .top)))
+                        .allowsHitTesting(false)
+                }
+            }
+            .zIndex(1)
             ZStack {
-                content
+                if state.search.active {
+                    SearchView(state: state).transition(.opacity)
+                } else {
+                    content
+                }
                 switch state.overlay {
                 case .none: EmptyView()
                 case .connections: ConnectionsView(state: state).transition(.move(edge: .bottom).combined(with: .opacity))
@@ -20,6 +46,13 @@ struct ExpandedPanel: View {
             .padding([.horizontal, .bottom], 8)
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.88), value: state.overlay)
+        .animation(.spring(response: 0.3, dampingFraction: 0.9), value: state.search.active)
+        .onAppear {
+            guard !searchTipShown, !state.searchPlatforms.isEmpty else { return }
+            searchTipShown = true
+            withAnimation { showSearchTip = true }
+            Task { try? await Task.sleep(for: .seconds(6)); withAnimation { showSearchTip = false } }
+        }
     }
 
     private var header: some View {
@@ -42,6 +75,11 @@ struct ExpandedPanel: View {
                 .buttonStyle(.plain)
             }
             Spacer()
+            iconButton("magnifyingglass", active: false) {
+                showSearchTip = false
+                state.openSearch()
+            }
+            .help("一次搜遍几个平台（⌘F）")
             iconButton("heart.text.square", active: state.overlay == .saved) { toggleOverlay(.saved) }
             Button { toggleOverlay(.connections) } label: {
                 HStack(spacing: 4) {
@@ -91,7 +129,7 @@ struct ExpandedPanel: View {
             if state.connectedContentPlatforms.isEmpty && !state.platforms.isEmpty {
                 StatusView(text: "还没有连接任何平台", detail: "连接小红书、B 站、X 等账号后就能开刷", action: ("连接平台", { state.overlay = .connections }))
             } else {
-                FeedView(state: state)
+                FeedView(state: state, feed: state.feed)
             }
         }
     }

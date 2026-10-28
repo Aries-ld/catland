@@ -43,7 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         pager.onPage = { [weak self] dir in self?.page(dir) }
-        pager.onHorizontal = { [weak self] dir in self?.state.feed.carousel(dir) }
+        pager.onHorizontal = { [weak self] dir in self?.state.activeFeed.carousel(dir) }
         #if DEBUG
         setupDebugCommands()
         #endif
@@ -64,8 +64,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 case "hover": self.state.hovering.toggle()
                 case "next": self.page(1)
                 case "prev": self.page(-1)
-                case "right": self.state.feed.carousel(1)
-                case "pause": self.state.feed.togglePause()
+                case "right": self.state.activeFeed.carousel(1)
+                case "pause": self.state.activeFeed.togglePause()
                 case "comments": self.state.commentsOpen.toggle()
                 case "connections", "settings", "saved":
                     if !self.state.expanded { self.toggle() }
@@ -84,6 +84,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self.screenChanged()
                 case "den": CatDirector.shared.forceDen = true
                 case "cats:dump": AppLog.info("cats", CatDirector.shared.debugDump())
+                case "search:close": self.state.closeSearch()
+                case let c where c.hasPrefix("search:play:"):
+                    if let i = Int(c.dropFirst(12)), self.state.search.visibleHits.indices.contains(i) { self.state.search.play(self.state.search.visibleHits[i]) }
+                case let c where c.hasPrefix("search:"):
+                    self.expand(source: "debug")
+                    self.state.openSearch()
+                    let q = String(c.dropFirst(7))
+                    if !q.isEmpty { self.state.search.query = q; self.state.search.submit(platforms: self.state.searchPlatforms) }
                 case "cast:off": self.state.castOverride = nil
                 case "sleep:off": self.state.sleepOverride = nil
                 case let c where c.hasPrefix("sleep:"):
@@ -161,9 +169,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if state.expanded {
             panel.ignoresMouseEvents = false
             panel.makeKey()
-            state.feed.resume()
+            // 搜索页开着但没在播：不恢复推荐流
+            if !state.search.active || state.search.playing { state.activeFeed.resume() }
         } else {
             state.feed.pauseAll()
+            state.search.player.pauseAll()
             panel.resignKey()
             updateMouse(NSEvent.mouseLocation)
         }
@@ -229,6 +239,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } as Any)
         monitors.append(NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel]) { [weak self] e in
             guard let self, self.state.expanded, e.window === self.panel, self.state.overlay == .none, !self.state.commentsOpen else { return e }
+            // 搜索结果瀑布流自己滚动；只有在播搜索结果时才按页翻
+            if self.state.search.active && !self.state.search.playing { return e }
             return self.pager.handle(e) ? nil : e
         } as Any)
         monitors.append(NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] e in
@@ -260,18 +272,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func page(_ dir: Int) {
         withAnimation(.spring(response: 0.34, dampingFraction: 0.86)) {
-            dir > 0 ? state.feed.next() : state.feed.previous()
+            dir > 0 ? state.activeFeed.next() : state.activeFeed.previous()
         }
     }
 
     /// 键盘：↑↓ / J K 翻页，空格暂停，L 点赞，S 收藏，C 评论，M 静音，Esc 收起。
     private func handleKey(_ e: NSEvent) -> Bool {
+        // ⌘F：打开搜索
+        if e.modifierFlags.contains(.command), Int(e.keyCode) == kVK_ANSI_F {
+            if state.search.playing { state.search.stopPlaying() }
+            state.openSearch()
+            return true
+        }
         if e.modifierFlags.intersection([.command, .control, .option]).isEmpty == false { return false }
-        let feed = state.feed
+        // 正在搜索框里打字：只接管 Esc，其余按键交给输入框
+        let typing = panel.firstResponder is NSTextView
+        if typing && Int(e.keyCode) != kVK_Escape { return false }
+        let feed = state.activeFeed
+        let browsingResults = state.search.active && !state.search.playing
         switch Int(e.keyCode) {
         case kVK_Escape:
-            if state.commentsOpen { state.commentsOpen = false } else if state.overlay != .none { state.overlay = .none } else { collapse() }
+            if state.commentsOpen { state.commentsOpen = false }
+            else if state.overlay != .none { state.overlay = .none }
+            else if state.search.playing { withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) { state.search.stopPlaying() } }
+            else if state.search.active { state.closeSearch() }
+            else { collapse() }
             return true
+        case _ where browsingResults: return false
         case kVK_DownArrow, kVK_ANSI_J: if state.overlay == .none, !state.commentsOpen { page(1) }; return true
         case kVK_UpArrow, kVK_ANSI_K: if state.overlay == .none, !state.commentsOpen { page(-1) }; return true
         case kVK_LeftArrow: feed.carousel(-1); return true

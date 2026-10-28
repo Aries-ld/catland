@@ -28,6 +28,10 @@ final class FeedController {
     private var viewStartedAt = Date()
     private var fetching = false
     private var retried = Set<String>()
+    /// 自定义数据源（搜索结果）：设置后从这里取卡片，而不是推荐流 feed.next。
+    private var loader: (() async -> [FeedCard])?
+    private var refresher: ((String) async -> FeedCard?)?
+    private var exhausted = false
 
     init(sidecar: SidecarClient) {
         self.sidecar = sidecar
@@ -35,6 +39,19 @@ final class FeedController {
     }
 
     var current: FeedCard? { cards.indices.contains(index) ? cards[index] : nil }
+
+    /// 换数据源（搜索结果播放用）：清空队列和播放器，之后 prime() 从 loader 取卡片。传 nil 恢复成推荐流。
+    func reset(loader: (() async -> [FeedCard])?, refresher: ((String) async -> FeedCard?)?) {
+        players.retain([])
+        cards = []
+        index = 0
+        carouselIndex = 0
+        paused = false
+        exhausted = false
+        retried = []
+        self.loader = loader
+        self.refresher = refresher
+    }
 
     /// sidecar 就绪后预热首屏，用户点开刘海时通常已经有卡片了。
     func prime() async {
@@ -121,6 +138,15 @@ final class FeedController {
         fetching = true
         loading = cards.count <= index + 1
         defer { fetching = false; loading = false }
+        if let loader {
+            guard !exhausted else { return }
+            let got = await loader()
+            exhausted = got.isEmpty
+            let known = Set(cards.map(\.key))
+            cards.append(contentsOf: got.filter { !known.contains($0.key) })
+            empty = cards.isEmpty
+            return
+        }
         do {
             let t0 = Date()
             let r: FeedNext = try await sidecar.call("feed.next", ["count": 6, "waitMs": wait])
@@ -167,7 +193,9 @@ final class FeedController {
     private func playbackFailed(_ key: String) async {
         guard let i = cards.firstIndex(where: { $0.key == key }) else { return }
         log.error("playback failed \(key, privacy: .public)")
-        if !retried.contains(key), let fresh: FeedCard = try? await sidecar.call("feed.refresh", ["key": key]) {
+        let fresh: FeedCard? = retried.contains(key) ? nil
+            : (refresher != nil ? await refresher!(key) : try? await sidecar.call("feed.refresh", ["key": key]))
+        if let fresh {
             retried.insert(key)
             var card = fresh
             card.liked = cards[i].liked

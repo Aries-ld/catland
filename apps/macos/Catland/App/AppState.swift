@@ -14,6 +14,10 @@ final class AppState {
 
     let sidecar = SidecarClient()
     let feed: FeedController
+    /// 跨平台搜索（搜索页 + 搜索结果的播放器）。
+    let search: SearchController
+    /// 当前在播的那一套卡片：正在看搜索结果时是搜索的播放器，否则是推荐流。
+    var activeFeed: FeedController { search.playing ? search.player : feed }
     private let log = Logger(subsystem: "app.catland", category: "app")
 
     var phase: Phase = .starting
@@ -148,6 +152,27 @@ final class AppState {
 
     init() {
         feed = FeedController(sidecar: sidecar)
+        search = SearchController(sidecar: sidecar)
+    }
+
+    /// 能搜索的平台：正常连接（登录没失效）的内容平台。
+    var searchPlatforms: [String] {
+        connectedContentPlatforms.filter { $0.health != "expired" && sourceStatus[$0.id] != "auth" }.map(\.id)
+    }
+
+    /// 打开搜索页：暂停推荐流。
+    func openSearch() {
+        overlay = .none
+        commentsOpen = false
+        feed.pauseAll()
+        search.open()
+    }
+
+    /// 关闭搜索页：回到推荐流，接着刚才那条播。
+    func closeSearch() {
+        search.close()
+        commentsOpen = false
+        if expanded { feed.resume() }
     }
 
     var connectedContentPlatforms: [PlatformState] {
@@ -394,6 +419,7 @@ final class AppState {
         expanded = false
         overlay = .none
         feed.pauseAll()
+        search.player.pauseAll()
     }
 }
 

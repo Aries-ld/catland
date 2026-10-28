@@ -57,6 +57,34 @@ struct FeedCard: Codable, Identifiable, Hashable {
     }
 }
 
+/// 搜索结果（只用于封面网格，点开时再 search.resolve 成 FeedCard）。
+struct SearchHit: Codable, Identifiable, Hashable {
+    let key: String
+    let platform: String
+    let id: String
+    let url: String
+    let kind: String
+    let title: String?
+    let author: UserRef?
+    let cover: ImageSource?
+    let stats: ItemStats
+    let duration: Double?
+
+    /// 封面宽高比（宽 / 高），未知时按 3:4。
+    var aspect: Double {
+        if let c = cover, let w = c.width, let h = c.height, w > 0, h > 0 { return w / h }
+        return 3.0 / 4.0
+    }
+}
+
+struct SearchResult: Codable {
+    /// ok / resting（平台在风控冷却）/ auth（登录失效）/ unsupported
+    let status: String
+    let hits: [SearchHit]
+    let cursor: String?
+    let hasMore: Bool
+}
+
 struct FeedNext: Codable {
     let cards: [FeedCard]
     let sources: [String]

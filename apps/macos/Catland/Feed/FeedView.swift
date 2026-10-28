@@ -5,21 +5,24 @@ import SwiftUI
 
 struct FeedView: View {
     let state: AppState
-    private var feed: FeedController { state.feed }
+    /// 推荐流或搜索结果的播放器。
+    var feed: FeedController
 
     var body: some View {
         GeometryReader { geo in
             ZStack {
                 Color(white: 0.04)
                 if feed.cards.isEmpty {
-                    if state.allSourcesResting {
+                    if feed !== state.feed {
+                        StatusView(text: feed.loading ? "猫正在把它叼过来…" : "这条打不开了", detail: feed.loading ? nil : "回到结果换一条试试")
+                    } else if state.allSourcesResting {
                         StatusView(text: "各平台都在歇口气", detail: "刷得有点猛啦，稍后会自动恢复，先喝口水吧")
                     } else {
                         StatusView(text: feed.loading ? "小猫正在搬运内容…" : "暂时没有新内容", detail: feed.loading ? nil : "稍后再来，或在设置里多勾选几个信息源")
                     }
                 }
                 ForEach(visible, id: \.card.key) { entry in
-                    CardView(state: state, card: entry.card, isCurrent: entry.offset == 0, size: geo.size)
+                    CardView(state: state, feed: feed, card: entry.card, isCurrent: entry.offset == 0, size: geo.size)
                         .frame(width: geo.size.width, height: geo.size.height)
                         .offset(y: CGFloat(entry.offset) * geo.size.height)
                         .zIndex(entry.offset == 0 ? 1 : 0)
@@ -58,6 +61,7 @@ struct FeedView: View {
 
 struct CardView: View {
     let state: AppState
+    let feed: FeedController
     let card: FeedCard
     let isCurrent: Bool
     let size: CGSize
@@ -68,7 +72,6 @@ struct CardView: View {
     /// 多图帖子：可以左右切换（触控板横滑、方向键、鼠标左右拖动、两侧按钮）。
     private var isGallery: Bool { !card.isVideo && card.images.count > 1 }
 
-    private var feed: FeedController { state.feed }
     /// 画面比例接近面板时铺满（抖音式），否则完整显示并以模糊封面垫底。
     private var fill: Bool { abs(card.aspect - size.width / size.height) < 0.12 }
 
