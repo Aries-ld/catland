@@ -21,6 +21,8 @@ struct VideoSource: Codable, Hashable {
     let width: Double?
     let height: Double?
     let duration: Double?
+    /// HLS 播放列表（地址可能以 .mp4 结尾，见 sidecar isHls）。
+    let hls: Bool?
 }
 
 struct ImageSource: Codable, Hashable {

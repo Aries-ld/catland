@@ -188,6 +188,7 @@ final class AppState {
             let hello: HelloResult = try await sidecar.call("app.hello")
             settings = hello.settings
             feed.muted = settings.muted
+            search.player.muted = settings.muted
             phase = .ready
             startWeather()
             startEventWatcher()
@@ -296,6 +297,7 @@ final class AppState {
     func setMuted(_ muted: Bool) {
         settings.muted = muted
         feed.muted = muted
+        search.player.muted = muted
         Task { let _: Settings? = try? await sidecar.call("settings.update", ["muted": muted]) }
     }
 

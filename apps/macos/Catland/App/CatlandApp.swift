@@ -85,6 +85,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 case "den": CatDirector.shared.forceDen = true
                 case "cats:dump": AppLog.info("cats", CatDirector.shared.debugDump())
                 case "search:close": self.state.closeSearch()
+                case let c where c.hasPrefix("search:filter:"):
+                    let f = String(c.dropFirst(14)); self.state.search.filter = f == "all" ? nil : f
+                case "search:next": self.page(1)
                 case let c where c.hasPrefix("search:play:"):
                     if let i = Int(c.dropFirst(12)), self.state.search.visibleHits.indices.contains(i) { self.state.search.play(self.state.search.visibleHits[i]) }
                 case let c where c.hasPrefix("search:"):

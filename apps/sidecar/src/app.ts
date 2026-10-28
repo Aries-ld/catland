@@ -166,7 +166,7 @@ export class App {
         return this.search.query(platform(p), query, optStr(p, 'cursor') ?? null)
       })
       .register('search.resolve', async (p) => {
-        const card = await this.search.resolve(str(p, 'key'))
+        const card = await this.search.resolve(str(p, 'key'), p.fresh === true)
         if (!card) return null
         this.remember(card)
         return { ...card, ...this.store.states([card.key])[card.key]! }

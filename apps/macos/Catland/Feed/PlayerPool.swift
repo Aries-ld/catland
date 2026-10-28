@@ -22,7 +22,10 @@ final class PlayerPool {
     func prepare(_ card: FeedCard) {
         guard entries[card.key] == nil, let v = card.video, let url = URL(string: v.url) else { return }
         // 媒体 CDN 的防盗链头由 sidecar 按平台给出；不经过本地代理。
-        let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": v.headers])
+        var options: [String: Any] = ["AVURLAssetHTTPHeaderFieldsKey": v.headers]
+        // 地址以 .mp4 结尾的 HLS（快手）：按扩展名会被当成 MP4 解析而卡在首帧，显式指定 MIME
+        if v.hls == true { options[AVURLAssetOverrideMIMETypeKey] = "application/vnd.apple.mpegurl" }
+        let asset = AVURLAsset(url: url, options: options)
         let item = AVPlayerItem(asset: asset)
         item.preferredForwardBufferDuration = 4
         let player = AVPlayer(playerItem: item)

@@ -237,7 +237,7 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
     const s = d && this.sources.get(d.platform)
     if (!d || !s) return null
     try {
-      return await s.adapter.resolve(d.item, s.abort.signal)
+      return await s.adapter.resolve(d.item, s.abort.signal, true) // 一定重新取地址，别复用可能已失效的
     } catch (err) {
       this.onError(s, err, 'refresh')
       return null

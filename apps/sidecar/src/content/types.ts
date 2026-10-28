@@ -9,6 +9,8 @@ export interface VideoSource {
   width: number | null
   height: number | null
   duration: number | null
+  /** HLS 播放列表（m3u8）。快手部分视频的地址以 .mp4 结尾、实际是 HLS，客户端要显式告诉播放器，否则卡在首帧。 */
+  hls?: boolean
 }
 
 export interface ImageSource {
@@ -64,8 +66,11 @@ export interface PlatformAdapter {
   readonly platform: string
   fetchFeed(cursor: string | null, signal?: AbortSignal): Promise<FeedPage>
   search?(query: string, cursor: string | null, signal?: AbortSignal): Promise<FeedPage>
-  /** 返回 null 表示这条内容不适合放进刷刷流（纯文字、没有可用媒体等）。 */
-  resolve(item: Item, signal?: AbortSignal): Promise<FeedCard | null>
+  /**
+   * 返回 null 表示这条内容不适合放进刷刷流（纯文字、没有可用媒体等）。
+   * fresh：播放失败后重新解析，不复用列表里自带的媒体地址（它可能已经失效），一定重新取详情。
+   */
+  resolve(item: Item, signal?: AbortSignal, fresh?: boolean): Promise<FeedCard | null>
 }
 
 export const cardKey = (platform: string, id: string) => `${platform}:${id}`

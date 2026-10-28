@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { toSearchHit } from '../src/content/adapters.ts'
+import { isHls, toSearchHit } from '../src/content/adapters.ts'
 import { CatbusCallError } from '../src/catbus/runner.ts'
 import type { Item } from '../src/catbus/types.ts'
 import { FeedMixer } from '../src/content/mixer.ts'
@@ -64,6 +64,14 @@ describe('toSearchHit', () => {
   })
 })
 
+describe('isHls', () => {
+  it('spots Kuaishou realtime remux playlists that end in .mp4', () => {
+    expect(isHls('https://v23-vod-3.kwaicdn.com/vod-rt-remux/hls-ts/v0/REALTIME_REMUX_TS_4999/video-def/enc_1_b.mp4/1_15bb.m3u8?x=1')).toBe(true)
+    expect(isHls('https://v23-vod-3.kwaicdn.com/vod-rt-remux/hls-ts/v0/REALTIME_REMUX_TS_4999/video-def/enc_1_b.mp4/1_15bb')).toBe(true)
+    expect(isHls('https://v1.kwaicdn.com/ksc2/abc.mp4?pkey=1')).toBe(false)
+  })
+})
+
 describe('SearchService', () => {
   it('returns hits per platform with a cursor for the next page', async () => {
     const { search, adapters } = setup()
@@ -117,6 +125,18 @@ describe('SearchService', () => {
     adapters.get('xhs')!.error = new Error('boom')
     await expect(search.query('xhs', '露营')).rejects.toThrow('boom')
     expect(mixer.statusOf('xhs')).toBe('active')
+  })
+
+  it('a retry after a playback failure asks for a fresh address', async () => {
+    const { search, adapters } = setup()
+    await search.query('xhs', '露营')
+    const calls: boolean[] = []
+    const a = adapters.get('xhs')!
+    const orig = a.resolve.bind(a)
+    a.resolve = async (it: Item, _signal?: AbortSignal, fresh?: boolean) => { calls.push(fresh ?? false); return orig(it) }
+    await search.resolve('xhs:0')
+    await search.resolve('xhs:0', true)
+    expect(calls).toEqual([false, true])
   })
 
   it('resolves an opened hit into a playable card', async () => {

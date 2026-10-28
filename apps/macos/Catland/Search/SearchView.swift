@@ -89,6 +89,8 @@ struct SearchView: View {
                         StatusView(text: search.allUnavailable ? "猫们都在打盹" : "没找到相关内容",
                                    detail: search.allUnavailable ? "各平台刚搜得有点多，过一会儿再试试" : "换个关键词试试")
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if let f = search.filter, search.visibleHits.isEmpty {
+                        filteredEmpty(f)
                     } else {
                         results
                     }
@@ -96,6 +98,18 @@ struct SearchView: View {
             }
         }
         .animation(.spring(response: 0.32, dampingFraction: 0.9), value: search.playing)
+    }
+
+    /// 筛选到某个平台、它一条都没有：说清楚是还在找、没找到、在打盹还是要重新登录，不要一直转圈。
+    private func filteredEmpty(_ p: String) -> some View {
+        let cat = Persona.forPlatform(p)?.name ?? "猫"
+        let (title, detail): (String, String?) = switch search.states[p]?.status {
+        case .loading, nil: ("\(cat)还在找…", nil)
+        case .resting: ("\(cat)在打盹", "\(PlatformBrand.shortName(p))刚搜得有点多，过一会儿再试试")
+        case .auth: ("\(cat)出不了门", "\(PlatformBrand.shortName(p))的登录过期了，去「连接」里重新登录")
+        default: ("\(cat)在\(PlatformBrand.shortName(p))没找到", "看看别的平台，或换个关键词")
+        }
+        return StatusView(text: title, detail: detail).frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - 筛选条
@@ -190,7 +204,8 @@ struct SearchView: View {
         let width = (NotchGeometry.expandedSize.width - 16 - 24 - 8) / 2
         let columns = Self.masonry(list, width: width)
         return ScrollView {
-            VStack(spacing: 10) {
+            // 外层也要惰性：普通 VStack 里底部的「加载更多」一创建就会 onAppear，没滑到底就开始翻页
+            LazyVStack(spacing: 10) {
                 if search.searching { CatsOut(state: state, compact: true) }
                 HStack(alignment: .top, spacing: 8) {
                     ForEach(0..<2, id: \.self) { c in

@@ -97,12 +97,12 @@ export class SearchService {
     }
   }
 
-  /** 点开一条搜索结果：解析出可播放媒体。 */
-  async resolve(key: string): Promise<FeedCard | null> {
+  /** 点开一条搜索结果：解析出可播放媒体。fresh：播放失败后重新取地址。 */
+  async resolve(key: string, fresh = false): Promise<FeedCard | null> {
     const d = this.items.get(key)
     if (!d) return null
     try {
-      return await this.deps.adapterFor(d.platform).resolve(d.item)
+      return await this.deps.adapterFor(d.platform).resolve(d.item, undefined, fresh)
     } catch (err) {
       this.deps.mixer.reportError(d.platform, err)
       throw err

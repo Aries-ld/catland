@@ -36,11 +36,18 @@ final class SearchController {
     private var generation = 0
     /// 各平台已返回、还没并入 hits 的结果（按平台排队，轮流取出）。
     private var queues: [String: [SearchHit]] = [:]
+    /// 后台按游标预取好的下一页（还没显示）：滑到底时直接放进来，不用等。
+    private var reserve: [String: [SearchHit]] = [:]
+    /// 正在预取下一页的平台；waiting 里的平台预取一回来就直接显示（用户已经滑到底了）。
+    private var prefetching: Set<String> = []
+    private var wantMore: Set<String> = []
     private var lastPlatform: String?
     private var run = 0
     private var playOffset = 0
     private static let recentKey = "recentSearches"
     static let maxRun = 3
+    /// 第一屏（两列各两张）：先回来的平台可以先把它铺满，让结果「一下子就出来」。
+    static let firstScreen = 4
 
     init(sidecar: SidecarClient) {
         self.sidecar = sidecar
@@ -50,7 +57,11 @@ final class SearchController {
 
     var searching: Bool { states.values.contains { $0.status == .loading } }
     var visibleHits: [SearchHit] { filter.map { f in hits.filter { $0.platform == f } } ?? hits }
-    var hasMore: Bool { states.values.contains { $0.hasMore } }
+    /// 当前筛选下还有没有下一页（含已预取、还没显示的）。
+    var hasMore: Bool {
+        let ps = filter.map { [$0] } ?? platforms
+        return ps.contains { states[$0]?.hasMore == true || !(reserve[$0]?.isEmpty ?? true) || !(queues[$0]?.isEmpty ?? true) }
+    }
     var allUnavailable: Bool { !states.isEmpty && states.values.allSatisfy { $0.status == .resting || $0.status == .auth || $0.status == .failed } }
 
     func open() {
@@ -74,6 +85,9 @@ final class SearchController {
         filter = filter.flatMap { ids.contains($0) ? $0 : nil }
         hits = []
         queues = [:]
+        reserve = [:]
+        prefetching = []
+        wantMore = []
         lastPlatform = nil
         run = 0
         states = Dictionary(uniqueKeysWithValues: ids.map { ($0, PlatformState()) })
@@ -82,16 +96,27 @@ final class SearchController {
         for p in ids { Task { await fetch(p, cursor: nil, gen: gen) } }
     }
 
-    /// 滑到底：还有下一页的平台各再取一页。
+    /// 滑到底：把后台预取好的下一页直接放进来，并接着预取再下一页；还没预取到的，等它回来就直接显示。
     func loadMore() {
         guard !searching else { return } // 第一页还没都回来时不翻页，免得快的平台挤占结果
-        let gen = generation
-        for p in platforms {
-            guard var s = states[p], s.status == .ok, s.hasMore, !s.loadingMore, let c = s.cursor else { continue }
-            s.loadingMore = true
-            states[p] = s
-            Task { await fetch(p, cursor: c, gen: gen) }
+        for p in filter.map({ [$0] }) ?? platforms {
+            if let r = reserve[p], !r.isEmpty {
+                queues[p, default: []] += r
+                reserve[p] = []
+            } else if prefetching.contains(p) {
+                wantMore.insert(p)
+            }
+            prefetch(p)
         }
+        drain()
+    }
+
+    /// 后台按游标取下一页，先放在 reserve 里不显示。
+    private func prefetch(_ p: String) {
+        guard let s = states[p], s.status == .ok, s.hasMore, let c = s.cursor, !prefetching.contains(p), reserve[p]?.isEmpty ?? true else { return }
+        prefetching.insert(p)
+        let gen = generation
+        Task { await fetch(p, cursor: c, gen: gen, intoReserve: true) }
     }
 
     func useRecent(_ q: String) {
@@ -105,22 +130,29 @@ final class SearchController {
 
     /// 点开一条结果：从它开始，在当前筛选结果里上下划着看。
     func play(_ hit: SearchHit) {
-        let list = visibleHits
-        guard let start = list.firstIndex(of: hit) else { return }
+        guard let start = visibleHits.firstIndex(of: hit) else { return }
         playOffset = start
         var next = start
         let sidecar = self.sidecar
-        player.reset {
-            // 每次解析接下来的 2 条（第一次从点开的那条开始），解析不出来的跳过
+        player.reset { [weak self] in
+            // 每次解析接下来的 2 条（第一次从点开的那条开始），解析不出来的跳过；
+            // 刷到结果末尾时加载下一页，在搜索词下一直刷下去
             var out: [FeedCard] = []
-            while out.count < 2, next < list.count {
-                let h = list[next]
+            while out.count < 2 {
+                guard let self else { break }
+                if next >= self.visibleHits.count {
+                    guard self.hasMore else { break }
+                    self.loadMore()
+                    for _ in 0..<30 where next >= self.visibleHits.count { try? await Task.sleep(for: .milliseconds(200)) }
+                    if next >= self.visibleHits.count { break }
+                }
+                let h = self.visibleHits[next]
                 next += 1
                 if let card: FeedCard = try? await sidecar.call("search.resolve", ["key": h.key]) { out.append(card) }
             }
             return out
         } refresher: { key in
-            try? await sidecar.call("search.resolve", ["key": key])
+            try? await sidecar.call("search.resolve", ["key": key, "fresh": true])
         }
         playing = true
         Task { await player.prime() }
@@ -135,12 +167,13 @@ final class SearchController {
 
     // MARK: - 内部
 
-    private func fetch(_ p: String, cursor: String?, gen: Int) async {
+    private func fetch(_ p: String, cursor: String?, gen: Int, intoReserve: Bool = false) async {
         var params: [String: Any] = ["platform": p, "query": submitted]
         if let cursor { params["cursor"] = cursor }
         let result: SearchResult? = try? await sidecar.call("search.query", params)
         guard gen == generation, var s = states[p] else { return } // 已经换了关键词：丢弃旧结果
         s.loadingMore = false
+        if intoReserve { prefetching.remove(p) }
         guard let r = result else {
             if s.count == 0 { s.status = .failed }
             states[p] = s
@@ -152,14 +185,21 @@ final class SearchController {
         case "auth": s.status = .auth
         default: s.status = .failed
         }
-        let known = Set(hits.map(\.key))
+        let known = Set(hits.map(\.key)).union((queues[p] ?? []).map(\.key)).union((reserve[p] ?? []).map(\.key))
         let fresh = r.hits.filter { !known.contains($0.key) }
         s.count += fresh.count
         s.cursor = r.cursor
         s.hasMore = r.status == "ok" && r.hasMore
         states[p] = s
-        queues[p, default: []] += fresh
+        if intoReserve && !wantMore.contains(p) {
+            reserve[p, default: []] += fresh
+        } else {
+            wantMore.remove(p)
+            queues[p, default: []] += fresh
+        }
         drain()
+        // 第一页都回来后，各平台在后台预取下一页，滑到底时直接显示
+        if !searching { for q in platforms { prefetch(q) } }
         AppLog.info("search.result", ["platform": p, "status": r.status, "got": fresh.count, "page": cursor == nil ? "first" : "more"])
     }
 
@@ -174,7 +214,7 @@ final class SearchController {
             let pick: String
             if let o = others.min(by: { (queues[$0]?.count ?? 0) > (queues[$1]?.count ?? 0) }) {
                 pick = o
-            } else if let only = available.first, run < Self.maxRun || !waiting {
+            } else if let only = available.first, run < (hits.count < Self.firstScreen ? Self.firstScreen : Self.maxRun) || !waiting {
                 pick = only
             } else {
                 return

@@ -58,10 +58,10 @@ export class CatbusAdapter implements PlatformAdapter {
     return { items: data, cursor: page?.cursor ?? null, hasMore: page?.has_more ?? false }
   }
 
-  async resolve(item: Item, signal?: AbortSignal): Promise<FeedCard | null> {
+  async resolve(item: Item, signal?: AbortSignal, fresh = false): Promise<FeedCard | null> {
     if (!isVisual(item)) return null
     let detail = item
-    if (!hasPlayable(detail)) detail = await this.getDetail(item, signal)
+    if (fresh || !hasPlayable(detail)) detail = await this.getDetail(item, signal)
     if (!hasPlayable(detail)) {
       const { data } = await this.catbus.run<Media[]>([this.platform, 'item', 'media', item.url], { signal })
       detail = { ...detail, media: data }
@@ -240,7 +240,12 @@ function pickVideo(media: Media[], headers: Headers): VideoSource | null {
   const audio = media.find((m) => m.type === 'audio')
   if (audio) return null // 分离音视频轨 AVPlayer 无法流畅播放，丢弃
   const v = videos[0]!
-  return { url: v.url, headers, width: v.width, height: v.height, duration: v.duration }
+  return { url: v.url, headers, width: v.width, height: v.height, duration: v.duration, ...(isHls(v.url) ? { hls: true } : {}) }
+}
+
+/** 快手的实时转封装流（vod-rt-remux/hls-ts/…/xxx.mp4）是 HLS 播放列表，地址却以 .mp4 结尾。 */
+export function isHls(url: string): boolean {
+  return /\.m3u8(\?|$)/i.test(url) || /\/hls-ts\//i.test(url) || /vod-rt-remux/i.test(url)
 }
 
 /** 详情覆盖列表字段，但列表里有、详情里为空的值保留。 */
