@@ -168,7 +168,8 @@ struct PauseCardView: View {
                             .frame(width: 46, height: 8)
                     }
                 }
-                Text(wait >= 3 ? "猫猫歇口气，约 \(Int(wait.rounded())) 秒后接着搬" : "搬运中 \(pause.progress)/\(pause.batch)")
+                Text(wait >= 90 ? "猫猫歇口气，约 \(Int((wait / 60).rounded(.up))) 分钟后接着搬"
+                     : (wait >= 3 ? "猫猫歇口气，约 \(Int(wait.rounded())) 秒后接着搬" : "搬运中 \(pause.progress)/\(pause.batch)"))
                     .font(.system(size: 11, weight: .medium)).monospacedDigit()
                     .foregroundStyle(.white.opacity(0.6))
             }

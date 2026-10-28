@@ -399,38 +399,40 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
   }
 
   /**
-   * 调试：让所有启用的平台假装进入风控冷却 ms 毫秒（不请求平台），并清空已备好的卡片，
+   * 调试：让启用的平台（默认全部，也可以只指定几个）假装进入风控冷却 ms 毫秒（不请求平台），并清掉它们已备好的卡片，
    * 用来验证「休息站」卡片、小岛打盹、倒计时结束后自动恢复的整条链路（catland-debug feed:rest:<秒>）。
    */
-  simulateCooldown(ms: number): void {
+  simulateCooldown(ms: number, platforms?: string[]): void {
     const until = this.now() + ms
     for (const s of this.sources.values()) {
-      if (s.status === 'auth') continue
+      if (s.status === 'auth' || (platforms && !platforms.includes(s.adapter.platform))) continue
       s.until = until
       s.probing = false
       this.setStatus(s, 'cooldown')
     }
-    this.ready = []
-    this.log.info('simulated cooldown', { ms })
+    // 只冷却部分平台时，留着其他平台已备好的卡片（验证用户无感）；全部冷却时清空，立刻见到休息站
+    this.ready = platforms ? this.ready.filter((c) => !platforms.includes(c.platform)) : []
+    this.log.info('simulated cooldown', { ms, platforms: platforms ?? 'all' })
     this.schedule(until)
   }
 
   /**
-   * 现在为什么没货、什么时候能恢复（推荐流空了时给 App 选「在路上」还是「休息站」卡片）：
-   * 每个启用的平台取「冷却结束 / 额度窗口滑过」的时间，取最早的那个；两分钟内能恢复算 waiting，否则 resting。
+   * 现在为什么没货、什么时候能恢复（推荐流空了时，App 据此决定给哪种卡片）：
+   * - single：只开了一个平台（不管是被限流还是额度用完）→ 单平台卡片，显示还要等多久；
+   * - resting：开了多个平台、且全部受限（冷却中，或额度要等 15 秒以上）→ 休息站卡片；
+   * - waiting：多个平台里只有部分受限 → 用户不该感知，App 静默多等一会儿，其他平台很快就会补上。
+   * resumeAt 取各平台「冷却结束 / 额度窗口滑过」中最早的那个。
    */
-  availability(): { state: 'ok' | 'waiting' | 'resting'; resumeAt: number | null } {
+  availability(): { state: 'ok' | 'single' | 'waiting' | 'resting'; resumeAt: number | null } {
     if (this.ready.length > 0) return { state: 'ok', resumeAt: null }
     const now = this.now()
-    const times: number[] = []
-    for (const s of this.sources.values()) {
-      if (s.status === 'auth') continue
-      const cooled = s.status === 'active' ? now : Math.max(now, s.until)
-      times.push(Math.max(cooled, this.budgetAt(s, now)))
-    }
-    if (times.length === 0) return { state: 'waiting', resumeAt: null }
+    const list = [...this.sources.values()].filter((s) => s.status !== 'auth')
+    if (list.length === 0) return { state: 'waiting', resumeAt: null }
+    const times = list.map((s) => Math.max(s.status === 'active' ? now : Math.max(now, s.until), this.budgetAt(s, now)))
     const resumeAt = Math.min(...times)
-    return { state: resumeAt - now > 120_000 ? 'resting' : 'waiting', resumeAt }
+    if (list.length === 1) return { state: 'single', resumeAt }
+    if (times.every((t) => t - now > 15_000)) return { state: 'resting', resumeAt }
+    return { state: 'waiting', resumeAt }
   }
 
   /**

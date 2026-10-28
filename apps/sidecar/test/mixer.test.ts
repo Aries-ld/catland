@@ -354,24 +354,30 @@ describe('FeedMixer', () => {
     m.stop()
   })
 
-  it('availability：额度用完要等很久时是 resting，并给出恢复时间', () => {
+  it('availability：只开一个平台时是 single，并给出恢复时间', () => {
     let now = 0
-    const a = new FakeAdapter('xhs')
     const m = new FeedMixer({ logger: createMemoryLogger(), now: () => now, platformRequestsPerMinute: { xhs: 1000 }, platformRequestsPerHour: { xhs: 2 } })
-    m.setSources([a])
+    m.setSources([new FakeAdapter('xhs')])
     m.stop()
-    expect(m.availability().state).toBe('waiting')
     m.acquire('xhs'); m.acquire('xhs')
-    const av = m.availability()
-    expect(av.state).toBe('resting')
-    expect(av.resumeAt).toBe(3_600_000)
+    expect(m.availability()).toEqual({ state: 'single', resumeAt: 3_600_000 })
+  })
+
+  it('availability：多个平台只有部分受限是 waiting（用户无感），全部受限才是 resting', () => {
+    let now = 0
+    const m = new FeedMixer({ logger: createMemoryLogger(), now: () => now })
+    m.setSources([new FakeAdapter('xhs'), new FakeAdapter('bilibili')])
+    m.stop()
+    m.simulateCooldown(300_000, ['xhs'])
+    expect(m.availability().state).toBe('waiting')
+    m.simulateCooldown(300_000)
+    expect(m.availability()).toEqual({ state: 'resting', resumeAt: 300_000 })
   })
 
   it('模拟冷却：所有平台进入 cooldown、availability 变成 resting，到点后恢复', async () => {
     let now = 0
-    const a = new FakeAdapter('xhs')
     const m = new FeedMixer({ logger: createMemoryLogger(), now: () => now })
-    m.setSources([a])
+    m.setSources([new FakeAdapter('xhs'), new FakeAdapter('bilibili')])
     m.simulateCooldown(150_000)
     expect(m.statusOf('xhs')).toBe('cooldown')
     expect(m.availability()).toEqual({ state: 'resting', resumeAt: 150_000 })

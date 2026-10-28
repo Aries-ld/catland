@@ -85,6 +85,8 @@ final class FeedController {
         guard index + 1 < cards.count else {
             Task {
                 await fetchMore(wait: 1_500)
+                // 多个平台里只有部分受限：用户不该感知，静默多等一会儿，其他平台很快会补上
+                if index + 1 >= cards.count, loader == nil, lastAvailability?.state == "waiting" { await fetchMore(wait: 8_000) }
                 if index + 1 < cards.count { next() } else if loader == nil { enterPause() }
             }
             return
@@ -189,11 +191,11 @@ final class FeedController {
         guard current?.isPause != true, !cards.contains(where: \.isPause) else { return }
         let cats = lastSources.compactMap(Persona.forPlatform)
         pauseCount += 1
-        pause = PauseInfo(mode: lastAvailability?.state == "resting" ? .resting : .waiting,
+        pause = PauseInfo(mode: Self.mode(lastAvailability),
                           resumeAt: lastAvailability?.resumeAt.map { Date(timeIntervalSince1970: $0 / 1000) },
                           batch: Self.releaseBatch,
                           speaker: cats.isEmpty ? .box : cats[pauseCount % cats.count], cats: cats.isEmpty ? [.box] : cats,
-                          single: lastSources.count == 1, line: pauseCount)
+                          single: lastAvailability?.state == "single" || lastSources.count == 1, line: pauseCount)
         AppLog.info("feed pause", ["mode": lastAvailability?.state ?? "waiting", "sources": lastSources])
         reportView()
         cards.append(.pause())
@@ -209,6 +211,9 @@ final class FeedController {
         lastAvailability = Availability(state: "waiting", resumeAt: nil)
         enterPause()
     }
+
+    /// 卡片类型：多个平台全部受限 → 休息站；其余（只开一个平台、或部分受限时的兜底）→ 在路上。
+    private static func mode(_ a: Availability?) -> PauseInfo.Mode { a?.state == "resting" ? .resting : .waiting }
 
     /// 猫猫卡后面已经排着的卡片数。
     private var queuedAfterPause: Int {
@@ -252,8 +257,9 @@ final class FeedController {
             pause?.progress = min(got, Self.releaseBatch)
             if got >= Self.releaseBatch || (got > 0 && Date().timeIntervalSince(started) >= Self.releaseAfter) { break }
             if let a = r.availability { // 平台额度什么时候放开：卡片上显示「约 N 秒后接着搬」
-                pause?.mode = a.state == "resting" ? .resting : .waiting
-                pause?.resumeAt = a.resumeAt.map { Date(timeIntervalSince1970: $0 / 1000) }
+                // 休息站一旦出现就保持到内容回来（冷却快结束时 sidecar 会报「马上就有」，别把它降级成单平台卡片）
+                if pause?.mode != .resting { pause?.mode = Self.mode(a) }
+                if pause?.mode != .resting || a.state == "resting" { pause?.resumeAt = a.resumeAt.map { Date(timeIntervalSince1970: $0 / 1000) } }
             }
             if !r.cards.isEmpty { continue }
             if pause?.mode == .resting { try? await Task.sleep(for: .seconds(10)) }
@@ -261,7 +267,7 @@ final class FeedController {
         if pause != nil, queuedAfterPause > 0 {
             pause?.progress = min(queuedAfterPause, Self.releaseBatch)
             pause?.arrived = true // 不自动跳走：停在这张卡上提示「往下滑」，收起再打开也一样
-            AppLog.info("feed pause: content arrived", ["got": queuedAfterPause, "waitedS": Int(Date().timeIntervalSince(started))])
+            AppLog.info("feed pause: content arrived", ["got": queuedAfterPause, "waitedS": Int(Date().timeIntervalSince(started)), "mode": pause?.mode == .resting ? "resting" : "waiting"])
         }
     }
 

@@ -178,7 +178,8 @@ export class App {
       .register('feed.sources', () => ({ enabled: this.enabled, states: this.mixer.sourceStates() }))
       // 调试：所有平台假装冷却 N 秒（只给调试版的 catland-debug feed:rest:<秒> 用，不请求平台）
       .register('debug.simulateCooldown', (p) => {
-        this.mixer.simulateCooldown((optInt(p, 'seconds', 10, 3600) ?? 150) * 1000)
+        const only = Array.isArray(p.platforms) ? (p.platforms as unknown[]).filter((x): x is string => typeof x === 'string') : undefined
+        this.mixer.simulateCooldown((optInt(p, 'seconds', 10, 3600) ?? 150) * 1000, only?.length ? only : undefined)
         return this.mixer.availability()
       })
       .register('feed.view', (p) => {

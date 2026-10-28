@@ -88,10 +88,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 case "render:cities": SceneSnapshot.renderCities()
                 case "feed:pause": self.state.feed.debugPause()
                 case let c where c.hasPrefix("feed:rest"):
-                    // 所有平台假装冷却 N 秒（默认 150 秒，超过 2 分钟才算「休息站」），验证休息站卡片和倒计时
-                    let seconds = Int(c.split(separator: ":").last ?? "") ?? 150
+                    // feed:rest:<秒>[:平台,平台]：平台假装冷却（不请求平台）。不指定平台 = 全部冷却，立刻停到休息站卡片；
+                    // 只指定部分平台 = 验证用户无感：推荐流照常刷，只有那几只猫打盹
+                    let parts = c.split(separator: ":").map(String.init)
+                    let seconds = parts.count > 2 ? Int(parts[2]) ?? 150 : 150
+                    let only = parts.count > 3 ? parts[3].split(separator: ",").map(String.init) : []
                     Task { @MainActor in
-                        if let a: Availability = try? await self.state.sidecar.call("debug.simulateCooldown", ["seconds": seconds]) {
+                        var params: [String: Any] = ["seconds": seconds]
+                        if !only.isEmpty { params["platforms"] = only }
+                        if let a: Availability = try? await self.state.sidecar.call("debug.simulateCooldown", params), only.isEmpty {
                             self.state.feed.debugRest(a)
                         }
                     }
