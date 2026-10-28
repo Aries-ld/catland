@@ -16,13 +16,10 @@ final class AppState {
     let feed: FeedController
     /// 跨平台搜索（搜索页 + 搜索结果的播放器）。
     let search: SearchController
-    /// 点赞 / 收藏页里点开的帖子：在 catland 里直接播放，上下划看整个列表（不跳到网页）。
+    /// 点赞 / 收藏页里点开的帖子：在 catland 里直接播放（不跳到网页），往下刷进入全局推荐流。
     let libraryPlayer: FeedController
     private(set) var savedPlaying = false
     private(set) var savedPlayingTitle = ""
-    private var savedOffset = 0
-    private(set) var savedCount = 0
-    var savedPlayIndex: Int { libraryPlayer.index + savedOffset }
     /// 当前在播的那一套卡片：点赞 / 收藏 → 搜索结果 → 推荐流。
     var activeFeed: FeedController { savedPlaying ? libraryPlayer : (search.playing ? search.player : feed) }
     private let log = Logger(subsystem: "app.catland", category: "app")
@@ -183,25 +180,26 @@ final class AppState {
         }
     }
 
-    /// 在点赞 / 收藏列表里点开一条：从它开始，在 catland 里上下划着看（每次解析接下来 2 条，地址重新取）。
-    func playSaved(_ entries: [SavedEntry], from start: Int, title: String) {
-        guard entries.indices.contains(start) else { return }
+    /// 在点赞 / 收藏列表里点开一条：先在 catland 里播放这一条（地址重新取），往下刷接着进入全局推荐流。
+    func playSaved(_ entry: SavedEntry, title: String) {
         feed.pauseAll()
-        savedOffset = start
-        savedCount = entries.count
         savedPlayingTitle = title
-        var next = start
+        let key = entry.card.key
+        var first = true
         let sidecar = self.sidecar
         libraryPlayer.reset {
-            var out: [FeedCard] = []
-            while out.count < 2, next < entries.count {
-                let key = entries[next].card.key
-                next += 1
-                if let card: FeedCard = try? await sidecar.call("saved.resolve", ["key": key]) { out.append(card) }
+            if first {
+                first = false
+                if let card: FeedCard = try? await sidecar.call("saved.resolve", ["key": key]) { return [card] }
             }
-            return out
+            // 之后和推荐流一样，从全局池子里取（推荐流偶尔一时没货，多等几次，别当成刷到底了）
+            for _ in 0..<3 {
+                if let r: FeedNext = try? await sidecar.call("feed.next", ["count": 6, "waitMs": 5_000]), !r.cards.isEmpty { return r.cards }
+            }
+            return []
         } refresher: { key in
-            try? await sidecar.call("saved.resolve", ["key": key])
+            if let card: FeedCard = try? await sidecar.call("saved.resolve", ["key": key]) { return card }
+            return try? await sidecar.call("feed.refresh", ["key": key])
         }
         libraryPlayer.muted = settings.muted
         savedPlaying = true

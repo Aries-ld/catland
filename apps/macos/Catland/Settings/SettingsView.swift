@@ -106,7 +106,7 @@ struct SavedView: View {
         ZStack {
             Color(white: 0.07)
             if state.savedPlaying {
-                // 点开的帖子在这里直接播放，上下划看整个列表
+                // 点开的帖子在这里直接播放，往下刷接着是推荐流
                 VStack(spacing: 0) {
                     HStack {
                         Button { withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) { state.stopSaved() } } label: {
@@ -121,8 +121,6 @@ struct SavedView: View {
                         }
                         .buttonStyle(PressStyle())
                         Spacer()
-                        Text("\(min(state.savedPlayIndex + 1, state.savedCount)) / \(state.savedCount)")
-                            .font(.system(size: 12, weight: .medium, design: .rounded)).foregroundStyle(.white.opacity(0.5))
                     }
                     .padding(.horizontal, 12).frame(height: 40)
                     FeedView(state: state, feed: state.libraryPlayer)
@@ -140,8 +138,8 @@ struct SavedView: View {
                 } else {
                     ScrollView {
                         LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                            ForEach(Array(entries.enumerated()), id: \.element.card.key) { i, e in
-                                SavedTile(entry: e) { state.playSaved(entries, from: i, title: kind == "like" ? "我的点赞" : "我的收藏") }
+                            ForEach(entries, id: \.card.key) { e in
+                                SavedTile(entry: e) { state.playSaved(e, title: kind == "like" ? "我的点赞" : "我的收藏") }
                             }
                         }
                     }
