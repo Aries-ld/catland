@@ -92,6 +92,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     let size = CGSize(width: 384, height: 600)
                     let states: [(String, PauseInfo)] = [
                         ("waiting", PauseInfo(mode: .waiting, resumeAt: nil, progress: 1, speaker: .shushu, cats: [.shushu], single: true, line: 0)),
+                        ("budget", PauseInfo(mode: .waiting, resumeAt: Date().addingTimeInterval(41), progress: 0, speaker: .shushu, cats: [.shushu], single: true, line: 1)),
                         ("arrived", PauseInfo(mode: .waiting, resumeAt: nil, arrived: true, speaker: .shushu, cats: [.shushu], single: true, line: 0)),
                         ("resting", PauseInfo(mode: .resting, resumeAt: Date().addingTimeInterval(754), speaker: .tietie, cats: [.shushu, .doudou, .tietie, .bibi], single: false, line: 0)),
                     ]

@@ -239,11 +239,11 @@ final class FeedController {
             got = queuedAfterPause
             pause?.progress = min(got, Self.releaseBatch)
             if got >= Self.releaseBatch || (got > 0 && Date().timeIntervalSince(started) >= Self.releaseAfter) { break }
-            if !r.cards.isEmpty { continue }
-            if let a = r.availability {
+            if let a = r.availability { // 平台额度什么时候放开：卡片上显示「约 N 秒后接着搬」
                 pause?.mode = a.state == "resting" ? .resting : .waiting
                 pause?.resumeAt = a.resumeAt.map { Date(timeIntervalSince1970: $0 / 1000) }
             }
+            if !r.cards.isEmpty { continue }
             if pause?.mode == .resting { try? await Task.sleep(for: .seconds(10)) }
         }
         if pause != nil, queuedAfterPause > 0 {

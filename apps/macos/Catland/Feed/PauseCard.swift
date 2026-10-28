@@ -153,20 +153,27 @@ struct PauseCardView: View {
         }
     }
 
-    /// 搬运进度：这一批搬到了几张（纸箱一格一格装满）。
+    /// 搬运进度：这一批搬到了几张（纸箱一格一格装满），正在搬的那一格轻轻闪；
+    /// 平台这一分钟的额度用完、要等一会儿才能接着搬时，说清楚还要等几秒，别让人以为卡住了。
     private var progressBar: some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 6) {
-                ForEach(0..<pause.batch, id: \.self) { i in
-                    RoundedRectangle(cornerRadius: 3, style: .continuous)
-                        .fill(i < pause.progress ? Color(red: 0.95, green: 0.72, blue: 0.4) : .white.opacity(0.15))
-                        .frame(width: 46, height: 8)
+        TimelineView(.periodic(from: .now, by: 0.5)) { tl in
+            let wait = max(0, (pause.resumeAt ?? tl.date).timeIntervalSince(tl.date))
+            let pulse = Int(tl.date.timeIntervalSinceReferenceDate * 2) % 2 == 0
+            VStack(spacing: 6) {
+                HStack(spacing: 6) {
+                    ForEach(0..<pause.batch, id: \.self) { i in
+                        RoundedRectangle(cornerRadius: 3, style: .continuous)
+                            .fill(i < pause.progress ? Color(red: 0.95, green: 0.72, blue: 0.4)
+                                  : (i == pause.progress && wait < 3 ? Color(red: 0.95, green: 0.72, blue: 0.4).opacity(pulse ? 0.45 : 0.2) : .white.opacity(0.15)))
+                            .frame(width: 46, height: 8)
+                    }
                 }
+                Text(wait >= 3 ? "猫猫歇口气，约 \(Int(wait.rounded())) 秒后接着搬" : "搬运中 \(pause.progress)/\(pause.batch)")
+                    .font(.system(size: 11, weight: .medium)).monospacedDigit()
+                    .foregroundStyle(.white.opacity(0.6))
             }
-            Text("搬运中 \(pause.progress)/\(pause.batch)").font(.system(size: 11, weight: .medium)).monospacedDigit()
-                .foregroundStyle(.white.opacity(0.6))
+            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: pause.progress)
         }
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: pause.progress)
     }
 
     private var swipeHint: some View {
