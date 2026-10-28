@@ -157,6 +157,22 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
     return [...this.sources.values()].map((s) => this.stateOf(s))
   }
 
+  /** 某个平台当前的状态（不在信息源里时为 null）。搜索据此决定要不要发请求。 */
+  statusOf(platform: string): SourceStatus | null {
+    const s = this.sources.get(platform)
+    if (!s) return null
+    if (s.status !== 'active' && s.status !== 'auth' && this.now() >= s.until) return 'active' // 冷却已到期，下一次 pump 会转为探测
+    return s.status
+  }
+
+  /** 推荐流以外的请求（如搜索）遇到风控 / 登录失效：和推荐流共用同一套冷却与暂停。其他错误不影响推荐流。 */
+  reportError(platform: string, err: unknown): void {
+    const s = this.sources.get(platform)
+    const code = err instanceof CatbusCallError ? err.code : 'ERROR'
+    if (!s || !['RISK_CONTROL', 'AUTH_REQUIRED', 'AUTH_EXPIRED'].includes(code)) return
+    this.onError(s, err, 'refresh')
+  }
+
   /** 取接下来 n 张卡片。缓冲为空时最多等 waitMs 拿到第一张（首屏）。 */
   async next(n: number, opts: { waitMs?: number } = {}): Promise<FeedCard[]> {
     this.dropExpired()

@@ -3,7 +3,7 @@ import type { CatbusClient } from '../accounts/service.ts'
 import { CatbusCallError } from '../catbus/runner.ts'
 import type { Item, Media } from '../catbus/types.ts'
 import type { Logger } from '../log.ts'
-import { cardKey, type FeedCard, type FeedPage, type Headers, type ImageSource, type PlatformAdapter, type VideoSource } from './types.ts'
+import { cardKey, type FeedCard, type FeedPage, type Headers, type ImageSource, type PlatformAdapter, type SearchHit, type VideoSource } from './types.ts'
 
 export const DESKTOP_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
 
@@ -20,6 +20,7 @@ export const MEDIA_HEADERS: Record<string, Headers> = {
 
 const DEFAULT_TTL_MS = 20 * 60_000
 const FEED_PAGE = 10
+const SEARCH_PAGE = 10
 
 export interface AdapterDeps {
   catbus: CatbusClient
@@ -46,6 +47,13 @@ export class CatbusAdapter implements PlatformAdapter {
 
   async fetchFeed(cursor: string | null, signal?: AbortSignal): Promise<FeedPage> {
     const argv = [this.platform, 'feed', 'list', '--limit', String(FEED_PAGE), ...(cursor ? ['--cursor', cursor] : [])]
+    const { data, page } = await this.catbus.run<Item[]>(argv, { signal })
+    return { items: data, cursor: page?.cursor ?? null, hasMore: page?.has_more ?? false }
+  }
+
+  /** 关键词搜索（综合排序）。关键词放在 `--` 之后，以 `-` 开头也不会被当成选项。 */
+  async search(query: string, cursor: string | null, signal?: AbortSignal): Promise<FeedPage> {
+    const argv = [this.platform, 'item', 'search', '--limit', String(SEARCH_PAGE), ...(cursor ? ['--cursor', cursor] : []), '--', query]
     const { data, page } = await this.catbus.run<Item[]>(argv, { signal })
     return { items: data, cursor: page?.cursor ?? null, hasMore: page?.has_more ?? false }
   }
@@ -189,6 +197,27 @@ export function createAdapter(platform: string, deps: AdapterDeps): PlatformAdap
   if (platform === 'xhs') return new XhsAdapter(deps)
   if (platform === 'bilibili') return new BilibiliAdapter(deps)
   return new CatbusAdapter(platform, deps)
+}
+
+/** 搜索结果 → 封面网格条目；纯文字等没有画面的内容返回 null。 */
+export function toSearchHit(platform: string, item: Item): SearchHit | null {
+  if (!isVisual(item)) return null
+  const headers = MEDIA_HEADERS[platform] ?? {}
+  const video = item.media.find((m) => m.type === 'video')
+  const firstImage = item.media.find((m) => m.type === 'image' && isHttpUrl(m.url))
+  const coverUrl = item.cover && isHttpUrl(item.cover) ? item.cover : (firstImage?.url ?? null)
+  return {
+    key: cardKey(platform, item.id),
+    platform,
+    id: item.id,
+    url: item.url,
+    kind: item.kind === 'video' || video ? 'video' : 'image',
+    title: item.title ?? item.text,
+    author: item.author,
+    cover: coverUrl ? { url: coverUrl, headers, width: video?.width ?? firstImage?.width ?? null, height: video?.height ?? firstImage?.height ?? null } : null,
+    stats: item.stats,
+    duration: video?.duration != null ? Math.round(video.duration) : null,
+  }
 }
 
 /** 刷刷流只放有画面的内容；纯文字推文等先跳过。 */

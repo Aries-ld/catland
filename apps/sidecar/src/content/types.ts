@@ -44,10 +44,26 @@ export interface FeedPage {
   hasMore: boolean
 }
 
-/** 一个平台如何取推荐流、如何把列表项解析成可播放的卡片。 */
+/** 搜索结果：只用于封面网格，不解析媒体；点开时再 search.resolve 成 FeedCard。 */
+export interface SearchHit {
+  key: string
+  platform: string
+  id: string
+  url: string
+  kind: 'video' | 'image'
+  title: string | null
+  author: UserRef | null
+  cover: ImageSource | null
+  stats: Item['stats']
+  /** 视频时长（秒），平台没给时为 null。 */
+  duration: number | null
+}
+
+/** 一个平台如何取推荐流、如何搜索、如何把列表项解析成可播放的卡片。 */
 export interface PlatformAdapter {
   readonly platform: string
   fetchFeed(cursor: string | null, signal?: AbortSignal): Promise<FeedPage>
+  search?(query: string, cursor: string | null, signal?: AbortSignal): Promise<FeedPage>
   /** 返回 null 表示这条内容不适合放进刷刷流（纯文字、没有可用媒体等）。 */
   resolve(item: Item, signal?: AbortSignal): Promise<FeedCard | null>
 }

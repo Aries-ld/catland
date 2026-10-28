@@ -4,6 +4,7 @@ import { getPlatform } from './accounts/catalog.ts'
 import { createAdapter } from './content/adapters.ts'
 import { CommentService } from './content/comments.ts'
 import { FeedMixer } from './content/mixer.ts'
+import { SearchService } from './content/search.ts'
 import type { FeedCard, PlatformAdapter } from './content/types.ts'
 import type { Logger } from './log.ts'
 import { bool, oneOf, optInt, optStr, ParamError, RpcServer, str } from './rpc/server.ts'
@@ -29,6 +30,7 @@ export class App {
   readonly mixer: FeedMixer
   readonly store: Store
   private readonly comments: CommentService
+  private readonly search: SearchService
   private readonly weather: WeatherService
   private readonly log: Logger
   private readonly adapterFor: (platform: string) => PlatformAdapter
@@ -45,6 +47,7 @@ export class App {
     this.weather = deps.weather ?? new WeatherService({ logger: deps.logger })
     this.mixer = deps.mixer ?? new FeedMixer({ logger: deps.logger, seen: deps.store })
     this.adapterFor = deps.adapterFor ?? ((p) => createAdapter(p, { catbus: deps.catbus, logger: deps.logger }))
+    this.search = new SearchService({ logger: deps.logger, adapterFor: (p) => this.adapter(p), mixer: this.mixer })
   }
 
   async start(): Promise<void> {
@@ -155,6 +158,18 @@ export class App {
       .register('feed.view', (p) => {
         this.store.recordView(this.lookup(str(p, 'key')), optInt(p, 'dwellMs', 0, 24 * 3600_000) ?? 0)
         return null
+      })
+
+      .register('search.query', (p) => {
+        const query = str(p, 'query').trim()
+        if (query.length === 0 || query.length > 60) throw new ParamError('query must be 1–60 characters')
+        return this.search.query(platform(p), query, optStr(p, 'cursor') ?? null)
+      })
+      .register('search.resolve', async (p) => {
+        const card = await this.search.resolve(str(p, 'key'))
+        if (!card) return null
+        this.remember(card)
+        return { ...card, ...this.store.states([card.key])[card.key]! }
       })
 
       .register('comments.list', (p) => {

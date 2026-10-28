@@ -15,6 +15,7 @@
     "smoke:accounts": "node scripts/smoke-accounts.ts",
     "smoke:feed": "node scripts/smoke-feed.ts",
     "smoke:rpc": "node scripts/smoke-rpc.ts",
+    "smoke:search": "node scripts/smoke-search.ts",
     "start": "node src/main.ts"
   },
   "dependencies": {
