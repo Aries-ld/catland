@@ -11,6 +11,9 @@ struct PauseInfo: Equatable {
     var resumeAt: Date?
     /// 新内容已经到了：卡片提示往下滑继续。
     var arrived = false
+    /// 这一批已经搬到几张（攒够 batch 张就放行）。
+    var progress = 0
+    var batch = 3
     /// 这次出场说话的猫，和一起打盹的猫。
     var speaker: Persona
     var cats: [Persona]
@@ -77,6 +80,7 @@ struct PauseCardView: View {
                 Spacer()
                 cats
                 bubble
+                if pause.mode == .waiting && !pause.arrived { progressBar }
                 if pause.mode == .resting && !pause.arrived { countdown }
                 if pause.arrived { swipeHint }
                 Spacer()
@@ -143,14 +147,26 @@ struct PauseCardView: View {
     private var countdown: some View {
         TimelineView(.periodic(from: .now, by: 1)) { tl in
             let left = max(0, (pause.resumeAt ?? tl.date).timeIntervalSince(tl.date))
-            VStack(spacing: 4) {
-                Text(left > 0 ? String(format: "%02d:%02d", Int(left) / 60, Int(left) % 60) : "马上就回来…")
-                    .font(.system(size: left > 0 ? 40 : 18, weight: .bold, design: .rounded)).monospacedDigit()
-                    .foregroundStyle(.white)
-                Text(left > 0 ? "后猫猫回来" : "猫猫正在醒过来")
-                    .font(.system(size: 12)).foregroundStyle(.white.opacity(0.6))
-            }
+            Text(String(format: "%02d:%02d", Int(left) / 60, Int(left) % 60))
+                .font(.system(size: 40, weight: .bold, design: .rounded)).monospacedDigit()
+                .foregroundStyle(.white)
         }
+    }
+
+    /// 搬运进度：这一批搬到了几张（纸箱一格一格装满）。
+    private var progressBar: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 6) {
+                ForEach(0..<pause.batch, id: \.self) { i in
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .fill(i < pause.progress ? Color(red: 0.95, green: 0.72, blue: 0.4) : .white.opacity(0.15))
+                        .frame(width: 46, height: 8)
+                }
+            }
+            Text("搬运中 \(pause.progress)/\(pause.batch)").font(.system(size: 11, weight: .medium)).monospacedDigit()
+                .foregroundStyle(.white.opacity(0.6))
+        }
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: pause.progress)
     }
 
     private var swipeHint: some View {

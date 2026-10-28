@@ -189,6 +189,7 @@ final class FeedController {
         pauseCount += 1
         pause = PauseInfo(mode: lastAvailability?.state == "resting" ? .resting : .waiting,
                           resumeAt: lastAvailability?.resumeAt.map { Date(timeIntervalSince1970: $0 / 1000) },
+                          batch: Self.releaseBatch,
                           speaker: cats.isEmpty ? .box : cats[pauseCount % cats.count], cats: cats.isEmpty ? [.box] : cats,
                           single: lastSources.count == 1, line: pauseCount)
         AppLog.info("feed pause", ["mode": lastAvailability?.state ?? "waiting", "sources": lastSources])
@@ -224,6 +225,7 @@ final class FeedController {
                 let fresh = r.cards.filter { !known.contains($0.key) }
                 cards.append(contentsOf: fresh)
                 got += fresh.count
+                pause?.progress = min(got, Self.releaseBatch) // 卡片上的搬运进度马上更新
                 preload()
             }
             if got >= Self.releaseBatch || (got > 0 && Date().timeIntervalSince(started) >= Self.releaseAfter) {

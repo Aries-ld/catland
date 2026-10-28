@@ -91,7 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     // 离屏渲染猫猫卡的三种状态：在路上 / 搬到了 / 休息站
                     let size = CGSize(width: 384, height: 600)
                     let states: [(String, PauseInfo)] = [
-                        ("waiting", PauseInfo(mode: .waiting, resumeAt: nil, speaker: .shushu, cats: [.shushu], single: true, line: 0)),
+                        ("waiting", PauseInfo(mode: .waiting, resumeAt: nil, progress: 1, speaker: .shushu, cats: [.shushu], single: true, line: 0)),
                         ("arrived", PauseInfo(mode: .waiting, resumeAt: nil, arrived: true, speaker: .shushu, cats: [.shushu], single: true, line: 0)),
                         ("resting", PauseInfo(mode: .resting, resumeAt: Date().addingTimeInterval(754), speaker: .tietie, cats: [.shushu, .doudou, .tietie, .bibi], single: false, line: 0)),
                     ]

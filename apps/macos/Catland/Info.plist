@@ -31,8 +31,8 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>MIT · 仅供学习研究，不商用</string>
 	<key>NSLocationUsageDescription</key>
-	<string>用所在城市让刘海里窗外的时间与天气和你一致。位置只留在本机，向天气服务只发送约 10km 精度的坐标。</string>
+	<string>猫猫想知道你在哪座城市：这样小岛窗外的天色、晴雨都和你那边同步，还能看到你那儿的地标。位置只存在你的 Mac 上，查天气时只告诉天气服务一个大概的位置（约 10 公里）。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>用所在城市让刘海里窗外的时间与天气和你一致。位置只留在本机，向天气服务只发送约 10km 精度的坐标。</string>
+	<string>猫猫想知道你在哪座城市：这样小岛窗外的天色、晴雨都和你那边同步，还能看到你那儿的地标。位置只存在你的 Mac 上，查天气时只告诉天气服务一个大概的位置（约 10 公里）。</string>
 </dict>
 </plist>

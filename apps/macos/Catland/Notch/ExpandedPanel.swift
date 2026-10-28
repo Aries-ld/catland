@@ -44,6 +44,13 @@ struct ExpandedPanel: View {
                 } else {
                     content
                 }
+                // 平台开关弹层打开时：点内容区任意位置关掉它
+                if showSources {
+                    Color.black.opacity(0.001)
+                        .contentShape(Rectangle())
+                        .onTapGesture { withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { showSources = false } }
+                        .zIndex(5)
+                }
                 switch state.overlay {
                 case .none: EmptyView()
                 case .connections: ConnectionsView(state: state).transition(.move(edge: .bottom).combined(with: .opacity))
