@@ -400,7 +400,7 @@ final class AppState {
         var chosen = settings.sources["content"] ?? all
         if chosen.contains(platform) { chosen.removeAll { $0 == platform } } else { chosen.append(platform) }
         if chosen.isEmpty { return showToast("至少保留一个平台") }
-        if chosen.count == 1, chosen.count < all.count { showToast("只刷一个平台时，猫会放慢搬运速度，免得被平台限流") }
+        if chosen.count == 1, chosen.count < all.count { showToast("只刷一个平台时，猫猫会比较辛苦，搬得慢一点") }
         settings.sources["content"] = chosen
         Task {
             let _: Settings? = try? await sidecar.call("settings.update", ["sources": ["content": chosen]])

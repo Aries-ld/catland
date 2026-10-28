@@ -238,7 +238,7 @@ struct SourcePicker: View {
                 }
             }
             Text(state.connectedContentPlatforms.filter { state.isSourceEnabled($0.id) }.count == 1
-                 ? "只刷一个平台时，猫会放慢搬运速度，免得被平台限流"
+                 ? "只刷一个平台时，猫猫会比较辛苦，搬得慢一点"
                  : "关掉的平台不会出现在推荐里；也可以在「连接」页里开关")
                 .font(.system(size: 10)).foregroundStyle(.white.opacity(0.4))
         }
