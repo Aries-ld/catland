@@ -107,11 +107,12 @@ final class FeedController {
     }
 
     private func afterMove() {
-        // 划过了已经就绪的猫猫卡：把它从队列里拿掉
-        if let pi = cards.firstIndex(where: \.isPause), pi < index, pause?.arrived == true {
+        // 划过了猫猫卡（只有就绪后才划得过去）：把它从队列里拿掉，往上滑也回不到它
+        if let pi = cards.firstIndex(where: \.isPause), pi < index {
             cards.remove(at: pi)
             index -= 1
             pause = nil
+            pauseTask?.cancel()
         }
         viewStartedAt = Date()
         paused = false
@@ -155,6 +156,7 @@ final class FeedController {
 
     private func fetchMore(wait: Int) async {
         guard !fetching else { return }
+        if loader == nil, let p = pause, !p.arrived { return } // 猫猫卡在等：由它自己去取，别抢它的卡
         fetching = true
         loading = cards.count <= index + 1
         defer { fetching = false; loading = false }
@@ -208,6 +210,12 @@ final class FeedController {
         enterPause()
     }
 
+    /// 猫猫卡后面已经排着的卡片数。
+    private var queuedAfterPause: Int {
+        guard let pi = cards.firstIndex(where: \.isPause) else { return 0 }
+        return cards.count - 1 - pi
+    }
+
     /// 一次放行至少攒几张：只等到 1 张就放行的话，看完这张马上又是猫猫卡，一触发就停不下来。
     static let releaseBatch = 3
     static let releaseAfter: TimeInterval = 20
@@ -215,30 +223,33 @@ final class FeedController {
     /// 停在猫猫卡上时：一直等新内容（sidecar 那边按平台预算排队），攒够一批（或等了 20 秒）再提示往下滑。
     private func waitForContent() async {
         let started = Date()
-        var got = 0
+        var got = queuedAfterPause
+        pause?.progress = min(got, Self.releaseBatch)
         while !Task.isCancelled, pause != nil, pause?.arrived == false {
-            guard let r: FeedNext = try? await sidecar.call("feed.next", ["count": Self.releaseBatch, "waitMs": 12_000]) else {
+            if got >= Self.releaseBatch { break }
+            guard let r: FeedNext = try? await sidecar.call("feed.next", ["count": Self.releaseBatch - got, "waitMs": 12_000]) else {
                 try? await Task.sleep(for: .seconds(5)); continue
             }
             if !r.cards.isEmpty {
                 let known = Set(cards.map(\.key))
-                let fresh = r.cards.filter { !known.contains($0.key) }
-                cards.append(contentsOf: fresh)
-                got += fresh.count
-                pause?.progress = min(got, Self.releaseBatch) // 卡片上的搬运进度马上更新
+                cards.append(contentsOf: r.cards.filter { !known.contains($0.key) })
                 preload()
             }
-            if got >= Self.releaseBatch || (got > 0 && Date().timeIntervalSince(started) >= Self.releaseAfter) {
-                pause?.arrived = true
-                AppLog.info("feed pause: content arrived", ["got": got, "waitedS": Int(Date().timeIntervalSince(started))])
-                return
-            }
+            // 进度 = 猫猫卡后面已经排着几张（不管卡是从哪条路径进来的）
+            got = queuedAfterPause
+            pause?.progress = min(got, Self.releaseBatch)
+            if got >= Self.releaseBatch || (got > 0 && Date().timeIntervalSince(started) >= Self.releaseAfter) { break }
             if !r.cards.isEmpty { continue }
             if let a = r.availability {
                 pause?.mode = a.state == "resting" ? .resting : .waiting
                 pause?.resumeAt = a.resumeAt.map { Date(timeIntervalSince1970: $0 / 1000) }
             }
             if pause?.mode == .resting { try? await Task.sleep(for: .seconds(10)) }
+        }
+        if pause != nil, queuedAfterPause > 0 {
+            pause?.progress = min(queuedAfterPause, Self.releaseBatch)
+            pause?.arrived = true // 不自动跳走：停在这张卡上提示「往下滑」，收起再打开也一样
+            AppLog.info("feed pause: content arrived", ["got": queuedAfterPause, "waitedS": Int(Date().timeIntervalSince(started))])
         }
     }
 
