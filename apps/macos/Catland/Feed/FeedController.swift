@@ -207,20 +207,31 @@ final class FeedController {
         enterPause()
     }
 
-    /// 停在猫猫卡上时：一直等新内容（sidecar 那边按平台预算排队），到了就提示往下滑。
+    /// 一次放行至少攒几张：只等到 1 张就放行的话，看完这张马上又是猫猫卡，一触发就停不下来。
+    static let releaseBatch = 3
+    static let releaseAfter: TimeInterval = 20
+
+    /// 停在猫猫卡上时：一直等新内容（sidecar 那边按平台预算排队），攒够一批（或等了 20 秒）再提示往下滑。
     private func waitForContent() async {
+        let started = Date()
+        var got = 0
         while !Task.isCancelled, pause != nil, pause?.arrived == false {
-            guard let r: FeedNext = try? await sidecar.call("feed.next", ["count": 4, "waitMs": 12_000]) else {
+            guard let r: FeedNext = try? await sidecar.call("feed.next", ["count": Self.releaseBatch, "waitMs": 12_000]) else {
                 try? await Task.sleep(for: .seconds(5)); continue
             }
             if !r.cards.isEmpty {
                 let known = Set(cards.map(\.key))
-                cards.append(contentsOf: r.cards.filter { !known.contains($0.key) })
-                pause?.arrived = true
-                AppLog.info("feed pause: content arrived", ["got": r.cards.count])
+                let fresh = r.cards.filter { !known.contains($0.key) }
+                cards.append(contentsOf: fresh)
+                got += fresh.count
                 preload()
+            }
+            if got >= Self.releaseBatch || (got > 0 && Date().timeIntervalSince(started) >= Self.releaseAfter) {
+                pause?.arrived = true
+                AppLog.info("feed pause: content arrived", ["got": got, "waitedS": Int(Date().timeIntervalSince(started))])
                 return
             }
+            if !r.cards.isEmpty { continue }
             if let a = r.availability {
                 pause?.mode = a.state == "resting" ? .resting : .waiting
                 pause?.resumeAt = a.resumeAt.map { Date(timeIntervalSince1970: $0 / 1000) }
