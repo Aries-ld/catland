@@ -53,6 +53,7 @@ final class SearchController {
         self.sidecar = sidecar
         recent = UserDefaults.standard.stringArray(forKey: Self.recentKey) ?? []
         player = FeedController(sidecar: sidecar)
+        if let data = UserDefaults.standard.data(forKey: Self.hotKey), let words = try? JSONDecoder().decode([HotWord].self, from: data) { hotWords = words }
     }
 
     var searching: Bool { states.values.contains { $0.status == .loading } }
@@ -71,34 +72,39 @@ final class SearchController {
     var editingRecent = false
     /// 「猜你想搜」换一换的轮次。
     var suggestionRound = 0
-    /// 平台实时热搜（打开搜索页时取，sidecar 缓存 30 分钟）；拿不到时用本地词兜底。
+    /// 平台实时热搜：App 在后台定时从 sidecar 缓存里读（sidecar 每个平台最多 1 小时取一次），并存到本地，
+    /// 下次启动、打开搜索页时直接显示，不闪；一个都没有时才用本地词兜底。
     private(set) var hotWords: [HotWord] = []
+    private static let hotKey = "hotWords"
 
-    func open(platforms ids: [String] = []) {
+    func open() {
         active = true
         collapsedAt = nil
-        guard !ids.isEmpty else { return }
-        Task {
-            if let words: [HotWord] = try? await sidecar.call("search.hot", ["platforms": ids]), !words.isEmpty {
-                hotWords = words
-                AppLog.info("search.hot", ["count": words.count, "platforms": Array(Set(words.map(\.platform)))])
-            }
+    }
+
+    /// 后台刷新热搜（启动后、之后每 30 分钟）：sidecar 只读缓存、不在这里发平台请求。
+    func refreshHot(platforms ids: [String]) async {
+        guard !ids.isEmpty, let words: [HotWord] = try? await sidecar.call("search.hot", ["platforms": ids]), !words.isEmpty else { return }
+        if words != hotWords {
+            hotWords = words
+            if let data = try? JSONEncoder().encode(words) { UserDefaults.standard.set(data, forKey: Self.hotKey) }
+            AppLog.info("search.hot", ["count": words.count, "platforms": Array(Set(words.map(\.platform)))])
         }
     }
 
-    /// 猜你想搜这一轮显示的词：有实时热搜用热搜（每轮 8 个，「换一换」翻下一组），否则用本地词。
-    /// 「换一换」：实时热搜和本地词排成一个大池子，每轮取 8 个（热搜在前；热搜只有一组时，第二轮换成本地词）。
-    func currentSuggestions(season: SceneSeason) -> (words: [String], platforms: [String: String], live: Bool) {
-        let live = hotWords.filter { !recent.contains($0.text) }
-        let liveTexts = Set(live.map(\.text))
-        let local = suggestions(season: season, round: 0, count: 24).filter { !liveTexts.contains($0) }
-        let pool = live.map(\.text) + local
-        guard !pool.isEmpty else { return ([], [:], false) }
-        let pages = max(1, Int((Double(pool.count) / 8).rounded(.up)))
+    /// 猜你想搜：有实时热搜就只显示热搜（不和本地词混在一起），每轮 8 个，「换一换」翻下一组；没有热搜时才用本地词。
+    func currentSuggestions(season: SceneSeason) -> [String] {
+        let live = hotWords.map(\.text).filter { !recent.contains($0) }
+        guard live.count >= 4 else { return suggestions(season: season) }
+        let pages = max(1, Int((Double(live.count) / 8).rounded(.up)))
         let start = (suggestionRound % pages) * 8
-        let page = Array(pool[start..<min(pool.count, start + 8)])
-        let platforms = Dictionary(live.map { ($0.text, $0.platform) }, uniquingKeysWith: { a, _ in a })
-        return (page, platforms.filter { page.contains($0.key) }, page.contains { liveTexts.contains($0) })
+        return Array(live[start..<min(live.count, start + 8)])
+    }
+
+    /// 实时热搜只有一组时，「换一换」没有可换的，就不显示按钮。
+    var canShuffleSuggestions: Bool {
+        let live = hotWords.map(\.text).filter { !recent.contains($0) }
+        return live.count >= 4 ? live.count > 8 : true
     }
 
     /// 退出搜索（取消 / Esc）：这次搜索会话结束，下次进来是干净的搜索首页。
@@ -190,15 +196,15 @@ final class SearchController {
     }
 
     /// 猜你想搜：本地按季节、时段挑的示例词（不请求平台），「换一换」轮换。
-    func suggestions(now: Date = Date(), season: SceneSeason, round: Int? = nil, count: Int = 8) -> [String] {
+    func suggestions(now: Date = Date(), season: SceneSeason) -> [String] {
         let hour = Calendar.current.component(.hour, from: now)
         var pool = Self.everyday
         pool += Self.bySeason[season] ?? []
         pool += hour >= 17 ? Self.evening : (hour < 11 ? Self.morning : Self.daytime)
         pool = pool.filter { !recent.contains($0) }
         guard !pool.isEmpty else { return [] }
-        let start = ((round ?? suggestionRound) * count) % pool.count
-        return (0..<min(count, pool.count)).map { pool[(start + $0) % pool.count] }
+        let start = (suggestionRound * 8) % pool.count
+        return (0..<min(8, pool.count)).map { pool[(start + $0) % pool.count] }
     }
 
     private static let everyday = ["咖啡拉花", "健身计划", "极简穿搭", "周末去哪", "猫咪日常", "Mac 效率工具", "收纳技巧", "新手化妆"]

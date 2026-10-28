@@ -160,12 +160,27 @@ final class AppState {
         connectedContentPlatforms.filter { $0.health != "expired" && sourceStatus[$0.id] != "auth" }.map(\.id)
     }
 
+    private var hotTask: Task<Void, Never>?
+
+    /// 后台定时把 sidecar 缓存里的热搜同步过来（启动后 15 秒一次，之后每 30 分钟），打开搜索页时直接用。
+    func startHotRefresh() {
+        hotTask?.cancel()
+        hotTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(15))
+            while !Task.isCancelled {
+                guard let self else { return }
+                await self.search.refreshHot(platforms: self.searchPlatforms)
+                try? await Task.sleep(for: .seconds(30 * 60))
+            }
+        }
+    }
+
     /// 打开搜索页：暂停推荐流。
     func openSearch() {
         overlay = .none
         commentsOpen = false
         feed.pauseAll()
-        search.open(platforms: searchPlatforms)
+        search.open()
     }
 
     /// 面板收起 / 展开时的搜索会话：收起只算暂停；隔超过 30 分钟再展开，结束这次搜索、回到推荐流。
@@ -216,7 +231,10 @@ final class AppState {
         case "app.ready", "accounts.changed":
             struct P: Decodable { let platforms: [PlatformState] }
             if let p = try? dec.decode(P.self, from: params) { setPlatforms(p.platforms) }
-            if method == "app.ready" { Task { await feed.prime() } }
+            if method == "app.ready" {
+                Task { await feed.prime() }
+                startHotRefresh()
+            }
         case "accounts.login":
             if let e = try? dec.decode(LoginEvent.self, from: params), qrLogin?.platform == e.platform {
                 if e.type == "qrcode", let b64 = e.png { qrLogin?.png = Data(base64Encoded: b64) }

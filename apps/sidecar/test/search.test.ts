@@ -149,12 +149,36 @@ describe('SearchService', () => {
   it('hot keywords: merged round-robin, deduped, cached, and unsupported platforms are remembered', async () => {
     const { search, adapters } = setup()
     adapters.get('douyin')!.hotError = new CatbusCallError('NOT_IMPLEMENTED', 'douyin keyword hot 尚未实现')
-    const words = await search.hot(['xhs', 'douyin'])
+    const words = await search.hot(['xhs', 'douyin']) // 都没缓存：先取一个平台
     expect(words.map((w) => w.text)).toEqual(['xhs热词1', '共同热词', 'xhs热词2'])
     expect(words[0]!.platform).toBe('xhs')
     await search.hot(['xhs', 'douyin'])
-    expect(adapters.get('xhs')!.hotCalls).toBe(1) // 30 分钟缓存
-    expect(adapters.get('douyin')!.hotCalls).toBe(1) // 没实现：记住，不再请求
+    expect(adapters.get('xhs')!.hotCalls).toBe(1) // 之后只读缓存，不发请求
+    expect(adapters.get('douyin')!.hotCalls).toBe(0)
+  })
+
+  it('the background schedule fetches one platform per tick, mixes them evenly and dedupes', async () => {
+    const { search, adapters } = setup()
+    adapters.get('douyin')!.hotError = null
+    search.startHotSchedule(() => ['xhs', 'douyin'], 20, 0)
+    await new Promise((r) => setTimeout(r, 5))
+    expect(adapters.get('xhs')!.hotCalls + adapters.get('douyin')!.hotCalls).toBe(1) // 一次只取一个平台
+    await new Promise((r) => setTimeout(r, 30))
+    search.stopHotSchedule()
+    expect(adapters.get('xhs')!.hotCalls).toBe(1)
+    expect(adapters.get('douyin')!.hotCalls).toBe(1)
+    const words = (await search.hot(['xhs', 'douyin'])).map((w) => w.text)
+    expect(words).toEqual(['xhs热词1', 'douyin热词1', '共同热词', 'xhs热词2', 'douyin热词2']) // 等比例轮流、去重
+  })
+
+  it('a platform catbus does not implement is remembered and skipped by the schedule', async () => {
+    const { search, adapters } = setup()
+    adapters.get('douyin')!.hotError = new CatbusCallError('NOT_IMPLEMENTED', 'nope')
+    search.startHotSchedule(() => ['douyin', 'xhs'], 10, 0)
+    await new Promise((r) => setTimeout(r, 45))
+    search.stopHotSchedule()
+    expect(adapters.get('douyin')!.hotCalls).toBe(1)
+    expect(adapters.get('xhs')!.hotCalls).toBe(1)
   })
 
   it('hot keywords skip platforms in cooldown', async () => {

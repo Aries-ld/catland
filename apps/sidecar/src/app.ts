@@ -54,9 +54,12 @@ export class App {
     await this.accounts.refresh()
     this.syncSources()
     this.accounts.on('changed', () => this.syncSources())
+    // 热搜在后台分散地取（每 5 分钟最多取一个平台，每个平台最多 1 小时一次），打开搜索页时只读缓存
+    this.search.startHotSchedule(() => this.enabled)
   }
 
   stop(): void {
+    this.search.stopHotSchedule()
     this.mixer.stop()
     this.store.close()
   }

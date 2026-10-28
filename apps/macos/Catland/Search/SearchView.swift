@@ -438,20 +438,14 @@ struct SearchHome: View {
         }
     }
 
-    /// 猜你想搜：优先用平台的实时热搜（标出来自哪个平台），拿不到时用本地示例词兜底；「换一换」翻下一组。
+    /// 猜你想搜：有实时热搜只显示热搜（来自各平台、等比例混合），没有时才用本地示例词；「换一换」翻下一组。
     private var suggestions: some View {
-        let s = search.currentSuggestions(season: SceneSeason.of(Date(), latitude: state.location.latitude))
-        let words = s.words
+        let words = search.currentSuggestions(season: SceneSeason.of(Date(), latitude: state.location.latitude))
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
                 sectionTitle("猜你想搜")
-                if s.live {
-                    Text("实时热搜").font(.system(size: 9, weight: .semibold)).foregroundStyle(.white)
-                        .padding(.horizontal, 5).padding(.vertical, 1.5)
-                        .background(Capsule().fill(Color.pink.opacity(0.85)))
-                }
                 Spacer()
-                Button { search.suggestionRound += 1 } label: {
+                if search.canShuffleSuggestions { Button { search.suggestionRound += 1 } label: {
                     HStack(spacing: 3) {
                         Image(systemName: "arrow.triangle.2.circlepath").font(.system(size: 10))
                         Text("换一换").font(.system(size: 12))
@@ -459,7 +453,7 @@ struct SearchHome: View {
                     .foregroundStyle(.white.opacity(0.45))
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.plain) }
             }
             LazyVGrid(columns: [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)], alignment: .leading, spacing: 12) {
                 ForEach(words, id: \.self) { w in
@@ -467,11 +461,8 @@ struct SearchHome: View {
                         search.query = w
                         search.submit(platforms: state.searchPlatforms)
                     } label: {
-                        HStack(spacing: 5) {
-                            if let p = s.platforms[w] { PlatformIcon(platform: p, size: 12) }
-                            Text(w).font(.system(size: 13)).foregroundStyle(.white.opacity(0.85)).lineLimit(1)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+                        Text(w).font(.system(size: 13)).foregroundStyle(.white.opacity(0.85)).lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .disabled(state.searchPlatforms.isEmpty)
