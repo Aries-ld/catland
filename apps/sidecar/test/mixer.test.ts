@@ -321,13 +321,13 @@ describe('FeedMixer', () => {
     m.stop()
   })
 
-  it('防风控默认值：小红书每分钟最多 8 次请求，第 9 次要等窗口滑过去', () => {
+  it('防风控默认值：每个平台每分钟最多 12 次请求，第 13 次要等窗口滑过去', () => {
     let now = 1_000_000
     const m = new FeedMixer({ logger: createMemoryLogger(), now: () => now })
     const waits: number[] = []
-    for (let i = 0; i < 9; i++) waits.push(m.acquire('xhs'))
-    expect(waits.slice(0, 8).every((w) => w === 0)).toBe(true)
-    expect(waits[8]).toBe(60_000)
+    for (let i = 0; i < 13; i++) waits.push(m.acquire('xhs'))
+    expect(waits.slice(0, 12).every((w) => w === 0)).toBe(true)
+    expect(waits[12]).toBe(60_000)
     now += 61_000
     expect(m.acquire('xhs')).toBe(0)
     m.stop()
