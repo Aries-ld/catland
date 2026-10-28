@@ -10,6 +10,12 @@ import { toSearchHit } from './adapters.ts'
 import type { FeedMixer } from './mixer.ts'
 import { type FeedCard, type PlatformAdapter, type SearchHit } from './types.ts'
 
+export interface HotWord {
+  text: string
+  platform: string
+  heat: number | null
+}
+
 export interface SearchResult {
   status: 'ok' | 'resting' | 'auth' | 'unsupported'
   hits: SearchHit[]
@@ -42,6 +48,11 @@ export class SearchService {
   private readonly cache = new Map<string, { at: number; result: SearchResult }>()
   /** 每个平台下一次允许发起搜索的时间（串行排队，避免连续回车打爆一个平台）。 */
   private readonly nextAt = new Map<string, number>()
+  /** 热搜缓存（每个平台 30 分钟取一次）；catbus 没实现的平台记住，不再请求。 */
+  private readonly hotCache = new Map<string, { at: number; words: HotWord[] }>()
+  private readonly hotUnsupported = new Set<string>()
+  private readonly hotInflight = new Map<string, Promise<HotWord[]>>()
+  static readonly HOT_TTL_MS = 30 * 60_000
 
   private readonly deps: SearchDeps
 
@@ -107,6 +118,52 @@ export class SearchService {
       this.deps.mixer.reportError(d.platform, err)
       throw err
     }
+  }
+
+  /**
+   * 各平台的实时热搜（打开搜索页时调用）：30 分钟缓存；风控冷却 / 登录失效 / catbus 没实现的平台跳过；
+   * 按平台轮流合并、去重。全都拿不到时返回空，App 用本地词兜底。
+   */
+  async hot(platforms: string[]): Promise<HotWord[]> {
+    const lists = await Promise.all(platforms.map((p) => this.hotOf(p)))
+    const out: HotWord[] = []
+    const seen = new Set<string>()
+    for (let i = 0; out.length < 30 && lists.some((l) => i < l.length); i++) {
+      for (const l of lists) {
+        const w = l[i]
+        if (w && !seen.has(w.text)) { seen.add(w.text); out.push(w) }
+      }
+    }
+    return out
+  }
+
+  private async hotOf(platform: string): Promise<HotWord[]> {
+    if (this.hotUnsupported.has(platform)) return []
+    const cached = this.hotCache.get(platform)
+    if (cached && this.now() - cached.at < SearchService.HOT_TTL_MS) return cached.words
+    const status = this.deps.mixer.statusOf(platform)
+    if (status === 'cooldown' || status === 'auth') return cached?.words ?? []
+    const adapter = this.deps.adapterFor(platform)
+    if (!adapter.hotKeywords) return []
+    let p = this.hotInflight.get(platform)
+    if (!p) {
+      p = adapter.hotKeywords()
+        .then((ks) => {
+          const words = ks.map((k) => ({ text: k.text, platform, heat: k.heat }))
+          this.hotCache.set(platform, { at: this.now(), words })
+          return words
+        })
+        .catch((err) => {
+          const code = err instanceof CatbusCallError ? err.code : 'ERROR'
+          if (code === 'NOT_IMPLEMENTED' || code === 'UNSUPPORTED') this.hotUnsupported.add(platform)
+          else this.deps.mixer.reportError(platform, err)
+          this.log.info('hot keywords unavailable', { platform, code })
+          return cached?.words ?? []
+        })
+        .finally(() => this.hotInflight.delete(platform))
+      this.hotInflight.set(platform, p)
+    }
+    return p
   }
 
   has(key: string): boolean {

@@ -3,7 +3,7 @@ import type { CatbusClient } from '../accounts/service.ts'
 import { CatbusCallError } from '../catbus/runner.ts'
 import type { Item, Media } from '../catbus/types.ts'
 import type { Logger } from '../log.ts'
-import { cardKey, type FeedCard, type FeedPage, type Headers, type ImageSource, type PlatformAdapter, type SearchHit, type VideoSource } from './types.ts'
+import { cardKey, type FeedCard, type FeedPage, type Headers, type HotKeyword, type ImageSource, type PlatformAdapter, type SearchHit, type VideoSource } from './types.ts'
 
 export const DESKTOP_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
 
@@ -56,6 +56,11 @@ export class CatbusAdapter implements PlatformAdapter {
     const argv = [this.platform, 'item', 'search', '--limit', String(SEARCH_PAGE), ...(cursor ? ['--cursor', cursor] : []), '--', query]
     const { data, page } = await this.catbus.run<Item[]>(argv, { signal })
     return { items: data, cursor: page?.cursor ?? null, hasMore: page?.has_more ?? false }
+  }
+
+  async hotKeywords(signal?: AbortSignal): Promise<HotKeyword[]> {
+    const { data } = await this.catbus.run<Array<{ text: string; heat: number | null }>>([this.platform, 'keyword', 'hot'], { signal })
+    return data.filter((k) => typeof k.text === 'string' && k.text.trim()).map((k) => ({ text: k.text.trim(), heat: k.heat ?? null }))
   }
 
   async resolve(item: Item, signal?: AbortSignal, fresh = false): Promise<FeedCard | null> {

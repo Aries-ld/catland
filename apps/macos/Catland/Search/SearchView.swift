@@ -382,7 +382,6 @@ struct SearchHome: View {
                             PlatformIcon(platform: p, size: 16)
                             Text("\(Persona.forPlatform(p)?.name ?? "") · \(PlatformBrand.shortName(p))").font(.system(size: 13))
                             Spacer()
-                            if p == "kuaishou" { Text("只按关键词").font(.system(size: 10)).foregroundStyle(.white.opacity(0.35)) }
                         }
                         .padding(.horizontal, 12).frame(height: 46)
                         .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.white.opacity(0.05)))
@@ -439,12 +438,18 @@ struct SearchHome: View {
         }
     }
 
-    /// 猜你想搜：本地示例词（按季节、时段），「换一换」轮换；不请求平台。
+    /// 猜你想搜：优先用平台的实时热搜（标出来自哪个平台），拿不到时用本地示例词兜底；「换一换」翻下一组。
     private var suggestions: some View {
-        let words = search.suggestions(season: SceneSeason.of(Date(), latitude: state.location.latitude))
+        let s = search.currentSuggestions(season: SceneSeason.of(Date(), latitude: state.location.latitude))
+        let words = s.words
         return VStack(alignment: .leading, spacing: 10) {
-            HStack {
+            HStack(spacing: 6) {
                 sectionTitle("猜你想搜")
+                if s.live {
+                    Text("实时热搜").font(.system(size: 9, weight: .semibold)).foregroundStyle(.white)
+                        .padding(.horizontal, 5).padding(.vertical, 1.5)
+                        .background(Capsule().fill(Color.pink.opacity(0.85)))
+                }
                 Spacer()
                 Button { search.suggestionRound += 1 } label: {
                     HStack(spacing: 3) {
@@ -462,8 +467,11 @@ struct SearchHome: View {
                         search.query = w
                         search.submit(platforms: state.searchPlatforms)
                     } label: {
-                        Text(w).font(.system(size: 13)).foregroundStyle(.white.opacity(0.85)).lineLimit(1)
-                            .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+                        HStack(spacing: 5) {
+                            if let p = s.platforms[w] { PlatformIcon(platform: p, size: 12) }
+                            Text(w).font(.system(size: 13)).foregroundStyle(.white.opacity(0.85)).lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .disabled(state.searchPlatforms.isEmpty)

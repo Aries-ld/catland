@@ -29,6 +29,13 @@ class FakeSearch implements PlatformAdapter {
     const start = cursor ? Number(cursor) : 0
     return { items: [item(`${start}`), item(`${start + 1}`, { kind: 'text' }), item(`${start + 2}`, { kind: 'image' })], cursor: `${start + 3}`, hasMore: true }
   }
+  hotCalls = 0
+  hotError: Error | null = null
+  async hotKeywords() {
+    this.hotCalls++
+    if (this.hotError) throw this.hotError
+    return [{ text: `${this.platform}热词1`, heat: null }, { text: '共同热词', heat: null }, { text: `${this.platform}热词2`, heat: 9 }]
+  }
   async resolve(it: Item): Promise<FeedCard | null> {
     const now = Date.now()
     return {
@@ -137,6 +144,24 @@ describe('SearchService', () => {
     await search.resolve('xhs:0')
     await search.resolve('xhs:0', true)
     expect(calls).toEqual([false, true])
+  })
+
+  it('hot keywords: merged round-robin, deduped, cached, and unsupported platforms are remembered', async () => {
+    const { search, adapters } = setup()
+    adapters.get('douyin')!.hotError = new CatbusCallError('NOT_IMPLEMENTED', 'douyin keyword hot 尚未实现')
+    const words = await search.hot(['xhs', 'douyin'])
+    expect(words.map((w) => w.text)).toEqual(['xhs热词1', '共同热词', 'xhs热词2'])
+    expect(words[0]!.platform).toBe('xhs')
+    await search.hot(['xhs', 'douyin'])
+    expect(adapters.get('xhs')!.hotCalls).toBe(1) // 30 分钟缓存
+    expect(adapters.get('douyin')!.hotCalls).toBe(1) // 没实现：记住，不再请求
+  })
+
+  it('hot keywords skip platforms in cooldown', async () => {
+    const { search, adapters, mixer } = setup()
+    mixer.reportError('xhs', new CatbusCallError('RISK_CONTROL', 'blocked'))
+    expect(await search.hot(['xhs'])).toEqual([])
+    expect(adapters.get('xhs')!.hotCalls).toBe(0)
   })
 
   it('resolves an opened hit into a playable card', async () => {

@@ -79,6 +79,13 @@ struct SearchHit: Codable, Identifiable, Hashable {
     }
 }
 
+/// 平台实时热搜词（search.hot）。
+struct HotWord: Codable, Hashable {
+    let text: String
+    let platform: String
+    let heat: Double?
+}
+
 struct SearchResult: Codable {
     /// ok / resting（平台在风控冷却）/ auth（登录失效）/ unsupported
     let status: String

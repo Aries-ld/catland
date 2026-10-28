@@ -165,7 +165,7 @@ final class AppState {
         overlay = .none
         commentsOpen = false
         feed.pauseAll()
-        search.open()
+        search.open(platforms: searchPlatforms)
     }
 
     /// 面板收起 / 展开时的搜索会话：收起只算暂停；隔超过 30 分钟再展开，结束这次搜索、回到推荐流。

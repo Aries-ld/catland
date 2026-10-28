@@ -165,6 +165,11 @@ export class App {
         if (query.length === 0 || query.length > 60) throw new ParamError('query must be 1–60 characters')
         return this.search.query(platform(p), query, optStr(p, 'cursor') ?? null)
       })
+      .register('search.hot', (p) => {
+        const ps = p.platforms
+        if (!Array.isArray(ps) || !ps.every((x) => typeof x === 'string' && getPlatform(x))) throw new ParamError('platforms must be platform ids')
+        return this.search.hot(ps as string[])
+      })
       .register('search.resolve', async (p) => {
         const card = await this.search.resolve(str(p, 'key'), p.fresh === true)
         if (!card) return null

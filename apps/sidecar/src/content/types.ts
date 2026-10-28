@@ -46,6 +46,11 @@ export interface FeedPage {
   hasMore: boolean
 }
 
+export interface HotKeyword {
+  text: string
+  heat: number | null
+}
+
 /** 搜索结果：只用于封面网格，不解析媒体；点开时再 search.resolve 成 FeedCard。 */
 export interface SearchHit {
   key: string
@@ -66,6 +71,8 @@ export interface PlatformAdapter {
   readonly platform: string
   fetchFeed(cursor: string | null, signal?: AbortSignal): Promise<FeedPage>
   search?(query: string, cursor: string | null, signal?: AbortSignal): Promise<FeedPage>
+  /** 平台实时热搜词（catbus keyword hot）。 */
+  hotKeywords?(signal?: AbortSignal): Promise<HotKeyword[]>
   /**
    * 返回 null 表示这条内容不适合放进刷刷流（纯文字、没有可用媒体等）。
    * fresh：播放失败后重新解析，不复用列表里自带的媒体地址（它可能已经失效），一定重新取详情。

@@ -88,6 +88,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 case let c where c.hasPrefix("render:search"):
                     // 离屏渲染搜索首页（不弹出面板），用于检查版式；render:search-edit 渲染编辑历史记录的样子
                     let editing = c.hasSuffix("-edit")
+                    if self.state.search.hotWords.isEmpty { self.state.search.open(platforms: self.state.searchPlatforms); self.state.search.active = false }
                     self.state.search.editingRecent = editing
                     let view = SearchHome(state: self.state)
                         .frame(width: 384, height: 620, alignment: .top).background(Color(white: 0.04)).environment(\.colorScheme, .dark)
