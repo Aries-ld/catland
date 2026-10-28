@@ -18,7 +18,7 @@ struct SearchHeader: View {
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
                     .focused($focused)
-                    .onSubmit { search.submit(platforms: state.searchPlatforms) }
+                    .onSubmit { search.submit(platforms: state.searchTargets) }
                     // 关键词删光：回到搜索首页（结果丢掉）
                     .onChange(of: search.query) { _, q in
                         if q.trimmingCharacters(in: .whitespaces).isEmpty && !search.submitted.isEmpty { search.clearResults() }
@@ -169,12 +169,16 @@ struct SearchView: View {
             // 外层也要惰性：普通 VStack 里底部的「加载更多」一创建就会 onAppear，没滑到底就开始翻页
             LazyVStack(spacing: 10) {
                 if search.searching { CatsOut(state: state, compact: true) }
-                CoverMasonry(items: list.map(CoverItem.init), columnWidth: width) { item in
+                CoverMasonry(items: list.map(CoverItem.init), columnWidth: width, open: { item in
                     if let hit = list.first(where: { $0.key == item.id }) { search.play(hit) }
-                }
-                // 滑到底才加载下一页（第一页都回来之后）
+                }, appeared: { index in
+                    // 滑到当前结果的六成左右才取下一页
+                    if index >= list.count * 6 / 10 { search.loadMore() }
+                })
+                // 底部：正在取下一页时转圈；滑到底还没触发时兜底触发一次
                 if search.hasMore && !search.searching {
                     ProgressView().controlSize(.small).padding(.vertical, 12)
+                        .opacity(search.loadingMore ? 1 : 0.4)
                         .onAppear { search.loadMore() }
                 }
             }
@@ -299,16 +303,29 @@ struct SearchHome: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                 } else {
-                    sectionTitle("猫们会去这些地方帮你找")
+                    HStack {
+                        sectionTitle("猫们会去这些地方帮你找")
+                        Spacer()
+                        Text("点猫勾选").font(.system(size: 11)).foregroundStyle(.white.opacity(0.35))
+                    }
                     ForEach(state.searchPlatforms, id: \.self) { p in
-                        HStack(spacing: 10) {
-                            if let persona = Persona.forPlatform(p) { CatSprite(skin: persona.skin, action: "idle", scale: 2.5) }
-                            PlatformIcon(platform: p, size: 16)
-                            Text("\(Persona.forPlatform(p)?.name ?? "") · \(PlatformBrand.shortName(p))").font(.system(size: 13))
-                            Spacer()
+                        let on = search.selected.isEmpty || search.selected.contains(p)
+                        Button { withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) { search.toggle(p) } } label: {
+                            HStack(spacing: 10) {
+                                if let persona = Persona.forPlatform(p) { CatSprite(skin: persona.skin, action: on ? "idle" : "nap", scale: 2.5) }
+                                PlatformIcon(platform: p, size: 16, dimmed: !on)
+                                Text("\(Persona.forPlatform(p)?.name ?? "") · \(PlatformBrand.shortName(p))").font(.system(size: 13))
+                                    .foregroundStyle(.white.opacity(on ? 1 : 0.4))
+                                Spacer()
+                                if !on { Text("这次不去").font(.system(size: 11)).foregroundStyle(.white.opacity(0.35)) }
+                                Image(systemName: on ? "checkmark.circle.fill" : "circle")
+                                    .font(.system(size: 16)).foregroundStyle(on ? Color.pink : .white.opacity(0.3))
+                            }
+                            .padding(.horizontal, 12).frame(height: 46)
+                            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.white.opacity(on ? 0.07 : 0.03)))
+                            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         }
-                        .padding(.horizontal, 12).frame(height: 46)
-                        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.white.opacity(0.05)))
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -343,7 +360,7 @@ struct SearchHome: View {
                     Button {
                         if search.editingRecent { search.removeRecent(q) } else {
                             search.useRecent(q)
-                            search.submit(platforms: state.searchPlatforms)
+                            search.submit(platforms: state.searchTargets)
                         }
                     } label: {
                         HStack(spacing: 4) {
@@ -383,7 +400,7 @@ struct SearchHome: View {
                 ForEach(words, id: \.self) { w in
                     Button {
                         search.query = w
-                        search.submit(platforms: state.searchPlatforms)
+                        search.submit(platforms: state.searchTargets)
                     } label: {
                         Text(w).font(.system(size: 13)).foregroundStyle(.white.opacity(0.85)).lineLimit(1)
                             .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())

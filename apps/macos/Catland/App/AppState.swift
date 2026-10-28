@@ -229,12 +229,19 @@ final class AppState {
         commentsOpen = false
     }
 
+    /// 这次搜索实际要去的平台：能搜的 ∩ 搜索首页勾选的。
+    var searchTargets: [String] {
+        let sel = search.selected
+        let list = searchPlatforms.filter { sel.isEmpty || sel.contains($0) }
+        return list.isEmpty ? searchPlatforms : list
+    }
+
     /// 打开搜索页：暂停推荐流。
     func openSearch() {
         overlay = .none
         commentsOpen = false
         feed.pauseAll()
-        search.open()
+        search.open(platforms: searchPlatforms)
         onboarding.advance(from: 1)
     }
 
@@ -392,7 +399,8 @@ final class AppState {
         let all = connectedContentPlatforms.map(\.id)
         var chosen = settings.sources["content"] ?? all
         if chosen.contains(platform) { chosen.removeAll { $0 == platform } } else { chosen.append(platform) }
-        if chosen.isEmpty { return showToast("至少保留一个信息源") }
+        if chosen.isEmpty { return showToast("至少保留一个平台") }
+        if chosen.count == 1, chosen.count < all.count { showToast("只刷一个平台时，猫会放慢搬运速度，免得被平台限流") }
         settings.sources["content"] = chosen
         Task {
             let _: Settings? = try? await sidecar.call("settings.update", ["sources": ["content": chosen]])

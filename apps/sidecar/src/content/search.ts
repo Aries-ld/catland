@@ -26,7 +26,7 @@ export interface SearchResult {
 export interface SearchDeps {
   logger: Logger
   adapterFor: (platform: string) => PlatformAdapter
-  mixer: Pick<FeedMixer, 'statusOf' | 'reportError'>
+  mixer: Pick<FeedMixer, 'statusOf' | 'reportError' | 'acquire'>
   now?: () => number
   sleep?: (ms: number) => Promise<void>
   /** 同一平台两次搜索请求的最小间隔。 */
@@ -36,6 +36,8 @@ export interface SearchDeps {
 }
 
 const ITEM_MEMORY = 500
+/** 同一平台每分钟最多搜索几次。 */
+const SEARCH_PER_MINUTE = 6
 const CACHE_SIZE = 60
 
 export class SearchService {
@@ -48,6 +50,7 @@ export class SearchService {
   private readonly cache = new Map<string, { at: number; result: SearchResult }>()
   /** 每个平台下一次允许发起搜索的时间（串行排队，避免连续回车打爆一个平台）。 */
   private readonly nextAt = new Map<string, number>()
+  private readonly recent = new Map<string, number[]>()
   /** 热搜缓存（后台每个平台最多 1 小时取一次）；catbus 没实现的平台记住，不再请求。 */
   private readonly hotCache = new Map<string, { at: number; words: HotWord[] }>()
   private readonly hotUnsupported = new Set<string>()
@@ -62,8 +65,8 @@ export class SearchService {
     this.log = deps.logger.child({ mod: 'search' })
     this.now = deps.now ?? Date.now
     this.sleep = deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)))
-    this.minIntervalMs = deps.minIntervalMs ?? 2_000
-    this.cacheTtlMs = deps.cacheTtlMs ?? 5 * 60_000
+    this.minIntervalMs = deps.minIntervalMs ?? 3_000
+    this.cacheTtlMs = deps.cacheTtlMs ?? 10 * 60_000
   }
 
   async query(platform: string, query: string, cursor: string | null = null): Promise<SearchResult> {
@@ -78,10 +81,16 @@ export class SearchService {
     const hit = this.cache.get(cacheKey)
     if (hit && this.now() - hit.at < this.cacheTtlMs) return hit.result
 
-    // 限速：同一平台的搜索请求排队，两次之间至少隔 minIntervalMs
-    const at = Math.max(this.now(), this.nextAt.get(platform) ?? 0)
+    // 限速：同一平台的搜索请求排队，两次之间至少隔 minIntervalMs；每分钟最多 6 次；
+    // 再和推荐流共用这个平台的请求预算（每分钟 / 每小时上限），搜索不会额外放大对平台的请求
+    const recent = (this.recent.get(platform) ?? []).filter((t) => t > this.now() - 60_000)
+    const minuteAt = recent.length >= SEARCH_PER_MINUTE ? recent[0]! + 60_000 : 0
+    const at = Math.max(this.now(), this.nextAt.get(platform) ?? 0, minuteAt)
     this.nextAt.set(platform, at + this.minIntervalMs)
+    this.recent.set(platform, [...recent, at])
     if (at > this.now()) await this.sleep(at - this.now())
+    const budgetWait = this.deps.mixer.acquire(platform)
+    if (budgetWait > 0) await this.sleep(budgetWait)
 
     try {
       const page = await adapter.search(q, cursor)

@@ -67,6 +67,18 @@ struct PlatformTile: View {
             Spacer(minLength: 0)
             if platform.connected && hovering && !disabled {
                 Button("退出") { Task { await state.logout(platform.id) } }.buttonStyle(.plain).font(.system(size: 10)).foregroundStyle(.red.opacity(0.9))
+            } else if platform.connected && !disabled && platform.sections.contains("content") {
+                // 「刷它」：这个平台出不出现在推荐里（和「视频」标签下的平台开关是同一份设置）
+                let on = state.isSourceEnabled(platform.id)
+                Button { withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) { state.toggleSource(platform.id) } } label: {
+                    Text(on ? "刷它" : "不刷").font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(on ? .black : .white.opacity(0.6))
+                        .padding(.horizontal, 7).frame(height: 18)
+                        .background(Capsule().fill(on ? Color.pink : .white.opacity(0.12)))
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .help(on ? "推荐里会刷到它，点一下关掉" : "推荐里不刷它，点一下打开")
             }
         }
         .padding(10)

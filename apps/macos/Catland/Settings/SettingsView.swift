@@ -1,4 +1,4 @@
-// 设置：静音、信息源勾选、快捷键说明、清空浏览历史；以及「我的」点赞 / 收藏列表。
+// 设置：静音、快捷键说明、清空浏览历史；以及「我的」点赞 / 收藏列表。
 import SwiftUI
 
 struct SettingsView: View {
@@ -33,14 +33,6 @@ struct SettingsView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("刘海下方小猫步道").font(.system(size: 12))
                                 Text("刘海处没有屏幕像素；打开后小猫能从刘海下方走过，会遮住其下约 15pt").font(.system(size: 10)).foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    section("视频板块的信息源") {
-                        if state.connectedContentPlatforms.isEmpty { Text("还没有连接内容平台").font(.system(size: 12)).foregroundStyle(.secondary) }
-                        ForEach(state.connectedContentPlatforms) { p in
-                            PillToggle(isOn: state.isSourceEnabled(p.id), action: { state.toggleSource(p.id) }) {
-                                HStack(spacing: 6) { PlatformBadge(platform: p.id); Text(p.current?.user?.name ?? "").font(.system(size: 12)).foregroundStyle(.secondary) }
                             }
                         }
                     }

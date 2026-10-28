@@ -7,6 +7,8 @@ struct ExpandedPanel: View {
     /// 搜索功能的一次性提示气泡（升级后第一次展开时出现）。
     @AppStorage("searchTipShown") private var searchTipShown = false
     @State private var showSearchTip = false
+    /// 再点一下「视频」标签：弹出刷哪些平台的开关。
+    @State private var showSources = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -15,6 +17,13 @@ struct ExpandedPanel: View {
                     if state.search.playing { SearchPlayerHeader(state: state) } else { SearchHeader(state: state) }
                 } else {
                     header
+                }
+            }
+            .overlay(alignment: .topLeading) {
+                if showSources && !state.search.active && state.overlay == .none {
+                    SourcePicker(state: state) { withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { showSources = false } }
+                        .offset(x: 12, y: 44)
+                        .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .topLeading)))
                 }
             }
             .overlay(alignment: .topTrailing) {
@@ -70,13 +79,25 @@ struct ExpandedPanel: View {
             ForEach(AppState.Section.allCases, id: \.self) { s in
                 Button {
                     if s == .commerce { return state.showToast("电商板块下个版本上线") }
+                    // 已经在「视频」上再点一下：弹出 / 收起平台开关
+                    if state.section == s && state.overlay == .none && s == .content {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { showSources.toggle() }
+                        return
+                    }
                     state.section = s
                     state.overlay = .none
                 } label: {
                     VStack(spacing: 4) {
-                        Text(s.rawValue)
-                            .font(.system(size: 14, weight: state.section == s ? .semibold : .regular))
-                            .foregroundStyle(s == .commerce ? .white.opacity(0.3) : (state.section == s ? .white : .white.opacity(0.55)))
+                        HStack(spacing: 2) {
+                            Text(s.rawValue)
+                                .font(.system(size: 14, weight: state.section == s ? .semibold : .regular))
+                                .foregroundStyle(s == .commerce ? .white.opacity(0.3) : (state.section == s ? .white : .white.opacity(0.55)))
+                            if s == .content && state.section == s {
+                                Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
+                                    .foregroundStyle(.white.opacity(0.5))
+                                    .rotationEffect(.degrees(showSources ? 180 : 0))
+                            }
+                        }
                         Capsule().fill(state.section == s ? Color.white : .clear).frame(width: 14, height: 2)
                     }
                     .padding(.horizontal, 4)
@@ -179,5 +200,52 @@ struct StatusView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(white: 0.07))
+    }
+}
+
+/// 刷哪些平台：一排平台小猫，点一下开关（和「连接」页的「刷它」开关是同一份设置，任意一处改都行）。
+struct SourcePicker: View {
+    let state: AppState
+    let close: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("刷哪些平台").font(.system(size: 12, weight: .semibold)).foregroundStyle(.white.opacity(0.85))
+                Spacer()
+                Button(action: close) { Image(systemName: "xmark").font(.system(size: 10, weight: .bold)).foregroundStyle(.white.opacity(0.4)) }
+                    .buttonStyle(.plain)
+            }
+            HStack(spacing: 8) {
+                ForEach(state.connectedContentPlatforms) { p in
+                    let on = state.isSourceEnabled(p.id)
+                    Button { withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) { state.toggleSource(p.id) } } label: {
+                        VStack(spacing: 4) {
+                            if let persona = Persona.forPlatform(p.id) {
+                                CatSprite(skin: persona.skin, action: on ? "idle" : "nap", scale: 2.5)
+                            }
+                            HStack(spacing: 3) {
+                                PlatformIcon(platform: p.id, size: 12, dimmed: !on)
+                                Text(PlatformBrand.shortName(p.id)).font(.system(size: 11)).foregroundStyle(.white.opacity(on ? 0.9 : 0.4))
+                            }
+                        }
+                        .frame(width: 76, height: 70)
+                        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.white.opacity(on ? 0.1 : 0.03)))
+                        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(on ? Color.pink.opacity(0.7) : .clear, lineWidth: 1))
+                        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    .buttonStyle(PressStyle())
+                }
+            }
+            Text(state.connectedContentPlatforms.filter { state.isSourceEnabled($0.id) }.count == 1
+                 ? "只刷一个平台时，猫会放慢搬运速度，免得被平台限流"
+                 : "关掉的平台不会出现在推荐里；也可以在「连接」页里开关")
+                .font(.system(size: 10)).foregroundStyle(.white.opacity(0.4))
+        }
+        .padding(12)
+        .frame(width: 360, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color(white: 0.1)))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(.white.opacity(0.08)))
+        .shadow(color: .black.opacity(0.5), radius: 16, y: 6)
     }
 }

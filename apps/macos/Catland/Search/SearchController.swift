@@ -36,11 +36,6 @@ final class SearchController {
     private var generation = 0
     /// 各平台已返回、还没并入 hits 的结果（按平台排队，轮流取出）。
     private var queues: [String: [SearchHit]] = [:]
-    /// 后台按游标预取好的下一页（还没显示）：滑到底时直接放进来，不用等。
-    private var reserve: [String: [SearchHit]] = [:]
-    /// 正在预取下一页的平台；waiting 里的平台预取一回来就直接显示（用户已经滑到底了）。
-    private var prefetching: Set<String> = []
-    private var wantMore: Set<String> = []
     private var lastPlatform: String?
     private var run = 0
     private var playOffset = 0
@@ -61,9 +56,12 @@ final class SearchController {
     /// 当前筛选下还有没有下一页（含已预取、还没显示的）。
     var hasMore: Bool {
         let ps = filter.map { [$0] } ?? platforms
-        return ps.contains { states[$0]?.hasMore == true || !(reserve[$0]?.isEmpty ?? true) || !(queues[$0]?.isEmpty ?? true) }
+        return ps.contains { states[$0]?.hasMore == true || !(queues[$0]?.isEmpty ?? true) }
     }
     var allUnavailable: Bool { !states.isEmpty && states.values.allSatisfy { $0.status == .resting || $0.status == .auth || $0.status == .failed } }
+
+    /// 这次搜索去哪些平台（搜索首页的小猫可勾选；每次进入搜索恢复全选）。
+    var selected: Set<String> = []
 
     /// 收起面板的时间：搜索中途收起只算暂停，再展开时回到原处；隔太久就回推荐流。
     var collapsedAt: Date?
@@ -77,9 +75,20 @@ final class SearchController {
     private(set) var hotWords: [HotWord] = []
     private static let hotKey = "hotWords"
 
-    func open() {
+    func open(platforms ids: [String]) {
         active = true
         collapsedAt = nil
+        selected = Set(ids)
+    }
+
+    /// 勾选 / 取消一只猫（至少留一只）。
+    func toggle(_ platform: String) {
+        if selected.contains(platform) {
+            guard selected.count > 1 else { return }
+            selected.remove(platform)
+        } else {
+            selected.insert(platform)
+        }
     }
 
     /// 后台刷新热搜（启动后、之后每 30 分钟）：sidecar 只读缓存、不在这里发平台请求。
@@ -126,9 +135,6 @@ final class SearchController {
         states = [:]
         hits = []
         queues = [:]
-        reserve = [:]
-        prefetching = []
-        wantMore = []
         lastPlatform = nil
         run = 0
     }
@@ -145,9 +151,6 @@ final class SearchController {
         filter = filter.flatMap { ids.contains($0) ? $0 : nil }
         hits = []
         queues = [:]
-        reserve = [:]
-        prefetching = []
-        wantMore = []
         lastPlatform = nil
         run = 0
         states = Dictionary(uniqueKeysWithValues: ids.map { ($0, PlatformState()) })
@@ -156,28 +159,19 @@ final class SearchController {
         for p in ids { Task { await fetch(p, cursor: nil, gen: gen) } }
     }
 
-    /// 滑到底：把后台预取好的下一页直接放进来，并接着预取再下一页；还没预取到的，等它回来就直接显示。
+    /// 滑到当前结果的六成左右：还有下一页的平台各取一页（不在后台提前预取，少一次请求是一次）。
     func loadMore() {
         guard !searching else { return } // 第一页还没都回来时不翻页，免得快的平台挤占结果
+        let gen = generation
         for p in filter.map({ [$0] }) ?? platforms {
-            if let r = reserve[p], !r.isEmpty {
-                queues[p, default: []] += r
-                reserve[p] = []
-            } else if prefetching.contains(p) {
-                wantMore.insert(p)
-            }
-            prefetch(p)
+            guard var s = states[p], s.status == .ok, s.hasMore, !s.loadingMore, let c = s.cursor else { continue }
+            s.loadingMore = true
+            states[p] = s
+            Task { await fetch(p, cursor: c, gen: gen) }
         }
-        drain()
     }
 
-    /// 后台按游标取下一页，先放在 reserve 里不显示。
-    private func prefetch(_ p: String) {
-        guard let s = states[p], s.status == .ok, s.hasMore, let c = s.cursor, !prefetching.contains(p), reserve[p]?.isEmpty ?? true else { return }
-        prefetching.insert(p)
-        let gen = generation
-        Task { await fetch(p, cursor: c, gen: gen, intoReserve: true) }
-    }
+    var loadingMore: Bool { states.values.contains { $0.loadingMore } }
 
     func useRecent(_ q: String) {
         query = q
@@ -258,13 +252,12 @@ final class SearchController {
 
     // MARK: - 内部
 
-    private func fetch(_ p: String, cursor: String?, gen: Int, intoReserve: Bool = false) async {
+    private func fetch(_ p: String, cursor: String?, gen: Int) async {
         var params: [String: Any] = ["platform": p, "query": submitted]
         if let cursor { params["cursor"] = cursor }
         let result: SearchResult? = try? await sidecar.call("search.query", params)
         guard gen == generation, var s = states[p] else { return } // 已经换了关键词：丢弃旧结果
         s.loadingMore = false
-        if intoReserve { prefetching.remove(p) }
         guard let r = result else {
             if s.count == 0 { s.status = .failed }
             states[p] = s
@@ -276,21 +269,14 @@ final class SearchController {
         case "auth": s.status = .auth
         default: s.status = .failed
         }
-        let known = Set(hits.map(\.key)).union((queues[p] ?? []).map(\.key)).union((reserve[p] ?? []).map(\.key))
+        let known = Set(hits.map(\.key)).union((queues[p] ?? []).map(\.key))
         let fresh = r.hits.filter { !known.contains($0.key) }
         s.count += fresh.count
         s.cursor = r.cursor
         s.hasMore = r.status == "ok" && r.hasMore
         states[p] = s
-        if intoReserve && !wantMore.contains(p) {
-            reserve[p, default: []] += fresh
-        } else {
-            wantMore.remove(p)
-            queues[p, default: []] += fresh
-        }
+        queues[p, default: []] += fresh
         drain()
-        // 第一页都回来后，各平台在后台预取下一页，滑到底时直接显示
-        if !searching { for q in platforms { prefetch(q) } }
         AppLog.info("search.result", ["platform": p, "status": r.status, "got": fresh.count, "page": cursor == nil ? "first" : "more"])
     }
 

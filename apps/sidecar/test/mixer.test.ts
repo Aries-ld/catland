@@ -55,7 +55,9 @@ class FakeAdapter implements PlatformAdapter {
 
 function mixer(over: Partial<MixerOptions> = {}) {
   return new FeedMixer({
-    logger: createMemoryLogger(), feedMinIntervalMs: 0, resolveMinIntervalMs: 0, backoffBaseMs: 20, backoffMaxMs: 40, riskCooldownMs: 10_000, ...over,
+    logger: createMemoryLogger(), feedMinIntervalMs: 0, resolveMinIntervalMs: 0, backoffBaseMs: 20, backoffMaxMs: 40, riskCooldownMs: 10_000,
+    // 这些测试验证混排 / 预取逻辑，关掉防风控限速（限速本身另有测试）
+    requestsPerMinute: 10_000, platformRequestsPerMinute: {}, requestsPerHour: 1_000_000, platformRequestsPerHour: {}, jitter: 0, ...over,
   })
 }
 
@@ -316,6 +318,39 @@ describe('FeedMixer', () => {
     const again = await m.refresh(card!.key)
     expect(again?.key).toBe(card!.key)
     expect(await m.refresh('nope:1')).toBeNull()
+    m.stop()
+  })
+
+  it('防风控默认值：小红书每分钟最多 8 次请求，第 9 次要等窗口滑过去', () => {
+    let now = 1_000_000
+    const m = new FeedMixer({ logger: createMemoryLogger(), now: () => now })
+    const waits: number[] = []
+    for (let i = 0; i < 9; i++) waits.push(m.acquire('xhs'))
+    expect(waits.slice(0, 8).every((w) => w === 0)).toBe(true)
+    expect(waits[8]).toBe(60_000)
+    now += 61_000
+    expect(m.acquire('xhs')).toBe(0)
+    m.stop()
+  })
+
+  it('每小时软上限：用到八成后每次至少隔 30 秒', () => {
+    let now = 0
+    const m = new FeedMixer({ logger: createMemoryLogger(), now: () => now, platformRequestsPerMinute: { xhs: 1000 }, platformRequestsPerHour: { xhs: 10 } })
+    for (let i = 0; i < 8; i++) { expect(m.acquire('xhs')).toBe(0); now += 1_000 }
+    expect(m.acquire('xhs')).toBeGreaterThanOrEqual(29_000)
+    m.stop()
+  })
+
+  it('取详情的间隔带随机抖动（1–1.6 倍），不是固定节拍', async () => {
+    const a = new FakeAdapter('bilibili')
+    let now = 0
+    const randoms = [0, 0.5, 1]
+    let k = 0
+    const m = new FeedMixer({ logger: createMemoryLogger(), now: () => now, feedMinIntervalMs: 0, resolveMinIntervalMs: 1_000, jitter: 0.6, random: () => randoms[k++ % 3]!,
+      requestsPerMinute: 1000, platformRequestsPerMinute: {} })
+    const spaced = (m as unknown as { spaced: (ms: number) => number }).spaced.bind(m)
+    expect([spaced(1_000), spaced(1_000), spaced(1_000)]).toEqual([1_000, 1_300, 1_600])
+    m.setSources([a])
     m.stop()
   })
 })

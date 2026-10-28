@@ -139,6 +139,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         try? data.write(to: URL(fileURLWithPath: editing ? "/tmp/search-home-edit.png" : "/tmp/search-home.png"))
                     }
                     self.state.search.editingRecent = false
+                    // 推荐流的平台开关弹层
+                    let picker = SourcePicker(state: self.state) {}.padding(10).background(Color(white: 0.04)).environment(\.colorScheme, .dark)
+                    let pr = ImageRenderer(content: picker); pr.scale = 2
+                    if let cg = pr.cgImage, let d = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) { try? d.write(to: URL(fileURLWithPath: "/tmp/source-picker.png")) }
                 case let c where c.hasPrefix("search:filter:"):
                     let f = String(c.dropFirst(14)); self.state.search.filter = f == "all" ? nil : f
                 case "search:next": self.page(1)

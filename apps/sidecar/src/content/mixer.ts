@@ -56,6 +56,12 @@ export interface MixerOptions {
   riskCooldownMaxMs?: number
   /** 每个平台每分钟最多发起的请求数（翻页 + 解析），把单个平台的请求频率压低。 */
   requestsPerMinute?: number
+  /** 每小时软上限：用到八成后每次请求至少隔 30 秒，到顶后等最早的一次滑出窗口。 */
+  requestsPerHour?: number
+  platformRequestsPerHour?: Record<string, number>
+  /** 间隔的随机抖动比例（0.6 = 实际间隔在 1–1.6 倍之间），避免固定节拍。 */
+  jitter?: number
+  random?: () => number
   /** 个别平台更保守的上限（如匿名访问的 Bilibili 播放地址）。 */
   platformRequestsPerMinute?: Record<string, number>
   backoffBaseMs?: number
@@ -102,6 +108,8 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
   /** 刚连接、还没下发过卡片的平台：下一次取卡时优先等它的第一张，让新平台立刻出现在刷刷流里。 */
   private readonly newcomers = new Set<string>()
   private inflight = 0
+  /** 没在推荐流里的平台（搜索时用到）的请求记账。 */
+  private readonly solo = new Map<string, Source>()
   private rr = 0
   private timer: NodeJS.Timeout | null = null
   private stopped = false
@@ -112,18 +120,24 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
     this.seen = opts.seen ?? new MemorySeenStore()
     this.now = opts.now ?? Date.now
     this.o = {
-      readyAhead: opts.readyAhead ?? 6,
-      readyPerSource: opts.readyPerSource ?? 4,
-      resolveConcurrency: opts.resolveConcurrency ?? 3,
-      feedMinIntervalMs: opts.feedMinIntervalMs ?? 2_000,
-      resolveMinIntervalMs: opts.resolveMinIntervalMs ?? 250,
+      // 防风控（见 ADR 0002「请求节奏」）：平台看的是请求次数和节奏，不是一次拿了多少条——
+      // 列表一次拉满一页；逐条取详情是大头，只为接下来一两条预取，两次之间留 1.5–2.4 秒并随机抖动。
+      readyAhead: opts.readyAhead ?? 3,
+      readyPerSource: opts.readyPerSource ?? 2,
+      resolveConcurrency: opts.resolveConcurrency ?? 2,
+      feedMinIntervalMs: opts.feedMinIntervalMs ?? 4_000,
+      resolveMinIntervalMs: opts.resolveMinIntervalMs ?? 1_500,
+      jitter: opts.jitter ?? 0.6,
+      random: opts.random ?? Math.random,
       maxConsecutive: opts.maxConsecutive ?? 1,
       maxRun: opts.maxRun ?? 3,
       balanceWaitMs: opts.balanceWaitMs ?? 2_500,
       riskCooldownMs: opts.riskCooldownMs ?? 5 * 60_000,
       riskCooldownMaxMs: opts.riskCooldownMaxMs ?? 60 * 60_000,
-      requestsPerMinute: opts.requestsPerMinute ?? 30,
-      platformRequestsPerMinute: opts.platformRequestsPerMinute ?? { bilibili: 20 },
+      requestsPerMinute: opts.requestsPerMinute ?? 10,
+      platformRequestsPerMinute: opts.platformRequestsPerMinute ?? { xhs: 8, douyin: 8, bilibili: 12, kuaishou: 12 },
+      requestsPerHour: opts.requestsPerHour ?? 300,
+      platformRequestsPerHour: opts.platformRequestsPerHour ?? { xhs: 200, douyin: 200 },
       backoffBaseMs: opts.backoffBaseMs ?? 5_000,
       backoffMaxMs: opts.backoffMaxMs ?? 2 * 60_000,
       expiryMarginMs: opts.expiryMarginMs ?? 60_000,
@@ -307,7 +321,7 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
   private maybeFetch(s: Source, now: number): number {
     if (s.fetching) return Infinity
     if (s.probing && s.inflight > 0) return Infinity
-    const allowedAt = Math.max(s.lastFetchAt + this.o.feedMinIntervalMs, this.budgetAt(s, now))
+    const allowedAt = Math.max(s.lastFetchAt + this.spaced(this.o.feedMinIntervalMs, s.lastFetchAt), this.budgetAt(s, now))
     if (now < allowedAt) return allowedAt
     s.fetching = true
     s.lastFetchAt = now
@@ -340,7 +354,7 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
 
   private resolveNext(s: Source, now: number): void {
     const item = s.pending.shift()!
-    s.nextResolveAt = now + this.o.resolveMinIntervalMs
+    s.nextResolveAt = now + this.spaced(this.o.resolveMinIntervalMs)
     s.requests.push(now)
     this.inflight++
     s.inflight++
@@ -364,10 +378,40 @@ export class FeedMixer extends EventEmitter<{ ready: []; source: [SourceState] }
   }
 
   /** 限速：最近一分钟的请求数达到上限时，返回可以再发请求的时间；否则返回 now。 */
+  /** 带随机抖动的间隔。seed 相同（同一次请求）时结果相同，避免每次 pump 重新抽签。 */
+  private spaced(ms: number, seed?: number): number {
+    if (ms <= 0 || this.o.jitter <= 0) return ms
+    if (seed !== undefined && Number.isFinite(seed)) return ms * (1 + this.o.jitter * ((Math.abs(Math.sin(seed)) * 10_000) % 1))
+    return ms * (1 + this.o.jitter * this.o.random())
+  }
+
+  /** 这个平台下一次允许请求的时间：每分钟上限 + 每小时软上限。推荐流和搜索共用（见 acquire）。 */
   private budgetAt(s: Source, now: number): number {
-    const limit = this.o.platformRequestsPerMinute[s.adapter.platform] ?? this.o.requestsPerMinute
-    while (s.requests.length > 0 && s.requests[0]! <= now - 60_000) s.requests.shift()
-    return s.requests.length < limit ? now : s.requests[0]! + 60_000
+    const p = s.adapter.platform
+    while (s.requests.length > 0 && s.requests[0]! <= now - 3_600_000) s.requests.shift()
+    const minuteLimit = this.o.platformRequestsPerMinute[p] ?? this.o.requestsPerMinute
+    const hourLimit = this.o.platformRequestsPerHour[p] ?? this.o.requestsPerHour
+    const lastMinute = s.requests.filter((t) => t > now - 60_000)
+    let at = lastMinute.length < minuteLimit ? now : lastMinute[0]! + 60_000
+    if (s.requests.length >= hourLimit) at = Math.max(at, s.requests[0]! + 3_600_000)
+    else if (s.requests.length >= hourLimit * 0.8) at = Math.max(at, (s.requests[s.requests.length - 1] ?? 0) + 30_000)
+    return at
+  }
+
+  /**
+   * 搜索也走同一个平台预算：返回还要等多少毫秒，并把这次请求记上。
+   * 平台没在推荐流里（没勾选）时单独记账，规则相同。
+   */
+  acquire(platform: string): number {
+    const now = this.now()
+    let s = this.sources.get(platform) ?? this.solo.get(platform)
+    if (!s) {
+      s = { adapter: { platform } as PlatformAdapter, requests: [] } as unknown as Source
+      this.solo.set(platform, s)
+    }
+    const at = Math.max(now, this.budgetAt(s, now))
+    s.requests.push(at)
+    return at - now
   }
 
   private onSuccess(s: Source): void {

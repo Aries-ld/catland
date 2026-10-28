@@ -61,13 +61,19 @@ struct CoverMasonry: View {
     let items: [CoverItem]
     let columnWidth: CGFloat
     let open: (CoverItem) -> Void
+    /// 某张卡片出现在屏幕上（参数是它在 items 里的位置）：搜索用它在滑到六成时取下一页。
+    var appeared: ((Int) -> Void)? = nil
 
     var body: some View {
         let cols = columns()
         HStack(alignment: .top, spacing: 8) {
             ForEach(0..<2, id: \.self) { c in
                 LazyVStack(spacing: 10) {
-                    ForEach(cols[c]) { item in CoverTile(item: item, width: columnWidth).onTapGesture { open(item) } }
+                    ForEach(cols[c]) { item in
+                        CoverTile(item: item, width: columnWidth)
+                            .onTapGesture { open(item) }
+                            .onAppear { if let appeared, let i = items.firstIndex(of: item) { appeared(i) } }
+                    }
                 }
                 .frame(width: columnWidth)
             }
