@@ -86,6 +86,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 case "cats:dump": AppLog.info("cats", CatDirector.shared.debugDump())
                 case "search:close": self.state.closeSearch()
                 case "render:cities": SceneSnapshot.renderCities()
+                case let c where c.hasPrefix("export:cats:"):
+                    // 导出平台猫的逐帧动画（每个动作一条横向精灵图 + 帧数 / 帧率），给官网用
+                    let dir = URL(fileURLWithPath: String(c.dropFirst(12)), isDirectory: true)
+                    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                    var meta: [String: [String: [String: Double]]] = [:]
+                    for skin in ["ragdoll", "tuxedoBlack", "calicoTV", "cowJacket", "kitten"] {
+                        guard let anims = CatAtlas.shared.cats[skin] else { continue }
+                        for (name, a) in anims where !a.frames.isEmpty {
+                            let w = a.frameWidth, h = a.frameHeight
+                            guard let ctx = CGContext(data: nil, width: w * a.frames.count, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+                                                      space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { continue }
+                            for (i, f) in a.frames.enumerated() { ctx.draw(f, in: CGRect(x: i * w, y: 0, width: w, height: h)) }
+                            if let img = ctx.makeImage(), let d = NSBitmapImageRep(cgImage: img).representation(using: .png, properties: [:]) {
+                                try? d.write(to: dir.appendingPathComponent("\(skin)-\(name).png"))
+                            }
+                            meta[skin, default: [:]][name] = ["frames": Double(a.frames.count), "fps": a.fps, "w": Double(w), "h": Double(h)]
+                        }
+                    }
+                    if let j = try? JSONSerialization.data(withJSONObject: meta, options: [.prettyPrinted, .sortedKeys]) { try? j.write(to: dir.appendingPathComponent("cats.json")) }
                 case "feed:pause": self.state.feed.debugPause()
                 case "render:comments":
                     // 用当前这条帖子的真实评论离屏渲染评论区（只读），检查版式、表情、楼中楼

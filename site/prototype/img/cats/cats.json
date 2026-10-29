@@ -1,0 +1,402 @@
+{
+  "calicoTV" : {
+    "groom" : {
+      "fps" : 4,
+      "frames" : 6,
+      "h" : 12,
+      "w" : 16
+    },
+    "hop" : {
+      "fps" : 9,
+      "frames" : 6,
+      "h" : 12,
+      "w" : 16
+    },
+    "idle" : {
+      "fps" : 3,
+      "frames" : 6,
+      "h" : 12,
+      "w" : 16
+    },
+    "loaf" : {
+      "fps" : 2,
+      "frames" : 6,
+      "h" : 12,
+      "w" : 16
+    },
+    "look" : {
+      "fps" : 2.5,
+      "frames" : 6,
+      "h" : 12,
+      "w" : 16
+    },
+    "nap" : {
+      "fps" : 1.6000000000000001,
+      "frames" : 9,
+      "h" : 12,
+      "w" : 16
+    },
+    "play" : {
+      "fps" : 5,
+      "frames" : 8,
+      "h" : 12,
+      "w" : 16
+    },
+    "roll" : {
+      "fps" : 4,
+      "frames" : 8,
+      "h" : 12,
+      "w" : 16
+    },
+    "sit" : {
+      "fps" : 2.5,
+      "frames" : 7,
+      "h" : 12,
+      "w" : 16
+    },
+    "stretch" : {
+      "fps" : 3.5,
+      "frames" : 7,
+      "h" : 12,
+      "w" : 16
+    },
+    "walk" : {
+      "fps" : 7,
+      "frames" : 4,
+      "h" : 12,
+      "w" : 16
+    },
+    "watch" : {
+      "fps" : 2,
+      "frames" : 8,
+      "h" : 12,
+      "w" : 16
+    },
+    "yawn" : {
+      "fps" : 3,
+      "frames" : 7,
+      "h" : 12,
+      "w" : 16
+    }
+  },
+  "cowJacket" : {
+    "groom" : {
+      "fps" : 4,
+      "frames" : 6,
+      "h" : 12,
+      "w" : 16
+    },
+    "hop" : {
+      "fps" : 9,
+      "frames" : 6,
+      "h" : 12,
+      "w" : 16
+    },
+    "idle" : {
+      "fps" : 3,
+      "frames" : 6,
+      "h" : 12,
+      "w" : 16
+    },
+    "loaf" : {
+      "fps" : 2,
+      "frames" : 6,
+      "h" : 12,
+      "w" : 16
+    },
+    "look" : {
+      "fps" : 2.5,
+      "frames" : 6,
+      "h" : 12,
+      "w" : 16
+    },
+    "nap" : {
+      "fps" : 1.6000000000000001,
+      "frames" : 9,
+      "h" : 12,
+      "w" : 16
+    },
+    "play" : {
+      "fps" : 5,
+      "frames" : 8,
+      "h" : 12,
+      "w" : 16
+    },
+    "roll" : {
+      "fps" : 4,
+      "frames" : 8,
+      "h" : 12,
+      "w" : 16
+    },
+    "sit" : {
+      "fps" : 2.5,
+      "frames" : 7,
+      "h" : 12,
+      "w" : 16
+    },
+    "stretch" : {
+      "fps" : 3.5,
+      "frames" : 7,
+      "h" : 12,
+      "w" : 16
+    },
+    "walk" : {
+      "fps" : 7,
+      "frames" : 4,
+      "h" : 12,
+      "w" : 16
+    },
+    "watch" : {
+      "fps" : 2,
+      "frames" : 8,
+      "h" : 12,
+      "w" : 16
+    },
+    "yawn" : {
+      "fps" : 3,
+      "frames" : 7,
+      "h" : 12,
+      "w" : 16
+    }
+  },
+  "kitten" : {
+    "groom" : {
+      "fps" : 4,
+      "frames" : 6,
+      "h" : 12,
+      "w" : 16
+    },
+    "hop" : {
+      "fps" : 9,
+      "frames" : 6,
+      "h" : 12,
+      "w" : 16
+    },
+    "idle" : {
+      "fps" : 3,
+      "frames" : 6,
+      "h" : 12,
+      "w" : 16
+    },
+    "loaf" : {
+      "fps" : 2,
+      "frames" : 6,
+      "h" : 12,
+      "w" : 16
+    },
+    "look" : {
+      "fps" : 2.5,
+      "frames" : 6,
+      "h" : 12,
+      "w" : 16
+    },
+    "nap" : {
+      "fps" : 1.6000000000000001,
+      "frames" : 9,
+      "h" : 12,
+      "w" : 16
+    },
+    "play" : {
+      "fps" : 5,
+      "frames" : 8,
+      "h" : 12,
+      "w" : 16
+    },
+    "roll" : {
+      "fps" : 4,
+      "frames" : 8,
+      "h" : 12,
+      "w" : 16
+    },
+    "sit" : {
+      "fps" : 2.5,
+      "frames" : 7,
+      "h" : 12,
+      "w" : 16
+    },
+    "stretch" : {
+      "fps" : 3.5,
+      "frames" : 7,
+      "h" : 12,
+      "w" : 16
+    },
+    "walk" : {
+      "fps" : 7,
+      "frames" : 4,
+      "h" : 12,
+      "w" : 16
+    },
+    "watch" : {
+      "fps" : 2,
+      "frames" : 8,
+      "h" : 12,
+      "w" : 16
+    },
+    "yawn" : {
+      "fps" : 3,
+      "frames" : 7,
+      "h" : 12,
+      "w" : 16
+    }
+  },
+  "ragdoll" : {
+    "groom" : {
+      "fps" : 4,
+      "frames" : 6,
+      "h" : 12,
+      "w" : 16
+    },
+    "hop" : {
+      "fps" : 9,
+      "frames" : 6,
+      "h" : 12,
+      "w" : 16
+    },
+    "idle" : {
+      "fps" : 3,
+      "frames" : 6,
+      "h" : 12,
+      "w" : 16
+    },
+    "loaf" : {
+      "fps" : 2,
+      "frames" : 6,
+      "h" : 12,
+      "w" : 16
+    },
+    "look" : {
+      "fps" : 2.5,
+      "frames" : 6,
+      "h" : 12,
+      "w" : 16
+    },
+    "nap" : {
+      "fps" : 1.6000000000000001,
+      "frames" : 9,
+      "h" : 12,
+      "w" : 16
+    },
+    "play" : {
+      "fps" : 5,
+      "frames" : 8,
+      "h" : 12,
+      "w" : 16
+    },
+    "roll" : {
+      "fps" : 4,
+      "frames" : 8,
+      "h" : 12,
+      "w" : 16
+    },
+    "sit" : {
+      "fps" : 2.5,
+      "frames" : 7,
+      "h" : 12,
+      "w" : 16
+    },
+    "stretch" : {
+      "fps" : 3.5,
+      "frames" : 7,
+      "h" : 12,
+      "w" : 16
+    },
+    "walk" : {
+      "fps" : 7,
+      "frames" : 4,
+      "h" : 12,
+      "w" : 16
+    },
+    "watch" : {
+      "fps" : 2,
+      "frames" : 8,
+      "h" : 12,
+      "w" : 16
+    },
+    "yawn" : {
+      "fps" : 3,
+      "frames" : 7,
+      "h" : 12,
+      "w" : 16
+    }
+  },
+  "tuxedoBlack" : {
+    "groom" : {
+      "fps" : 4,
+      "frames" : 6,
+      "h" : 12,
+      "w" : 16
+    },
+    "hop" : {
+      "fps" : 9,
+      "frames" : 6,
+      "h" : 12,
+      "w" : 16
+    },
+    "idle" : {
+      "fps" : 3,
+      "frames" : 6,
+      "h" : 12,
+      "w" : 16
+    },
+    "loaf" : {
+      "fps" : 2,
+      "frames" : 6,
+      "h" : 12,
+      "w" : 16
+    },
+    "look" : {
+      "fps" : 2.5,
+      "frames" : 6,
+      "h" : 12,
+      "w" : 16
+    },
+    "nap" : {
+      "fps" : 1.6000000000000001,
+      "frames" : 9,
+      "h" : 12,
+      "w" : 16
+    },
+    "play" : {
+      "fps" : 5,
+      "frames" : 8,
+      "h" : 12,
+      "w" : 16
+    },
+    "roll" : {
+      "fps" : 4,
+      "frames" : 8,
+      "h" : 12,
+      "w" : 16
+    },
+    "sit" : {
+      "fps" : 2.5,
+      "frames" : 7,
+      "h" : 12,
+      "w" : 16
+    },
+    "stretch" : {
+      "fps" : 3.5,
+      "frames" : 7,
+      "h" : 12,
+      "w" : 16
+    },
+    "walk" : {
+      "fps" : 7,
+      "frames" : 4,
+      "h" : 12,
+      "w" : 16
+    },
+    "watch" : {
+      "fps" : 2,
+      "frames" : 8,
+      "h" : 12,
+      "w" : 16
+    },
+    "yawn" : {
+      "fps" : 3,
+      "frames" : 7,
+      "h" : 12,
+      "w" : 16
+    }
+  }
+}

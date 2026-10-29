@@ -3,123 +3,187 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>catland · 在 Mac 刘海里，刷你常刷的 App</title>
+<title>catland · 把小红书、抖音、B 站装进 Mac</title>
 <style>
-  :root { --pink: #ff5c96; --ink: #f1f0ff; --sub: rgba(241, 240, 255, .66); }
+  :root { --ink: #f5f3ff; --sub: rgba(245, 243, 255, .62); --line: rgba(255, 255, 255, .14); }
   * { box-sizing: border-box; margin: 0; }
-  html, body { background: #0b0a1d; color: var(--ink); font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", sans-serif; }
-  img, .layer { image-rendering: pixelated; }
+  html, body { background: #0b0a1d; color: var(--ink); font-family: -apple-system, "SF Pro Display", "PingFang SC", "Hiragino Sans GB", sans-serif; -webkit-font-smoothing: antialiased; }
 
   /* ── 首屏：三层像素视差夜景 ── */
-  .hero { position: relative; height: 100vh; min-height: 680px; overflow: hidden; }
-  .layer { position: absolute; inset: -4% -4% 0 -4%; background-repeat: repeat-x; background-size: auto 100%; background-position: 0 100%;
-           will-change: background-position, transform; }
-  .bg { background-image: url(img/background.png); animation: drift 240s linear infinite; }
-  .mg { background-image: url(img/midground.png);  animation: drift 120s linear infinite; }
-  .fg { background-image: url(img/foreground.png); animation: drift 60s linear infinite; }
-  @keyframes drift { to { background-position-x: -1376vh; } }
-  /* 暗角 + 底部渐隐到下一屏，标题区更清楚 */
-  .hero::after { content: ""; position: absolute; inset: 0; pointer-events: none;
-    background: radial-gradient(ellipse at 50% 42%, rgba(11,10,29,.15) 0%, rgba(11,10,29,.55) 60%, rgba(11,10,29,.85) 100%),
-                linear-gradient(to bottom, rgba(11,10,29,0) 70%, #0b0a1d 100%); }
+  .hero { position: relative; height: 100vh; min-height: 720px; overflow: hidden;
+          background: linear-gradient(to bottom, #0d0b22 0%, #1b1442 60%, #241650 100%); }
+  /* 城市只占画面下方约 3/4：文字落在上方安静的夜空里，不压在楼群上 */
+  .layer { position: absolute; left: -3%; right: -3%; bottom: 0; height: 78vh; background-repeat: repeat-x; background-size: auto 100%; background-position: 0 100%;
+           image-rendering: pixelated; will-change: background-position, transform; }
+  .bg { background-image: url(img/background.png); animation: drift 260s linear infinite; }
+  .mg { background-image: url(img/midground.png);  animation: drift 140s linear infinite; }
+  .fg { background-image: url(img/foreground.png); animation: drift 70s linear infinite; }
+  @keyframes drift { to { background-position-x: calc(-1376 / 768 * 78vh * 10); } }
+  .bg { -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 22%); mask-image: linear-gradient(to bottom, transparent 0%, #000 22%); }
+  .shade { position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse 60% 42% at 50% 30%, rgba(10,8,28,.72) 0%, rgba(10,8,28,.35) 60%, rgba(10,8,28,0) 100%),
+                linear-gradient(to bottom, rgba(11,10,29,0) 80%, #0b0a1d 100%); }
 
-  /* 屏幕顶部的刘海 + 小岛 */
-  .notch { position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 20; display: flex; flex-direction: column; align-items: center; }
-  .island { width: 520px; border-radius: 0 0 22px 22px; overflow: hidden; box-shadow: 0 18px 60px rgba(120, 80, 255, .35), 0 0 0 1px rgba(255,255,255,.06);
-            transition: width .45s cubic-bezier(.2,.9,.3,1.2), box-shadow .45s; }
-  .island img { display: block; width: 100%; }
-  .notch:hover .island { width: 600px; box-shadow: 0 24px 80px rgba(255, 92, 150, .45), 0 0 0 1px rgba(255,255,255,.1); }
-  .hint { margin-top: 10px; font-size: 13px; color: #ffd27a; opacity: .9; transition: opacity .3s; }
-  .notch:hover .hint { opacity: 0; }
+  /* 屋顶上的猫：逐帧动画，由脚本编排（走、停、坐、张望、舔爪、蹦一下、打哈欠） */
+  #cats { position: absolute; left: 0; right: 0; top: 0; width: 100%; height: 100%; pointer-events: none; image-rendering: pixelated; }
+  .bubble { position: absolute; z-index: 4; padding: 8px 14px; border-radius: 14px; background: #fff; color: #1d1b2e; font-size: 14px; font-weight: 600;
+            white-space: nowrap; transform: translate(-50%, -100%); box-shadow: 0 8px 30px rgba(0,0,0,.35); opacity: 0; transition: opacity .35s; }
+  .bubble::after { content: ""; position: absolute; left: 50%; bottom: -6px; width: 12px; height: 12px; background: #fff; transform: translateX(-50%) rotate(45deg); border-radius: 2px; }
+  .bubble.on { opacity: 1; }
 
   /* 顶栏 */
-  nav { position: fixed; top: 0; left: 0; right: 0; z-index: 10; display: flex; justify-content: space-between; align-items: center; padding: 18px 32px; }
-  nav .logo { display: flex; gap: 10px; align-items: center; font-weight: 700; font-size: 20px; }
-  nav .logo img { height: 26px; }
-  nav .links { display: flex; gap: 26px; align-items: center; font-size: 14px; color: var(--sub); }
-  nav .lang { padding: 6px 12px; border-radius: 99px; border: 1px solid rgba(255,255,255,.2); backdrop-filter: blur(10px); background: rgba(255,255,255,.06); color: var(--ink); }
+  nav { position: fixed; top: 0; left: 0; right: 0; z-index: 10; display: flex; justify-content: space-between; align-items: center; padding: 22px 40px; }
+  nav .logo { font-weight: 700; font-size: 19px; letter-spacing: -.01em; }
+  nav .links { display: flex; gap: 30px; align-items: center; font-size: 14px; color: var(--sub); }
+  nav .links a { color: inherit; text-decoration: none; }
+  nav .lang { color: var(--ink); }
 
-  /* 标题 */
-  .copy { position: absolute; z-index: 5; left: 0; right: 0; top: 33%; text-align: center; padding: 0 24px; }
-  h1 { font-size: clamp(44px, 6.4vw, 92px); line-height: 1.12; letter-spacing: -.01em; font-weight: 800;
-       text-shadow: 0 6px 40px rgba(0,0,0,.45); }
-  h1 .hl { background: linear-gradient(90deg, #ff7ab0, #b98cff 55%, #61e3ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  .lead { margin-top: 22px; font-size: clamp(16px, 1.5vw, 21px); color: var(--sub); }
-  .lead small { display: block; margin-top: 6px; font-size: .8em; opacity: .75; }
-  .cta { margin-top: 36px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
-  .btn { padding: 16px 28px; border-radius: 99px; font-size: 17px; font-weight: 700; text-decoration: none; transition: transform .2s, box-shadow .2s; }
-  .btn.primary { background: var(--pink); color: #2a0a1a; box-shadow: 0 10px 40px rgba(255, 92, 150, .55); }
-  .btn.primary:hover { transform: translateY(-2px); box-shadow: 0 16px 56px rgba(255, 92, 150, .7); }
-  .btn.ghost { color: var(--ink); border: 1px solid rgba(255,255,255,.25); backdrop-filter: blur(12px); background: rgba(255,255,255,.07); }
-  .tags { margin-top: 22px; display: flex; gap: 22px; justify-content: center; font-size: 13px; color: var(--sub); }
-  .tags span::before { content: "●"; color: var(--pink); margin-right: 6px; font-size: 8px; vertical-align: 2px; }
-
-  /* 下一屏预告：四只猫在屋顶上走 */
-  .walkers { position: absolute; z-index: 6; bottom: 9%; left: 0; right: 0; height: 64px; pointer-events: none; }
-  .walkers img { position: absolute; bottom: 0; height: 54px; animation: walk linear infinite; }
-  @keyframes walk { from { transform: translateX(-120px); } to { transform: translateX(110vw); } }
-  .scroll { position: absolute; z-index: 6; bottom: 26px; left: 50%; transform: translateX(-50%); font-size: 12px; color: var(--sub); letter-spacing: .2em; }
+  /* 标题：克制的排版，白字为主，只在关键词上一点暖色 */
+  .copy { position: absolute; z-index: 3; left: 0; right: 0; top: 12vh; text-align: center; padding: 0 24px; }
+  .eyebrow { display: inline-flex; gap: 10px; align-items: center; padding: 7px 14px; border-radius: 99px; border: 1px solid var(--line);
+             background: rgba(255,255,255,.05); backdrop-filter: blur(14px); font-size: 13px; color: var(--sub); }
+  .eyebrow b { color: var(--ink); font-weight: 600; }
+  h1 { margin-top: 24px; font-size: clamp(38px, 4.8vw, 68px); text-shadow: 0 4px 30px rgba(10,8,28,.6); line-height: 1.08; letter-spacing: -.035em; font-weight: 700; }
+  h1 em { font-style: normal; background: linear-gradient(180deg, #ffffff 0%, #ffc7dc 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lead { margin: 20px auto 0; max-width: 620px; font-size: clamp(15px, 1.25vw, 18px); line-height: 1.65; color: rgba(245,243,255,.78); text-shadow: 0 2px 16px rgba(10,8,28,.8); }
+  .cta { margin-top: 30px; display: flex; gap: 22px; justify-content: center; align-items: center; flex-wrap: wrap; }
+  .btn { display: inline-flex; flex-direction: column; align-items: center; padding: 15px 30px; border-radius: 16px; background: #fff; color: #14121f;
+         text-decoration: none; font-weight: 650; font-size: 16px; box-shadow: 0 12px 40px rgba(0,0,0,.35); transition: transform .2s; }
+  .btn small { font-weight: 500; font-size: 11.5px; color: #6b6880; margin-top: 3px; }
+  .btn:hover { transform: translateY(-2px); }
+  .link { color: var(--ink); text-decoration: none; font-size: 15px; opacity: .8; }
+  .link:hover { opacity: 1; }
 
   .next { min-height: 60vh; display: grid; place-items: center; color: var(--sub); font-size: 15px; }
-  @media (prefers-reduced-motion: reduce) { .layer, .walkers img { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .layer { animation: none; } }
 </style>
 </head>
 <body>
   <nav>
-    <div class="logo"><img src="img/cat_ragdoll.png" alt="">catland</div>
-    <div class="links"><span>功能</span><span>下载</span><span>GitHub</span><span class="lang">中文 · EN</span></div>
+    <div class="logo">catland</div>
+    <div class="links"><a href="#">功能</a><a href="#">下载</a><a href="https://github.com/Aries-ld/catland">GitHub</a><a class="lang" href="#">中文 / EN</a></div>
   </nav>
 
-  <div class="notch">
-    <div class="island"><img src="img/island.gif" alt="catland 小岛"></div>
-    <div class="hint">↑ 鼠标移上来，猫会跟你打招呼</div>
-  </div>
-
-  <section class="hero" id="hero">
+  <section class="hero">
     <div class="layer bg" data-depth="6"></div>
     <div class="layer mg" data-depth="14"></div>
-    <div class="layer fg" data-depth="28"></div>
+    <div class="layer fg" data-depth="26"></div>
+    <canvas id="cats"></canvas>
+    <div class="bubble" id="bubble"></div>
+    <div class="shade"></div>
     <div class="copy">
-      <h1>在 Mac 刘海里，<br><span class="hl">刷你常刷的 App</span></h1>
-      <p class="lead">小红书、抖音、B 站、快手，鼠标一推就开刷；四只猫替你把内容叼回来
-        <small>Your favorite feeds, living in your MacBook notch.</small></p>
+      <div class="eyebrow"><b>catland</b> · macOS 免费开源</div>
+      <h1>把小红书、抖音、B 站<br><em>装进 Mac 的刘海里</em></h1>
+      <p class="lead">鼠标往屏幕顶上一推就开刷，还能一次搜遍四个平台。<br>四只猫替你把内容叼回来，数据只留在你的 Mac 上。</p>
       <div class="cta">
-        <a class="btn primary" href="https://github.com/Aries-ld/catland/releases/latest" id="dl">下载 macOS 版</a>
-        <a class="btn ghost" href="https://github.com/Aries-ld/catland">GitHub Star</a>
+        <a class="btn" id="dl" href="https://github.com/Aries-ld/catland/releases/latest">下载 macOS 版<small id="ver">Apple 芯片 · macOS 14+</small></a>
+        <a class="link" href="https://github.com/Aries-ld/catland">在 GitHub 查看 →</a>
       </div>
-      <div class="tags"><span>免费开源</span><span>不用注册</span><span>数据只在你的 Mac 上</span></div>
     </div>
-    <div class="walkers">
-      <img src="img/cat_ragdoll.png"    style="animation-duration: 26s; animation-delay: -3s"  alt="">
-      <img src="img/cat_tuxedoBlack.png" style="animation-duration: 31s; animation-delay: -14s" alt="">
-      <img src="img/cat_calicoTV.png"   style="animation-duration: 28s; animation-delay: -21s" alt="">
-      <img src="img/cat_cowJacket.png"  style="animation-duration: 34s; animation-delay: -8s"  alt="">
-    </div>
-    <div class="scroll">SCROLL ↓</div>
   </section>
-  <section class="next">（下一屏：点一下就开刷 —— 原型只做了首屏）</section>
+  <section class="next">（下一屏 —— 原型只做了首屏）</section>
 
 <script>
-  // 鼠标视差：越近的层动得越多
-  const layers = [...document.querySelectorAll('.layer')];
-  addEventListener('mousemove', (e) => {
-    const x = (e.clientX / innerWidth - .5), y = (e.clientY / innerHeight - .5);
-    layers.forEach((l) => { const d = +l.dataset.depth; l.style.transform = `translate(${-x * d}px, ${-y * d * .5}px)`; });
-  });
-  // 往下滑：远景慢、近景快，标题淡出
-  const copy = document.querySelector('.copy');
-  addEventListener('scroll', () => {
-    const s = scrollY;
-    layers.forEach((l) => l.style.translate = `0 ${s * (+l.dataset.depth / 60)}px`);
-    copy.style.opacity = Math.max(0, 1 - s / 420); copy.style.transform = `translateY(${s * .25}px)`;
-  });
-  // 下载按钮：读 GitHub 最新版本号
-  fetch('https://api.github.com/repos/Aries-ld/catland/releases/latest').then((r) => r.json()).then((rel) => {
-    const dmg = (rel.assets || []).find((a) => a.name.endsWith('.dmg'));
-    const dl = document.getElementById('dl');
-    if (rel.tag_name) dl.textContent = `下载 macOS 版 · ${rel.tag_name}`;
-    if (dmg) dl.href = dmg.browser_download_url;
-  }).catch(() => {});
+// ── 视差 ──
+const layers = [...document.querySelectorAll('.layer')];
+addEventListener('mousemove', (e) => {
+  const x = e.clientX / innerWidth - .5, y = e.clientY / innerHeight - .5;
+  layers.forEach((l) => { const d = +l.dataset.depth; l.style.transform = `translate(${-x * d}px, ${-y * d * .4}px)`; });
+});
+const copy = document.querySelector('.copy');
+addEventListener('scroll', () => {
+  const s = scrollY;
+  layers.forEach((l) => l.style.translate = `0 ${s * (+l.dataset.depth / 70)}px`);
+  copy.style.opacity = Math.max(0, 1 - s / 380); copy.style.transform = `translateY(${s * .2}px)`;
+});
+
+// ── 屋顶上的猫：和 App 同一套手绘像素帧 ──
+const SKINS = [
+  { skin: 'ragdoll', name: '薯薯', lines: ['本小姐挑的，都是好看的', '刷累了就看看窗外嘛', '今天也要精致地摸鱼'] },
+  { skin: 'tuxedoBlack', name: '抖抖', lines: ['家人们，这条必须看', '下一条更好笑，信我', '快乐马上加载完成'] },
+  { skin: 'calicoTV', name: 'bibi', lines: ['才、才不是特意等你', '新番更新了，要一起看吗', '弹幕护体！'] },
+  { skin: 'cowJacket', name: '铁铁', lines: ['老铁，整点好看的', '干活累了就刷两条', '这花棉袄暖和着呢'] },
+];
+const ACTIONS = ['idle', 'sit', 'look', 'groom', 'yawn', 'loaf', 'stretch'];
+const canvas = document.getElementById('cats'), ctx = canvas.getContext('2d');
+let meta = {}, sheets = {}, cats = [];
+const SCALE = () => Math.max(4, Math.round(innerHeight / 150)); // 一个美术像素放大几倍
+// 屋顶平台的高度：近景图层占画面下方 78%，屋顶边在图层里约 59% 处
+const ROOF = () => innerHeight * (1 - .78) + innerHeight * .78 * .6;
+
+function late() { const h = new Date().getHours(); return h >= 23 || h < 5; }
+function lineFor(c) {
+  if (late()) return '这么晚还没睡，辛苦啦';
+  return c.lines[Math.floor(Math.random() * c.lines.length)];
+}
+
+async function loadCats() {
+  meta = await (await fetch('img/cats/cats.json')).json();
+  const want = SKINS.flatMap((s) => ['walk', 'hop', ...ACTIONS].map((a) => `${s.skin}-${a}`));
+  await Promise.all(want.map((k) => new Promise((ok) => { const im = new Image(); im.onload = () => { sheets[k] = im; ok(); }; im.onerror = ok; im.src = `img/cats/${k}.png`; })));
+  cats = SKINS.map((s, i) => ({ ...s, x: innerWidth * (.12 + i * .23), dir: i % 2 ? 1 : -1, act: 'idle', t0: performance.now(), until: performance.now() + 1500 + i * 700, target: null }));
+  requestAnimationFrame(tick);
+}
+
+function decide(c, now) {
+  const r = Math.random();
+  if (r < .45) { c.act = 'walk'; c.target = Math.max(60, Math.min(innerWidth - 60, c.x + (Math.random() - .5) * innerWidth * .5)); c.dir = c.target > c.x ? 1 : -1; c.until = now + 12000; }
+  else if (r < .55) { c.act = 'hop'; c.until = now + 900; }
+  else { c.act = ACTIONS[Math.floor(Math.random() * ACTIONS.length)]; c.until = now + 2200 + Math.random() * 3500; }
+  c.t0 = now;
+}
+
+let last = performance.now();
+function tick(now) {
+  const dt = (now - last) / 1000; last = now;
+  const s = SCALE(), roof = ROOF();
+  canvas.width = innerWidth * devicePixelRatio; canvas.height = innerHeight * devicePixelRatio;
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0); ctx.imageSmoothingEnabled = false;
+  for (const c of cats) {
+    if (c.act === 'walk') {
+      c.x += c.dir * 14 * s * dt;
+      if ((c.dir > 0 && c.x >= c.target) || (c.dir < 0 && c.x <= c.target)) decide(c, now);
+    }
+    if (now > c.until) decide(c, now);
+    const key = `${c.skin}-${c.act}`, m = meta[c.skin]?.[c.act], im = sheets[key];
+    if (!m || !im) continue;
+    const f = Math.floor(((now - c.t0) / 1000) * m.fps) % m.frames;
+    const w = m.w * s, h = m.h * s;
+    ctx.save();
+    ctx.translate(c.x, roof);
+    if (c.dir > 0) ctx.scale(-1, 1); // 美术朝左绘制，往右走时翻过来
+    ctx.drawImage(im, f * m.w, 0, m.w, m.h, -w / 2, -h, w, h);
+    ctx.restore();
+  }
+  placeBubble();
+  requestAnimationFrame(tick);
+}
+
+// 气泡：每 4.5 秒换一只猫说一句（半夜会关心你）
+const bubble = document.getElementById('bubble');
+let speaker = 0, bubbleUntil = 0;
+function placeBubble() {
+  const c = cats[speaker]; if (!c) return;
+  bubble.style.left = `${c.x}px`; bubble.style.top = `${ROOF() - meta[c.skin].walk.h * SCALE() - 14}px`;
+}
+setInterval(() => {
+  bubble.classList.remove('on');
+  setTimeout(() => {
+    speaker = (speaker + 1) % SKINS.length;
+    const c = cats[speaker]; if (!c) return;
+    bubble.textContent = `${c.name}：${lineFor(c)}`;
+    bubble.classList.add('on');
+  }, 400);
+}, 4500);
+
+loadCats();
+
+// ── 下载按钮：读 GitHub 最新版本 ──
+fetch('https://api.github.com/repos/Aries-ld/catland/releases/latest').then((r) => r.json()).then((rel) => {
+  const dmg = (rel.assets || []).find((a) => a.name.endsWith('.dmg'));
+  if (dmg) document.getElementById('dl').href = dmg.browser_download_url;
+  if (rel.tag_name) document.getElementById('ver').textContent = `${rel.tag_name} · Apple 芯片 · macOS 14+`;
+}).catch(() => {});
 </script>
 </body>
 </html>
