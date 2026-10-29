@@ -1,0 +1,21 @@
+{
+  "status": "success",
+  "job_id": "job_d14764887e7946ba90416972f5aaecff",
+  "outputs": [
+    {
+      "type": "media",
+      "path": "/Users/lindong/catlands/assets/website/meowa/hero-city/Distant_city_skyline_at_night_dense_skyscrapers_with_lit_windows_a_few_neon_signs_in_pink_and_cyan_a_tall_TV_t_e78c00c2/midground.png",
+      "mime_type": "image/png"
+    },
+    {
+      "type": "media",
+      "path": "/Users/lindong/catlands/assets/website/meowa/hero-city/Distant_city_skyline_at_night_dense_skyscrapers_with_lit_windows_a_few_neon_signs_in_pink_and_cyan_a_tall_TV_t_e78c00c2/foreground.png",
+      "mime_type": "image/png"
+    },
+    {
+      "type": "media",
+      "path": "/Users/lindong/catlands/assets/website/meowa/hero-city/Distant_city_skyline_at_night_dense_skyscrapers_with_lit_windows_a_few_neon_signs_in_pink_and_cyan_a_tall_TV_t_e78c00c2/background.png",
+      "mime_type": "image/png"
+    }
+  ]
+}
