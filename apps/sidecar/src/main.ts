@@ -4,6 +4,7 @@ import { CatbusRunner } from './catbus/runner.ts'
 import { createFileLogger } from './log.ts'
 import { RpcServer } from './rpc/server.ts'
 import { Store } from './store/store.ts'
+import { prepareWorkspace, workspace } from './store/workspace.ts'
 
 // stdout 只能有 RPC 消息：任何误用 console.log 的输出都改到 stderr。
 console.log = (...args: unknown[]) => console.error(...args)
@@ -15,8 +16,10 @@ process.on('uncaughtException', (err) => {
 })
 process.on('unhandledRejection', (err) => logger.error('unhandled rejection', { err: (err as Error)?.stack ?? String(err) }))
 
-const store = new Store()
-const app = new App({ catbus: new CatbusRunner({ logger }), logger, store })
+// 本地工作区：数据库、封面、登录凭证都在 ~/Library/Application Support/catland，删 App / 重装都不受影响
+const catbusHome = prepareWorkspace(logger)
+const store = new Store({ path: workspace.db() })
+const app = new App({ catbus: new CatbusRunner({ logger, env: { CATBUS_HOME: catbusHome } }), logger, store })
 const rpc = new RpcServer({ logger })
 app.register(rpc)
 

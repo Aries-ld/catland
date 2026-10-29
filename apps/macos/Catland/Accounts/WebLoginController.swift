@@ -1,6 +1,6 @@
 // 内嵌官方登录页（只支持 cookie 登录的平台，以及扫码被风控时的备用方式）。
 // 用户在平台官方页面完成登录；检测到登录态 cookie 后自动交给 sidecar（catbus 在线校验后保存）。
-// 使用非持久化的 WKWebsiteDataStore：登录态只落在 ~/.catbus，窗口关闭即清空。
+// 使用非持久化的 WKWebsiteDataStore：登录态只落在本机的 catland 工作区（accounts/），窗口关闭即清空。
 // 外观做成一个迷你浏览器：前进 / 后退 / 刷新、带锁的地址栏（一眼看出是官方域名）、加载进度条。
 import AppKit
 import SwiftUI
@@ -354,7 +354,7 @@ private struct BrowserImportView: View {
                     Button(action: onOpenBrowser) { Label("打开浏览器登录", systemImage: "safari") }.controlSize(.regular)
                 }
                 step(2, "复制登录态（Cookie）", "在\(platform.name)页面按 ⌥⌘I 打开开发者工具 → 网络（Network）→ 刷新页面 → 点开任意一个发往该网站的请求 → 在「请求标头」里找到 Cookie，复制整行的值。") { EmptyView() }
-                step(3, "粘贴到这里", "只保存在这台 Mac 的 ~/.catbus，校验通过后自动连接。") {
+                step(3, "粘贴到这里", "只保存在这台 Mac 上，校验通过后自动连接。") {
                     VStack(alignment: .leading, spacing: 8) {
                         TextEditor(text: $header)
                             .font(.system(size: 11, design: .monospaced))

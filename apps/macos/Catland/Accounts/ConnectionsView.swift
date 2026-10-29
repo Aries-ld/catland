@@ -17,7 +17,7 @@ struct ConnectionsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     Text("连接平台").font(.system(size: 16, weight: .semibold))
-                    Text("登录态只保存在这台电脑上（~/.catbus），catland 不上传任何信息。").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Text("登录状态只保存在这台 Mac 上，删掉或重装 catland 也不用重新登录；catland 不上传任何信息。").font(.system(size: 11)).foregroundStyle(.secondary)
                     ForEach(groups, id: \.0) { title, list in
                         VStack(alignment: .leading, spacing: 8) {
                             Text(title).font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)

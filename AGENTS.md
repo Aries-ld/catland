@@ -28,6 +28,7 @@
 | catbus 源码（只读参考） | `vendor/catbus/`，不进版本控制。能力矩阵 `vendor/catbus/docs/capabilities.md`，统一类型 `vendor/catbus/docs/guide/output.md` |
 | 美术（Meowa game-assets skill） | `~/.agents/skills/game-assets/meowart_api.py`，用 conda env `catlands` 运行，key 从项目根 `.env` 的 `MEOWART_API_KEY` 读取 |
 | Python 环境 | conda env `catlands`（Python 3.12）：`~/miniconda3/envs/catlands/bin/python` |
+| 本地工作区 | `~/Library/Application Support/catland/`：`data/catland.db`（点赞、收藏、历史、设置）、`covers/`、`accounts/`（catbus 的 `CATBUS_HOME`，各平台登录凭证）、`说明.txt`。首次启动从 `~/.catbus` 复制已有登录状态（只复制不移动）。删 App / 重装都保留。见 `apps/sidecar/src/store/workspace.ts` |
 
 | 小猫美术 | **手绘像素（代码生成，用户确认保持此风格）**：`apps/macos/Catland/Cat/PixelCatArt.swift`。Meowa 版（`assets/art/cats/`，`scripts/gen_cats.py` / `pack_cats.py`）用户觉得不如手绘可爱，已不打包进 App，仅留档 |
 

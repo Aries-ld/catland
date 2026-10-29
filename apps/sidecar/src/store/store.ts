@@ -58,6 +58,7 @@ const MIGRATIONS: Record<number, string> = {
   `,
 }
 
+/** 工作区根目录（见 workspace.ts）。 */
 export function defaultDataDir(): string {
   return process.env.CATLAND_DATA_DIR ?? join(homedir(), 'Library', 'Application Support', 'catland')
 }
@@ -86,7 +87,7 @@ export class Store implements SeenStore {
   private readonly seenCache = new Set<string>()
 
   constructor(opts: StoreOptions = {}) {
-    const path = opts.path ?? join(defaultDataDir(), 'catland.db')
+    const path = opts.path ?? join(defaultDataDir(), 'data', 'catland.db')
     if (path !== ':memory:') {
       const dir = join(path, '..')
       if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 })

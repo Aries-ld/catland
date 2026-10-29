@@ -87,6 +87,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 case "search:close": self.state.closeSearch()
                 case "render:cities": SceneSnapshot.renderCities()
                 case "feed:pause": self.state.feed.debugPause()
+                case "render:comments":
+                    // 用当前这条帖子的真实评论离屏渲染评论区（只读），检查版式、表情、楼中楼
+                    Task { @MainActor in
+                        guard let card = self.state.feed.cards.first(where: { ($0.stats.comments ?? 0) > 20 && !$0.isPause }) ?? self.state.feed.current else { return }
+                        guard let page: CommentPage = try? await self.state.sidecar.call("comments.list", ["key": card.key]) else { return }
+                        let list = Array(page.comments.prefix(8))
+                        var reps: [String: [Comment]] = [:]
+                        if let c = list.first(where: { ($0.stats.replies ?? 0) > 0 }),
+                           let r: CommentPage = try? await self.state.sidecar.call("comments.replies", ["key": card.key, "commentId": c.id]) { reps[c.id] = Array(r.comments.prefix(4)) }
+                        let view = VStack(alignment: .leading, spacing: 18) {
+                            ForEach(list) { c in CommentRow(comment: c, replies: reps[c.id], toggleReplies: {}, openOriginal: {}) }
+                        }
+                        .padding(16).frame(width: 400, alignment: .topLeading).background(Color(white: 0.09)).environment(\.colorScheme, .dark)
+                        let r = ImageRenderer(content: view); r.scale = 2
+                        if let cg = r.cgImage, let d = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) { try? d.write(to: URL(fileURLWithPath: "/tmp/comments.png")) }
+                        AppLog.info("render comments", ["platform": card.platform, "count": list.count])
+                    }
                 case let c where c.hasPrefix("feed:rest"):
                     // feed:rest:<秒>[:平台,平台]：平台假装冷却（不请求平台）。不指定平台 = 全部冷却，立刻停到休息站卡片；
                     // 只指定部分平台 = 验证用户无感：推荐流照常刷，只有那几只猫打盹
