@@ -503,7 +503,20 @@ final class AppState {
     }
 
     /// 老板键：立刻收起、暂停、静音。
+    /// 全屏沉浸式刷（窗口由 AppDelegate 管理，见 FullscreenFeed.swift）。
+    private(set) var fullscreen = false
+    var fullscreenHandler: ((Bool) -> Void)?
+
+    func setFullscreen(_ on: Bool) {
+        guard fullscreen != on else { return }
+        fullscreen = on
+        commentsOpen = false
+        AppLog.info("fullscreen", ["on": on])
+        fullscreenHandler?(on)
+    }
+
     func bossKey() {
+        setFullscreen(false)
         onboarding.advance(from: 2)
         expanded = false
         overlay = .none

@@ -217,6 +217,10 @@ struct CardView: View {
             ActionButton(icon: state.settings.muted ? "speaker.slash" : "speaker.wave.2", tint: .white, count: nil) {
                 state.setMuted(!state.settings.muted)
             }
+            ActionButton(icon: state.fullscreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right", tint: .white, count: nil) {
+                state.setFullscreen(!state.fullscreen)
+            }
+            .help(state.fullscreen ? "退出全屏（Esc）" : "全屏沉浸式刷（F）")
             ActionButton(icon: "arrow.up.right.square", tint: .white, count: nil) {
                 if let u = URL(string: card.url) { NSWorkspace.shared.open(u) }
             }

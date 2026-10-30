@@ -34,6 +34,7 @@ struct SettingsView: View {
                         shortcut("↑ ↓ / J K / 触控板上下滑", "上一条 / 下一条")
                         shortcut("← →", "图集翻页")
                         shortcut("空格", "暂停 / 播放")
+                        shortcut("F", "全屏沉浸式刷（Esc 退出）")
                         shortcut("L / S / C / M", "点赞 / 收藏 / 评论 / 静音")
                     }
                     section("新手引导") {

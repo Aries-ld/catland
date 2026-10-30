@@ -18,6 +18,8 @@ enum Main {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let state = AppState()
     private var panel: NotchPanel!
+    /// 全屏沉浸式刷的窗口（进入时创建，退出时关掉）。
+    private var fullscreenWindow: FullscreenWindow?
     private var geometry: NotchGeometry!
     private var statusItem: NSStatusItem!
     private var monitors: [Any] = []
@@ -32,6 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         geometry = NotchGeometry.current(Self.targetScreen())
         state.notch = geometry
         panel = NotchPanel(rootView: NotchRootView(state: state), geometry: geometry)
+        state.fullscreenHandler = { [weak self] on in self?.fullscreenChanged(on) }
         panel.orderFrontRegardless()
         setupStatusItem()
         setupMonitors()
@@ -106,6 +109,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                     if let j = try? JSONSerialization.data(withJSONObject: meta, options: [.prettyPrinted, .sortedKeys]) { try? j.write(to: dir.appendingPathComponent("cats.json")) }
                 case "feed:pause": self.state.feed.debugPause()
+                case "fullscreen": self.state.setFullscreen(!self.state.fullscreen)
                 case "render:comments":
                     // 用当前这条帖子的真实评论离屏渲染评论区（只读），检查版式、表情、楼中楼
                     Task { @MainActor in
@@ -306,7 +310,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func toggle() {
+        if state.fullscreen { state.setFullscreen(false) }
         withAnimation(.spring(response: 0.38, dampingFraction: 0.82)) { state.expanded.toggle() }
+    }
+
+    /// 进入 / 退出全屏：在小岛所在的屏幕上铺一个黑底窗口（盖住菜单栏），面板先藏起来，退出时再回来，播放不中断。
+    private func fullscreenChanged(_ on: Bool) {
+        if on {
+            let screen = panel.screen ?? NSScreen.main
+            guard let frame = screen?.frame else { return }
+            let w = FullscreenWindow(contentRect: frame, styleMask: [.borderless], backing: .buffered, defer: false)
+            w.level = .mainMenu + 1
+            w.backgroundColor = .black
+            w.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+            w.isReleasedWhenClosed = false
+            w.contentView = FirstMouseHostingView(rootView: AnyView(FullscreenFeedView(state: state)))
+            w.alphaValue = 0
+            w.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            NSAnimationContext.runAnimationGroup { $0.duration = 0.25; w.animator().alphaValue = 1 }
+            fullscreenWindow = w
+            panel.orderOut(nil)
+            state.activeFeed.resume()
+        } else {
+            guard let w = fullscreenWindow else { return }
+            fullscreenWindow = nil
+            panel.orderFrontRegardless()
+            if state.expanded { panel.makeKey(); state.activeFeed.resume() }
+            NSAnimationContext.runAnimationGroup({ $0.duration = 0.2; w.animator().alphaValue = 0 }, completionHandler: { w.orderOut(nil) })
+        }
     }
 
     private func collapse() {
@@ -365,13 +397,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } as Any)
         monitors.append(NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel]) { [weak self] e in
             // 点赞 / 收藏里点开帖子播放时，滚轮也能翻页
-            guard let self, self.state.expanded, e.window === self.panel, self.state.overlay == .none || self.state.savedPlaying, !self.state.commentsOpen else { return e }
+            let inFullscreen = self?.fullscreenWindow != nil && e.window === self?.fullscreenWindow
+            guard let self, (self.state.expanded && e.window === self.panel) || inFullscreen, self.state.overlay == .none || self.state.savedPlaying || inFullscreen, !self.state.commentsOpen else { return e }
             // 搜索结果瀑布流自己滚动；只有在播搜索结果时才按页翻
             if self.state.search.active && !self.state.search.playing { return e }
             return self.pager.handle(e) ? nil : e
         } as Any)
         monitors.append(NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] e in
-            guard let self, self.state.expanded, e.window === self.panel else { return e }
+            guard let self, (self.state.expanded && e.window === self.panel) || (self.fullscreenWindow != nil && e.window === self.fullscreenWindow) else { return e }
             return self.handleKey(e) ? nil : e
         } as Any)
     }
@@ -418,6 +451,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let feed = state.activeFeed
         let browsingResults = state.search.active && !state.search.playing
         switch Int(e.keyCode) {
+        case kVK_Escape where state.fullscreen && !state.commentsOpen:
+            state.setFullscreen(false)
+            return true
+        case kVK_ANSI_F where !browsingResults || state.fullscreen:
+            state.setFullscreen(!state.fullscreen)
+            return true
         case kVK_Escape where state.onboarding.step != nil:
             withAnimation { state.onboarding.skip() }
             return true
