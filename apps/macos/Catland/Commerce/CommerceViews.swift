@@ -70,16 +70,37 @@ private let dropGreen = Color(red: 0.25, green: 0.85, blue: 0.55)
 
 struct CommerceSearchBar: View {
     let query: String
+    /// 给了就是可输入的搜索框（回车才搜）；离屏渲染设计稿时为 nil，只显示文字
+    var text: Binding<String>? = nil
+    var onSubmit: () -> Void = {}
+    var onClear: () -> Void = {}
+    @FocusState private var focused: Bool
+    private static let prompt = "想买点什么？京东价格 + 大家的真实测评"
+
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass").font(.system(size: 12, weight: .semibold)).foregroundStyle(.white.opacity(0.5))
-            Text(query.isEmpty ? "想买点什么？京东价格 + 大家的真实测评" : query)
-                .font(.system(size: 13)).foregroundStyle(.white.opacity(query.isEmpty ? 0.4 : 0.92))
-            Spacer()
+            if let text {
+                TextField("", text: text, prompt: Text(Self.prompt).foregroundStyle(.white.opacity(0.4)))
+                    .textFieldStyle(.plain).font(.system(size: 13))
+                    .focused($focused)
+                    .onSubmit(onSubmit)
+                if !text.wrappedValue.isEmpty {
+                    Button { onClear(); focused = true } label: {
+                        Image(systemName: "xmark.circle.fill").font(.system(size: 12)).foregroundStyle(.white.opacity(0.4))
+                    }
+                    .buttonStyle(.plain)
+                }
+            } else {
+                Text(query.isEmpty ? Self.prompt : query)
+                    .font(.system(size: 13)).foregroundStyle(.white.opacity(query.isEmpty ? 0.4 : 0.92))
+            }
+            Spacer(minLength: 0)
             PlatformIcon(platform: "jd", size: 16)
         }
         .padding(.horizontal, 12).frame(height: 36)
         .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(.white.opacity(0.08)))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(focused ? Color.pink.opacity(0.6) : .clear, lineWidth: 1))
     }
 }
 
@@ -90,19 +111,37 @@ struct CommerceHome: View {
     let orders: [OrderStatus]
     let recent: [String]
     var rest: JDRest? = nil
+    var onRecent: (String) -> Void = { _ in }
+    var onOpenWish: (WishItem) -> Void = { _ in }
+    var onRemoveWish: (WishItem) -> Void = { _ in }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            CommerceSearchBar(query: "")
             if !recent.isEmpty {
                 HStack(spacing: 6) {
-                    ForEach(recent, id: \.self) { Chip(text: $0) }
+                    ForEach(recent.prefix(5), id: \.self) { q in Chip(text: q) { onRecent(q) } }
                 }
             }
             ForEach(orders) { OrderCard(order: $0) }
-            SectionTitle(title: "心愿单", detail: "每小时帮你看一眼价格")
-            if let rest { WishPausedBanner(rest: rest) }
-            VStack(spacing: 8) { ForEach(wishes) { WishRow(item: $0) } }
+            SectionTitle(title: "心愿单", detail: wishes.isEmpty ? nil : "每小时帮你看一眼价格")
+            if let rest, !wishes.isEmpty { WishPausedBanner(rest: rest) }
+            if wishes.isEmpty {
+                Text("搜到喜欢的点一下 ♡ 就放进来，箱箱帮你盯着价格；降价了会在刘海里告诉你。")
+                    .font(.system(size: 11)).foregroundStyle(.white.opacity(0.45))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12).background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.white.opacity(0.04)))
+            }
+            VStack(spacing: 8) {
+                ForEach(wishes) { w in
+                    WishRow(item: w)
+                        .contentShape(Rectangle())
+                        .onTapGesture { onOpenWish(w) }
+                        .contextMenu {
+                            if let u = URL(string: w.product.url) { Button("在京东打开") { NSWorkspace.shared.open(u) } }
+                            Button("移出心愿单", role: .destructive) { onRemoveWish(w) }
+                        }
+                }
+            }
         }
     }
 }
@@ -122,11 +161,21 @@ struct SectionTitle: View {
 struct Chip: View {
     let text: String
     var active = false
+    var action: (() -> Void)? = nil
+
+    init(text: String, active: Bool = false, action: (() -> Void)? = nil) {
+        self.text = text
+        self.active = active
+        self.action = action
+    }
+
     var body: some View {
-        Text(text).font(.system(size: 11, weight: active ? .semibold : .regular))
+        let label = Text(text).font(.system(size: 11, weight: active ? .semibold : .regular))
             .foregroundStyle(active ? .black : .white.opacity(0.75))
             .padding(.horizontal, 10).frame(height: 24)
             .background(Capsule().fill(active ? Color.white : .white.opacity(0.08)))
+            .contentShape(Capsule())
+        if let action { Button(action: action) { label }.buttonStyle(PressStyle()) } else { label }
     }
 }
 
@@ -150,7 +199,11 @@ struct WishRow: View {
                 }
             }
             Spacer(minLength: 4)
-            PriceChart(item: item, compact: true).frame(width: 96, height: 44)
+            if item.history.count >= 2 {
+                PriceChart(item: item, compact: true).frame(width: 96, height: 44)
+            } else {
+                Text("刚加入\n箱箱开始盯了").font(.system(size: 9)).foregroundStyle(.white.opacity(0.4)).multilineTextAlignment(.trailing)
+            }
         }
         .padding(8)
         .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.white.opacity(0.05)))
@@ -302,21 +355,58 @@ struct CommerceResults: View {
     /// 京东歇着时：顶上放说明卡，下面是上次的结果
     var rest: JDRest? = nil
     var cachedAt: Date? = nil
+    var sort = "general"
+    var loading = false
+    var reviewsLoading = false
+    var hasMore = false
+    var onSort: (String) -> Void = { _ in }
+    var onOpen: (Product) -> Void = { _ in }
+    var onWish: (Product) -> Void = { _ in }
+    var onReview: (CoverItem) -> Void = { _ in }
+    var onSearchInJD: () -> Void = {}
+    var onLoadMore: () -> Void = {}
+
+    static let sorts: [(String, String)] = [("general", "综合"), ("sales", "销量"), ("price_asc", "价格"), ("comments", "评价")]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            CommerceSearchBar(query: query)
             SectionTitle(title: "大家怎么说", detail: "小红书 · B 站 · 抖音的真实测评")
-            ReviewStrip(reviews: Array(reviews.prefix(6)), scrollable: scrollable)
+            if reviews.isEmpty {
+                Text(reviewsLoading ? "小猫们正在找测评…" : "没找到相关测评").font(.system(size: 11)).foregroundStyle(.white.opacity(0.4))
+                    .frame(maxWidth: .infinity, minHeight: 60)
+            } else {
+                ReviewStrip(reviews: Array(reviews.prefix(10)), scrollable: scrollable, onTap: onReview)
+            }
             HStack(spacing: 6) {
                 SectionTitle(title: "京东")
                 Spacer()
-                ForEach(["综合", "销量", "价格", "评价"], id: \.self) { Chip(text: $0, active: $0 == "综合") }
+                ForEach(Self.sorts, id: \.0) { key, name in
+                    // 「价格」再点一下切换升降序
+                    let on = sort == key || (key == "price_asc" && sort == "price_desc")
+                    Chip(text: key == "price_asc" && sort == "price_desc" ? "价格↓" : (key == "price_asc" && on ? "价格↑" : name), active: on) {
+                        onSort(key == "price_asc" && sort == "price_asc" ? "price_desc" : key)
+                    }
+                }
             }
             .opacity(rest == nil ? 1 : 0.4)
-            if let rest { JDRestCard(rest: rest, query: query, cachedAt: cachedAt) }
-            VStack(spacing: 8) { ForEach(products) { ProductRow(product: $0, wished: wished.contains($0.id)) } }
-                .opacity(rest == nil ? 1 : 0.75)
+            .allowsHitTesting(rest == nil)
+            if let rest { JDRestCard(rest: rest, query: query, cachedAt: cachedAt, onSearchInJD: onSearchInJD) }
+            if loading && products.isEmpty {
+                ProgressView().controlSize(.small).frame(maxWidth: .infinity, minHeight: 80)
+            } else if products.isEmpty && rest == nil {
+                Text("京东上没搜到「\(query)」，换个说法试试").font(.system(size: 11)).foregroundStyle(.white.opacity(0.45)).frame(maxWidth: .infinity, minHeight: 60)
+            }
+            VStack(spacing: 8) {
+                ForEach(products) { p in
+                    ProductRow(product: p, wished: wished.contains(p.id), onWish: { onWish(p) })
+                        .contentShape(Rectangle())
+                        .onTapGesture { onOpen(p) }
+                }
+            }
+            .opacity(rest == nil ? 1 : 0.75)
+            if hasMore && rest == nil {
+                ProgressView().controlSize(.small).frame(maxWidth: .infinity).padding(.vertical, 6).onAppear(perform: onLoadMore)
+            }
         }
     }
 }
@@ -325,8 +415,9 @@ struct CommerceResults: View {
 struct ReviewStrip: View {
     let reviews: [CoverItem]
     var scrollable = true
+    var onTap: (CoverItem) -> Void = { _ in }
     var body: some View {
-        let row = HStack(spacing: 8) { ForEach(reviews) { ReviewTile(item: $0) } }
+        let row = HStack(spacing: 8) { ForEach(reviews) { r in ReviewTile(item: r).contentShape(Rectangle()).onTapGesture { onTap(r) } } }
         if scrollable { ScrollView(.horizontal, showsIndicators: false) { row } } else {
             // 不让超宽的一排把父视图撑宽：放进固定高度的容器里，靠左、裁掉右边
             Color.clear.frame(height: 172).overlay(alignment: .topLeading) { row.fixedSize() }.clipped()
@@ -360,6 +451,7 @@ struct ReviewTile: View {
 struct ProductRow: View {
     let product: Product
     let wished: Bool
+    var onWish: () -> Void = {}
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             ProductThumb(source: product.cover, size: 84)
@@ -375,11 +467,17 @@ struct ProductRow: View {
                 }
                 Spacer(minLength: 0)
                 HStack(alignment: .lastTextBaseline) {
-                    Text(PriceFormat.yuan(product.price)).font(.system(size: 17, weight: .bold, design: .rounded)).foregroundStyle(priceRed)
+                    Text(product.price > 0 ? PriceFormat.yuan(product.price) : "看价格").font(.system(size: 17, weight: .bold, design: .rounded)).foregroundStyle(priceRed)
                     if let c = PriceFormat.comments(product.comments) { Text(c).font(.system(size: 10)).foregroundStyle(.white.opacity(0.45)) }
                     Spacer()
-                    Image(systemName: wished ? "heart.fill" : "heart").font(.system(size: 14))
-                        .foregroundStyle(wished ? Color.pink : .white.opacity(0.6))
+                    Button(action: onWish) {
+                        Image(systemName: wished ? "heart.fill" : "heart").font(.system(size: 14))
+                            .foregroundStyle(wished ? Color.pink : .white.opacity(0.6))
+                            .symbolEffect(.bounce, value: wished)
+                            .frame(width: 30, height: 30).contentShape(Rectangle())
+                    }
+                    .buttonStyle(PressStyle())
+                    .help(wished ? "移出心愿单" : "加入心愿单，帮你盯价格")
                 }
             }
             .frame(height: 84)
@@ -396,29 +494,40 @@ struct ProductDetailView: View {
     let reviews: [CoverItem]
     let wish: WishItem?
     var scrollable = true
+    /// 价格来自多久之前的搜索结果（京东歇着时显示「更新于」）
+    var priceAt: Date? = nil
+    var onBack: () -> Void = {}
+    var onWish: () -> Void = {}
+    var onBuy: () -> Void = {}
+    var onReview: (CoverItem) -> Void = { _ in }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             ZStack(alignment: .topLeading) {
                 RemoteImage(source: product.cover, contentMode: .fit).frame(maxWidth: .infinity).frame(height: 220).clipped().background(Color.white)
-                HStack(spacing: 4) {
-                    Image(systemName: "chevron.left").font(.system(size: 10, weight: .bold))
-                    Text("结果").font(.system(size: 11, weight: .medium))
+                Button(action: onBack) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left").font(.system(size: 10, weight: .bold))
+                        Text("返回").font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundStyle(.white).padding(.horizontal, 9).frame(height: 24).background(Capsule().fill(.black.opacity(0.55))).contentShape(Capsule())
                 }
-                .foregroundStyle(.white).padding(.horizontal, 9).frame(height: 24).background(Capsule().fill(.black.opacity(0.55))).padding(10)
+                .buttonStyle(PressStyle())
+                .padding(10)
             }
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .lastTextBaseline, spacing: 8) {
-                    Text(PriceFormat.yuan(product.price)).font(.system(size: 24, weight: .bold, design: .rounded)).foregroundStyle(priceRed)
+                    Text(product.price > 0 ? PriceFormat.yuan(product.price) : "去京东看价格").font(.system(size: 24, weight: .bold, design: .rounded)).foregroundStyle(priceRed)
                     if let w = wish, w.change < 0 { Text("比加入时降了 \(PriceFormat.yuan(-w.change))").font(.system(size: 11, weight: .medium)).foregroundStyle(dropGreen) }
                     Spacer()
                     if let c = PriceFormat.comments(product.comments) { Text(c).font(.system(size: 11)).foregroundStyle(.white.opacity(0.5)) }
                 }
+                if let priceAt { Text("价格更新于 \(JDRestCard.ago(priceAt))，以京东页面为准").font(.system(size: 10)).foregroundStyle(.white.opacity(0.45)) }
                 Text(product.title).font(.system(size: 13)).foregroundStyle(.white.opacity(0.92)).lineLimit(3)
                 Text(product.shop).font(.system(size: 11)).foregroundStyle(.white.opacity(0.5))
             }
-            if let w = wish {
+            if let w = wish, w.history.count >= 2 {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text("价格走势").font(.system(size: 11, weight: .medium)).foregroundStyle(.white.opacity(0.7))
@@ -429,20 +538,28 @@ struct ProductDetailView: View {
                 }
                 .padding(10).background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(.white.opacity(0.05)))
             }
-            SectionTitle(title: "大家怎么说")
-            ReviewStrip(reviews: Array(reviews.prefix(6)), scrollable: scrollable)
+            if !reviews.isEmpty {
+                SectionTitle(title: "大家怎么说")
+                ReviewStrip(reviews: Array(reviews.prefix(10)), scrollable: scrollable, onTap: onReview)
+            }
             HStack(spacing: 10) {
-                Label(wish == nil ? "加入心愿单" : "已在心愿单", systemImage: wish == nil ? "heart" : "heart.fill")
-                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
-                    .frame(maxWidth: .infinity).frame(height: 38)
-                    .background(Capsule().fill(.white.opacity(0.1)))
-                HStack(spacing: 6) {
-                    PlatformIcon(platform: "jd", size: 16)
-                    Text("去京东买").font(.system(size: 13, weight: .semibold))
+                Button(action: onWish) {
+                    Label(wish == nil ? "加入心愿单" : "已在心愿单", systemImage: wish == nil ? "heart" : "heart.fill")
+                        .font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                        .frame(maxWidth: .infinity).frame(height: 38)
+                        .background(Capsule().fill(.white.opacity(0.1))).contentShape(Capsule())
                 }
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity).frame(height: 38)
-                .background(Capsule().fill(priceRed))
+                .buttonStyle(PressStyle())
+                Button(action: onBuy) {
+                    HStack(spacing: 6) {
+                        PlatformIcon(platform: "jd", size: 16)
+                        Text("去京东买").font(.system(size: 13, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity).frame(height: 38)
+                    .background(Capsule().fill(priceRed)).contentShape(Capsule())
+                }
+                .buttonStyle(PressStyle())
             }
         }
     }
@@ -490,6 +607,7 @@ struct JDRestCard: View {
     let rest: JDRest
     let query: String
     var cachedAt: Date? = nil
+    var onSearchInJD: () -> Void = {}
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -499,9 +617,12 @@ struct JDRestCard: View {
                     .font(.system(size: 12, weight: .semibold))
                 Text(detail).font(.system(size: 10)).foregroundStyle(.white.opacity(0.6)).fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 6) {
-                    Label("在京东里搜「\(query)」", systemImage: "arrow.up.right")
-                        .font(.system(size: 10, weight: .semibold)).foregroundStyle(.white)
-                        .padding(.horizontal, 9).frame(height: 22).background(Capsule().fill(priceRed.opacity(0.85)))
+                    Button(action: onSearchInJD) {
+                        Label("在京东里搜「\(query)」", systemImage: "arrow.up.right")
+                            .font(.system(size: 10, weight: .semibold)).foregroundStyle(.white)
+                            .padding(.horizontal, 9).frame(height: 22).background(Capsule().fill(priceRed.opacity(0.85))).contentShape(Capsule())
+                    }
+                    .buttonStyle(PressStyle())
                     if let cachedAt {
                         Text("下面是 \(Self.ago(cachedAt))的结果").font(.system(size: 10)).foregroundStyle(.white.opacity(0.45))
                     }

@@ -11,11 +11,17 @@ struct KeyContext: Equatable {
     /// 焦点在输入框里（搜索框打字）
     var typing = false
     var overlay: AppState.Overlay = .none
+    /// 在电商板块里浏览（没在播测评）
+    var commerceBrowsing = false
+    /// 在电商板块里播测评
+    var commercePlaying = false
+    /// 电商的商品页或搜索结果开着：Esc 退一层
+    var commerceBack = false
     var command = false
     /// ⌃ / ⌥ 等其他修饰键
     var otherModifiers = false
 
-    var browsingResults: Bool { searchActive && !searchPlaying }
+    var browsingResults: Bool { (searchActive && !searchPlaying) || commerceBrowsing }
     /// 能翻页：没开着设置等浮层（点赞收藏里点开在播的除外），评论也没开。
     var canPage: Bool { (overlay == .none || savedPlaying) && !commentsOpen }
 }
@@ -27,6 +33,7 @@ enum KeyAction: Equatable {
     case consume
     case openSearch, toggleFullscreen, exitFullscreen, skipOnboarding
     case closeComments, stopSaved, closeOverlay, stopSearchPlaying, closeSearch, collapse
+    case stopCommercePlaying, commerceBack
     case page(Int), carousel(Int)
     case togglePause, toggleMute, like, collect, toggleComments
 }
@@ -47,6 +54,8 @@ enum KeyRouter {
             if c.overlay != .none { return .closeOverlay }
             if c.searchPlaying { return .stopSearchPlaying }
             if c.searchActive { return .closeSearch }
+            if c.commercePlaying { return .stopCommercePlaying }
+            if c.commerceBack { return .commerceBack }
             return .collapse
         case _ where c.browsingResults: return .pass
         case kVK_DownArrow, kVK_ANSI_J: return c.canPage ? .page(1) : .consume

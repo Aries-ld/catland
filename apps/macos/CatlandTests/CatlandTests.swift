@@ -394,6 +394,20 @@ final class KeyRouterTests: XCTestCase {
         XCTAssertEqual(KeyRouter.route(kVK_Escape, KeyContext(searchActive: true, typing: true)), .closeSearch)
     }
 
+    func testCommerceEscapeAndKeys() {
+        // 电商里浏览：方向键、空格交给页面；F 不进全屏；Esc 先关商品页 / 结果，再收起
+        let browse = KeyContext(commerceBrowsing: true, commerceBack: true)
+        XCTAssertEqual(KeyRouter.route(kVK_DownArrow, browse), .pass)
+        XCTAssertEqual(KeyRouter.route(kVK_ANSI_F, browse), .pass)
+        XCTAssertEqual(KeyRouter.route(kVK_Escape, browse), .commerceBack)
+        XCTAssertEqual(KeyRouter.route(kVK_Escape, KeyContext(commerceBrowsing: true)), .collapse)
+        // 播测评：和刷视频一样，Esc 回到电商页
+        let playing = KeyContext(commercePlaying: true, commerceBack: true)
+        XCTAssertEqual(KeyRouter.route(kVK_DownArrow, playing), .page(1))
+        XCTAssertEqual(KeyRouter.route(kVK_ANSI_F, playing), .toggleFullscreen)
+        XCTAssertEqual(KeyRouter.route(kVK_Escape, playing), .stopCommercePlaying)
+    }
+
     func testPagingRespectsOverlaysAndComments() {
         XCTAssertEqual(KeyRouter.route(kVK_DownArrow, KeyContext()), .page(1))
         XCTAssertEqual(KeyRouter.route(kVK_ANSI_K, KeyContext()), .page(-1))

@@ -20,7 +20,7 @@ struct ExpandedPanel: View {
                 }
             }
             .overlay(alignment: .topLeading) {
-                if showSources && !state.search.active && state.overlay == .none {
+                if showSources && !state.search.active && state.overlay == .none && state.section == .content {
                     SourcePicker(state: state) { withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { showSources = false } }
                         .offset(x: 12, y: 44)
                         .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .topLeading)))
@@ -86,20 +86,18 @@ struct ExpandedPanel: View {
         HStack(spacing: 14) {
             ForEach(AppState.Section.allCases, id: \.self) { s in
                 Button {
-                    if s == .commerce { return state.showToast("电商板块下个版本上线") }
                     // 已经在「视频」上再点一下：弹出 / 收起平台开关
                     if state.section == s && state.overlay == .none && s == .content {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { showSources.toggle() }
                         return
                     }
-                    state.section = s
-                    state.overlay = .none
+                    state.setSection(s)
                 } label: {
                     VStack(spacing: 4) {
                         HStack(spacing: 2) {
                             Text(s.rawValue)
                                 .font(.system(size: 14, weight: state.section == s ? .semibold : .regular))
-                                .foregroundStyle(s == .commerce ? .white.opacity(0.3) : (state.section == s ? .white : .white.opacity(0.55)))
+                                .foregroundStyle(state.section == s ? .white : .white.opacity(0.55))
                             if s == .content && state.section == s {
                                 Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
                                     .foregroundStyle(.white.opacity(0.5))
@@ -171,7 +169,9 @@ struct ExpandedPanel: View {
         case .failed(let msg):
             StatusView(text: "本地服务启动失败", detail: msg)
         case .ready:
-            if state.connectedContentPlatforms.isEmpty && !state.platforms.isEmpty {
+            if state.section == .commerce {
+                CommerceView(state: state)
+            } else if state.connectedContentPlatforms.isEmpty && !state.platforms.isEmpty {
                 if state.onboarding.done {
                     StatusView(text: "还没有连接任何平台", detail: "连接小红书、B 站、快手等账号后就能开刷", action: ("连接平台", { state.overlay = .connections }))
                 } else {

@@ -22,6 +22,8 @@ final class AppState {
     let search: SearchController
     /// 点赞 / 收藏页里点开的帖子：在 catland 里直接播放（不跳到网页），往下刷进入全局推荐流。
     let libraryPlayer: FeedController
+    /// 购物小助手（电商板块，先只接京东，见 ADR 0005）。
+    let commerce: CommerceController
     /// 自动更新（每天查一次，有新版时小猫提醒，点一下就装）。
     let updater = AppUpdater()
     /// 小猫刚在刘海里报了新版本：这时点开小岛直接到设置页的「更新」。
@@ -29,7 +31,14 @@ final class AppState {
     private(set) var savedPlaying = false
     private(set) var savedPlayingTitle = ""
     /// 当前在播的那一套卡片：点赞 / 收藏 → 搜索结果 → 推荐流。
-    var activeFeed: FeedController { savedPlaying ? libraryPlayer : (search.playing ? search.player : feed) }
+    var activeFeed: FeedController {
+        if savedPlaying { return libraryPlayer }
+        if search.playing { return search.player }
+        if section == .commerce && commerce.reviews.playing { return commerce.reviews.player }
+        return feed
+    }
+    /// 在电商板块里浏览（没在播测评）：方向键、滚轮交给页面自己。
+    var browsingCommerce: Bool { section == .commerce && !commerce.reviews.playing && !savedPlaying && overlay == .none && !search.active }
     private let log = Logger(subsystem: "app.catland", category: "app")
 
     var phase: Phase = .starting
@@ -166,6 +175,21 @@ final class AppState {
         feed = FeedController(sidecar: sidecar)
         search = SearchController(sidecar: sidecar)
         libraryPlayer = FeedController(sidecar: sidecar)
+        commerce = CommerceController(sidecar: sidecar)
+    }
+
+    /// 切换板块：去电商时推荐流暂停；回视频时测评停掉、推荐流接着播。
+    func setSection(_ s: Section) {
+        guard s != section else { return }
+        section = s
+        overlay = .none
+        commentsOpen = false
+        if s == .commerce {
+            feed.pauseAll()
+        } else {
+            commerce.reviews.stopPlaying()
+            if expanded { feed.resume() }
+        }
     }
 
     /// 能搜索的平台：正常连接（登录没失效）的内容平台。
@@ -279,6 +303,7 @@ final class AppState {
             feed.muted = settings.muted
             search.player.muted = settings.muted
             libraryPlayer.muted = settings.muted
+            commerce.reviews.player.muted = settings.muted
             phase = .ready
             startWeather()
             startEventWatcher()
@@ -351,6 +376,14 @@ final class AppState {
                     // 扫码后 catbus 还要几秒去平台换登录凭证、校验登录态，这段时间没有新消息：提前告诉用户在等什么
                     qrLogin?.message = m.contains("已扫码") ? "已扫码 ✓ 在手机上确认后，再等几秒就好（正在向\(name)确认登录）" : m
                 }
+            }
+        case "commerce.rest":
+            // 京东熔断：兜底卡片换上；箱箱只在这时说一句，之后不重复打扰
+            if let r = try? dec.decode(RestDTO.self, from: params) {
+                let rest = r.rest
+                commerce.noteRest(rest)
+                let t = rest.resumeAt.map { $0.formatted(date: .omitted, time: .shortened) } ?? "稍后"
+                announce(rest.kind == .verify ? "箱箱：京东想确认你是真人，有空在浏览器里逛两下京东就好" : "箱箱：京东让我们歇会儿，\(t)左右回来接着盯价")
             }
         case "feed.source":
             if let s = try? dec.decode(SourceState.self, from: params) {
@@ -439,6 +472,7 @@ final class AppState {
         feed.muted = muted
         search.player.muted = muted
         libraryPlayer.muted = muted
+        commerce.reviews.player.muted = muted
         Task { let _: Settings? = try? await sidecar.call("settings.update", ["muted": muted]) }
     }
 
@@ -571,6 +605,7 @@ final class AppState {
         feed.pauseAll()
         search.player.pauseAll()
         libraryPlayer.pauseAll()
+        commerce.reviews.player.pauseAll()
     }
 }
 

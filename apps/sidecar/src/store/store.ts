@@ -44,7 +44,7 @@ export interface Settings {
 
 const DEFAULT_SETTINGS: Settings = { muted: true, sources: {}, weather: true }
 
-const SCHEMA_VERSION = 1
+const SCHEMA_VERSION = 2
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -56,7 +56,32 @@ const MIGRATIONS: Record<number, string> = {
     CREATE INDEX history_at ON history(at DESC);
     CREATE TABLE settings (name TEXT PRIMARY KEY, value TEXT NOT NULL);
   `,
+  // 购物小助手（ADR 0005）：心愿单、价格历史、小状态（京东熔断）
+  2: `
+    CREATE TABLE wish (sku TEXT PRIMARY KEY, product TEXT NOT NULL, at INTEGER NOT NULL);
+    CREATE TABLE price (sku TEXT NOT NULL, at INTEGER NOT NULL, price REAL NOT NULL, PRIMARY KEY (sku, at));
+    CREATE TABLE kv (name TEXT PRIMARY KEY, value TEXT NOT NULL);
+  `,
 }
+
+/** 心愿单里存的商品快照（京东搜索结果里的字段）。 */
+export interface ProductSnapshot {
+  sku: string
+  title: string
+  price: number | null
+  shop: string | null
+  cover: string | null
+  url: string
+  comments: number | null
+}
+
+export interface WishEntry {
+  product: ProductSnapshot
+  at: string
+  history: Array<{ at: string; price: number }>
+}
+
+export const WISH_LIMIT = 30
 
 /** 工作区根目录（见 workspace.ts）。 */
 export function defaultDataDir(): string {
@@ -212,6 +237,61 @@ export class Store implements SeenStore {
 
   importHistory(card: CardSnapshot, at: number, dwellMs: number): boolean {
     return this.db.prepare('INSERT INTO history (key, card, at, dwell_ms) VALUES (?, ?, ?, ?) ON CONFLICT (key) DO NOTHING').run(card.key, JSON.stringify(card), at, dwellMs).changes > 0
+  }
+
+  // ---- 心愿单与价格历史
+
+  wishCount(): number {
+    return (this.db.prepare('SELECT COUNT(*) AS n FROM wish').get() as { n: number }).n
+  }
+
+  /** 加入心愿单，同时记下当时的价格作为价格历史的第一个点。已在心愿单里时只更新快照。 */
+  addWish(p: ProductSnapshot): void {
+    const now = this.now()
+    this.db.prepare('INSERT INTO wish (sku, product, at) VALUES (?, ?, ?) ON CONFLICT (sku) DO UPDATE SET product = excluded.product').run(p.sku, JSON.stringify(p), now)
+    if (p.price !== null) this.recordPrice(p.sku, p.price, now)
+  }
+
+  removeWish(sku: string): void {
+    this.db.prepare('DELETE FROM wish WHERE sku = ?').run(sku)
+    this.db.prepare('DELETE FROM price WHERE sku = ?').run(sku)
+  }
+
+  isWished(skus: string[]): Set<string> {
+    if (skus.length === 0) return new Set()
+    const rows = this.db.prepare(`SELECT sku FROM wish WHERE sku IN (${skus.map(() => '?').join(',')})`).all(...skus) as Array<{ sku: string }>
+    return new Set(rows.map((r) => r.sku))
+  }
+
+  /** 记一个价格点。价格没变时只把「最新」那个点往后挪：同价的一段只用起点和最新两个点表示，曲线能画到现在。 */
+  recordPrice(sku: string, price: number, at = this.now()): void {
+    const [last, prev] = this.db.prepare('SELECT at, price FROM price WHERE sku = ? ORDER BY at DESC LIMIT 2').all(sku) as Array<{ at: number; price: number }>
+    if (last && prev && last.price === price && prev.price === price) {
+      this.db.prepare('UPDATE price SET at = ? WHERE sku = ? AND at = ?').run(at, sku, last.at)
+      return
+    }
+    this.db.prepare('INSERT OR REPLACE INTO price (sku, at, price) VALUES (?, ?, ?)').run(sku, at, price)
+  }
+
+  listWish(): WishEntry[] {
+    const rows = this.db.prepare('SELECT sku, product, at FROM wish ORDER BY at DESC').all() as Array<{ sku: string; product: string; at: number }>
+    const hist = this.db.prepare('SELECT at, price FROM price WHERE sku = ? ORDER BY at ASC')
+    return rows.map((r) => ({
+      product: JSON.parse(r.product) as ProductSnapshot,
+      at: new Date(r.at).toISOString(),
+      history: (hist.all(r.sku) as Array<{ at: number; price: number }>).map((h) => ({ at: new Date(h.at).toISOString(), price: h.price })),
+    }))
+  }
+
+  // ---- 小状态（kv）
+
+  getKv<T>(name: string): T | null {
+    const row = this.db.prepare('SELECT value FROM kv WHERE name = ?').get(name) as { value: string } | undefined
+    return row ? (JSON.parse(row.value) as T) : null
+  }
+
+  setKv(name: string, value: unknown): void {
+    this.db.prepare('INSERT INTO kv (name, value) VALUES (?, ?) ON CONFLICT (name) DO UPDATE SET value = excluded.value').run(name, JSON.stringify(value))
   }
 
   /** 按 key 找回收藏夹或浏览历史里的快照（不限条数）。 */

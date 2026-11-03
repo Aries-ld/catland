@@ -39,14 +39,16 @@ final class SearchController {
     private var lastPlatform: String?
     private var run = 0
     private var playOffset = 0
-    private static let recentKey = "recentSearches"
+    /// 最近搜索存在哪个键（购物小助手的测评搜索用另一份，不和搜索页混在一起）
+    private let recentKey: String
     static let maxRun = 3
     /// 第一屏（两列各两张）：先回来的平台可以先把它铺满，让结果「一下子就出来」。
     static let firstScreen = 4
 
-    init(sidecar: SidecarClient) {
+    init(sidecar: SidecarClient, recentKey: String = "recentSearches") {
         self.sidecar = sidecar
-        recent = UserDefaults.standard.stringArray(forKey: Self.recentKey) ?? []
+        self.recentKey = recentKey
+        recent = UserDefaults.standard.stringArray(forKey: recentKey) ?? []
         player = FeedController(sidecar: sidecar)
         if let data = UserDefaults.standard.data(forKey: Self.hotKey), let words = try? JSONDecoder().decode([HotWord].self, from: data) { hotWords = words }
     }
@@ -180,12 +182,12 @@ final class SearchController {
     func clearRecent() {
         recent = []
         editingRecent = false
-        UserDefaults.standard.removeObject(forKey: Self.recentKey)
+        UserDefaults.standard.removeObject(forKey: recentKey)
     }
 
     func removeRecent(_ q: String) {
         recent.removeAll { $0 == q }
-        UserDefaults.standard.set(recent, forKey: Self.recentKey)
+        UserDefaults.standard.set(recent, forKey: recentKey)
         if recent.isEmpty { editingRecent = false }
     }
 
@@ -305,6 +307,6 @@ final class SearchController {
     private func remember(_ q: String) {
         recent = [q] + recent.filter { $0 != q }
         recent = Array(recent.prefix(10))
-        UserDefaults.standard.set(recent, forKey: Self.recentKey)
+        UserDefaults.standard.set(recent, forKey: recentKey)
     }
 }

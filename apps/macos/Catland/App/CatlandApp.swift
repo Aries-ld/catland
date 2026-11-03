@@ -168,15 +168,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                             r.scale = 2
                             if let cg = r.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) { try? png.write(to: URL(fileURLWithPath: "/tmp/commerce-\(name).png")) }
                         }
-                        save(CommerceHome(wishes: wishes, orders: [order], recent: ["机械键盘", "降噪耳机", "猫砂"]), "home", height: 620)
-                        save(CommerceResults(query: "机械键盘", reviews: Array(reviews), products: Array(products.prefix(4)), wished: [products[1].id], scrollable: false), "results")
+                        save(VStack(spacing: 16) { CommerceSearchBar(query: ""); CommerceHome(wishes: wishes, orders: [order], recent: ["机械键盘", "降噪耳机", "猫砂"]) }, "home", height: 620)
+                        save(VStack(spacing: 14) { CommerceSearchBar(query: "机械键盘"); CommerceResults(query: "机械键盘", reviews: Array(reviews), products: Array(products.prefix(4)), wished: [products[1].id], scrollable: false) }, "results")
                         save(ProductDetailView(product: products[3], reviews: Array(reviews), wish: wishes[0], scrollable: false), "detail")
                         save(PriceDropBubble(item: wishes[0]), "bubble")
                         // 兜底：京东歇着时的搜索结果、心愿单
                         let rest = JDRest(kind: .resting, resumeAt: Date().addingTimeInterval(2 * 3600))
-                        save(CommerceResults(query: "机械键盘", reviews: Array(reviews), products: Array(products.prefix(3)), wished: [], scrollable: false,
-                                             rest: rest, cachedAt: Date().addingTimeInterval(-3 * 3600)), "results-resting")
-                        save(CommerceHome(wishes: wishes, orders: [], recent: ["机械键盘", "降噪耳机", "猫砂"], rest: rest), "home-resting", height: 560)
+                        save(VStack(spacing: 14) {
+                            CommerceSearchBar(query: "机械键盘")
+                            CommerceResults(query: "机械键盘", reviews: Array(reviews), products: Array(products.prefix(3)), wished: [], scrollable: false,
+                                            rest: rest, cachedAt: Date().addingTimeInterval(-3 * 3600))
+                        }, "results-resting")
+                        save(VStack(spacing: 16) { CommerceSearchBar(query: ""); CommerceHome(wishes: wishes, orders: [], recent: ["机械键盘", "降噪耳机", "猫砂"], rest: rest) }, "home-resting", height: 560)
                         AppLog.info("render commerce", ["products": products.count, "reviews": reviews.count])
                     }
                 case "render:update":
@@ -383,11 +386,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             panel.ignoresMouseEvents = false
             panel.makeKey()
             // 搜索页开着但没在播：不恢复推荐流
-            if state.savedPlaying || (state.overlay == .none && (!state.search.active || state.search.playing)) { state.activeFeed.resume() }
+            if state.savedPlaying || (state.overlay == .none && (!state.search.active || state.search.playing) && !state.browsingCommerce) { state.activeFeed.resume() }
         } else {
             state.feed.pauseAll()
             state.search.player.pauseAll()
             state.libraryPlayer.pauseAll()
+            state.commerce.reviews.player.pauseAll()
             panel.resignKey()
             updateMouse(NSEvent.mouseLocation)
         }
@@ -485,6 +489,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self, (self.state.expanded && e.window === self.panel) || inFullscreen, self.state.overlay == .none || self.state.savedPlaying || inFullscreen, !self.state.commentsOpen else { return e }
             // 搜索结果瀑布流自己滚动；只有在播搜索结果时才按页翻
             if self.state.search.active && !self.state.search.playing { return e }
+            if self.state.browsingCommerce { return e }
             return self.pager.handle(e) ? nil : e
         } as Any)
         monitors.append(NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] e in
@@ -529,6 +534,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let ctx = KeyContext(fullscreen: state.fullscreen, commentsOpen: state.commentsOpen, onboarding: state.onboarding.step != nil,
                              savedPlaying: state.savedPlaying, searchActive: state.search.active, searchPlaying: state.search.playing,
                              typing: panel.firstResponder is NSTextView, overlay: state.overlay,
+                             commerceBrowsing: state.browsingCommerce, commercePlaying: state.section == .commerce && state.commerce.reviews.playing,
+                             commerceBack: state.commerce.detail != nil || !state.commerce.submitted.isEmpty,
                              command: m.contains(.command), otherModifiers: !m.intersection([.control, .option]).isEmpty)
         let feed = state.activeFeed
         let spring = Animation.spring(response: 0.3, dampingFraction: 0.9)
@@ -545,6 +552,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .stopSaved: withAnimation(spring) { state.stopSaved() }
         case .closeOverlay: state.overlay = .none; state.feed.resume()
         case .stopSearchPlaying: withAnimation(spring) { state.search.stopPlaying() }
+        case .stopCommercePlaying: withAnimation(spring) { state.commerce.reviews.stopPlaying() }
+        case .commerceBack:
+            withAnimation(spring) {
+                if state.commerce.detail != nil { state.commerce.detail = nil } else { state.commerce.query = ""; state.commerce.clear() }
+            }
         case .closeSearch: state.closeSearch()
         case .collapse: collapse()
         case .page(let d): page(d)
