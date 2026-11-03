@@ -138,6 +138,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 // 自动更新的本地端到端测试（需要 CATLAND_UPDATER_TEST=1 启动，见 docs/development.md）
                 case "update:check": self.state.updater.checkNow()
                 case "update:install": self.state.updater.install()
+                case let c where c.hasPrefix("render:commerce:"):
+                    // 电商设计稿：京东商品读自 catbus 的搜索结果文件（不再请求京东），测评走一次正常的内容搜索
+                    let path = String(c.dropFirst(16))
+                    Task { @MainActor in
+                        struct Raw: Decodable { let data: [R]; struct R: Decodable { let id: String; let title: String; let url: String; let cover: String?; let author: UserRef?; let price: P?; let stats: ItemStats }; struct P: Decodable { let amount: Double } }
+                        guard let d = FileManager.default.contents(atPath: path), let raw = try? JSONDecoder().decode(Raw.self, from: d) else { return }
+                        let products = raw.data.map { r in Product(id: r.id, title: r.title, price: r.price?.amount ?? 0, shop: r.author?.name ?? "", cover: r.cover.map { ImageSource(url: $0, headers: [:], width: nil, height: nil) }, url: r.url, comments: r.stats.comments) }
+                        let search = self.state.search
+                        search.query = "机械键盘"
+                        search.submit(platforms: self.state.searchPlatforms.filter { ["xhs", "bilibili", "douyin"].contains($0) })
+                        try? await Task.sleep(for: .seconds(8))
+                        let reviews = search.hits.prefix(8).map(CoverItem.init)
+                        for p in products { if let s = p.cover { _ = await ImageLoader.shared.load(s).value } }
+                        for r in reviews { if let s = r.cover { _ = await ImageLoader.shared.load(s).value } }
+                        search.clearResults()
+                        let wishes = [
+                            WishItem(product: products[3], history: [349, 349, 339, 329, 329, 319, 299.9]),
+                            WishItem(product: products[5], history: [299, 309, 315, 315, 315, 315]),
+                            WishItem(product: products[1], history: [329, 329, 319, 319, 299, 299]),
+                        ]
+                        let order = OrderStatus(id: "1", title: products[0].title, cover: products[0].cover, status: "运输中", detail: "预计明天送达", progress: 0.62)
+                        @MainActor func save(_ v: some View, _ name: String, height: CGFloat? = nil) {
+                            let r = ImageRenderer(content: v.padding(14).frame(width: 384, height: height, alignment: .top).background(Color(white: 0.07)).environment(\.colorScheme, .dark))
+                            r.scale = 2
+                            if let cg = r.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) { try? png.write(to: URL(fileURLWithPath: "/tmp/commerce-\(name).png")) }
+                        }
+                        save(CommerceHome(wishes: wishes, orders: [order], recent: ["机械键盘", "降噪耳机", "猫砂"]), "home", height: 620)
+                        save(CommerceResults(query: "机械键盘", reviews: Array(reviews), products: Array(products.prefix(4)), wished: [products[1].id], scrollable: false), "results")
+                        save(ProductDetailView(product: products[3], reviews: Array(reviews), wish: wishes[0], scrollable: false), "detail")
+                        save(PriceDropBubble(item: wishes[0]), "bubble")
+                        AppLog.info("render commerce", ["products": products.count, "reviews": reviews.count])
+                    }
                 case "render:update":
                     // 离屏渲染「更新」卡片的三种状态（不碰真实的更新流程）
                     let u = AppUpdater()
