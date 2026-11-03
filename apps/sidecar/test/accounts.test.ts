@@ -1,6 +1,6 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { AccountService, type CatbusClient, type LoginEvent } from '../src/accounts/service.ts'
 import { CatbusCallError, type CatbusResult, type RunOptions } from '../src/catbus/runner.ts'
@@ -93,7 +93,8 @@ describe('AccountService.checkHealth', () => {
 describe('AccountService.loginQrcode', () => {
   it('把二维码 PNG 以 base64 推给客户端，过滤字符画，转发进度，成功后刷新', async () => {
     const { catbus, svc } = setup()
-    const png = join(mkdtempSync(join(tmpdir(), 'catland-qr-')), 'qrcode.png')
+    const png = join(mkdtempSync(join(tmpdir(), 'catland qr ')), 'Application Support', 'qrcode.png') // 路径带空格（真实工作区就是）
+    mkdirSync(dirname(png), { recursive: true })
     writeFileSync(png, Buffer.from([0x89, 0x50, 0x4e, 0x47]))
     catbus.on('bilibili auth login', (_argv, opts) => {
       opts.onStderrLine?.('▄▄▄▄ █▀▀▀█ ▄▄')

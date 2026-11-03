@@ -48,7 +48,8 @@ export interface BrowserCookie {
   expires?: number
 }
 
-const QR_LINE = /二维码图片：(\S+\.png)/
+// 路径里可能有空格（工作区在 ~/Library/Application Support 下），取到行尾的 .png 为止
+const QR_LINE = /二维码图片：(.+\.png)\s*$/
 const QR_LOGIN_TIMEOUT_MS = 6 * 60_000
 
 export class AccountService extends EventEmitter<{ changed: [] }> {
