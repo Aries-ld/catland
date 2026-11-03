@@ -68,6 +68,10 @@ final class CommerceController {
     private(set) var recent: [String]
     /// 「大家怎么说」：在内容平台上搜同一个词，用和搜索页同一套播放
     let reviews: SearchController
+    /// 商品页的测评：按「品牌 型号」单独搜，只留标题里对得上这一款的
+    let detailReviews: SearchController
+    private(set) var detailMatch: ProductMatch?
+    private var detailReviewsFor: String?
 
     private let sidecar: SidecarClient
     private var generation = 0
@@ -78,10 +82,46 @@ final class CommerceController {
     init(sidecar: SidecarClient) {
         self.sidecar = sidecar
         reviews = SearchController(sidecar: sidecar, recentKey: "commerceReviewSearches")
+        detailReviews = SearchController(sidecar: sidecar, recentKey: "commerceDetailReviewSearches")
         recent = UserDefaults.standard.stringArray(forKey: Self.recentKey) ?? []
     }
 
     var wishedIDs: Set<String> { Set(wishes.map(\.id)) }
+
+    /// 正在播测评（搜索结果的或商品页的）
+    var playing: Bool { reviews.playing || detailReviews.playing }
+    var player: FeedController { detailReviews.playing ? detailReviews.player : reviews.player }
+    var playingTitle: String { detailReviews.playing ? (detailMatch?.query ?? submitted) : submitted }
+
+    func stopPlaying() {
+        reviews.stopPlaying()
+        detailReviews.stopPlaying()
+    }
+
+    func pauseAll() {
+        reviews.player.pauseAll()
+        detailReviews.player.pauseAll()
+    }
+
+    func setMuted(_ m: Bool) {
+        reviews.player.muted = m
+        detailReviews.player.muted = m
+    }
+
+    /// 打开商品页：按这一款的品牌、型号去内容平台找测评（同一件商品只搜一次）。
+    func openDetail(_ p: Product, contentPlatforms: [String]) {
+        detail = p
+        guard detailReviewsFor != p.id else { return }
+        detailReviewsFor = p.id
+        let m = ProductMatch.parse(p.title)
+        detailMatch = m
+        detailReviews.hitFilter = { m.matches($0.title) }
+        let targets = contentPlatforms.filter { Self.reviewPlatforms.contains($0) }
+        guard !m.query.isEmpty, !targets.isEmpty else { detailReviews.clearResults(); return }
+        detailReviews.query = m.query
+        detailReviews.submit(platforms: targets)
+        AppLog.info("product reviews", ["query": m.query, "specific": m.specific])
+    }
 
     func wish(for p: Product) -> WishItem? { wishes.first { $0.id == p.id } }
 
@@ -120,7 +160,7 @@ final class CommerceController {
         cachedAt = nil
         detail = nil
         sort = "general"
-        reviews.stopPlaying()
+        stopPlaying()
         reviews.clearResults()
     }
 

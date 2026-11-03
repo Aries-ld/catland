@@ -63,6 +63,9 @@ export class CommerceService {
       this.cache.set(key, { at: this.now(), page })
       if (this.cache.size > CACHE_MAX) this.cache.delete(this.cache.keys().next().value!)
       this.log.info('jd search', { len: query.length, sort, got: page.products.length, more: page.hasMore })
+      // 搜到心愿单里的商品：顺手记下价格（不为盯价多发请求）
+      const wished = this.deps.store.isWished(page.products.map((p) => p.sku))
+      for (const p of page.products) if (wished.has(p.sku) && p.price !== null) this.deps.store.recordPrice(p.sku, p.price)
       return this.decorate(page, null, null)
     } catch (err) {
       const rest = err instanceof JdRestingError ? err.rest : err instanceof CatbusCallError && err.code === 'RISK_CONTROL' ? this.rest() : null

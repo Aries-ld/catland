@@ -172,6 +172,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         save(VStack(spacing: 14) { CommerceSearchBar(query: "机械键盘"); CommerceResults(query: "机械键盘", reviews: Array(reviews), products: Array(products.prefix(4)), wished: [products[1].id], scrollable: false) }, "results")
                         save(ProductDetailView(product: products[3], reviews: Array(reviews), wish: wishes[0], scrollable: false), "detail")
                         save(PriceDropBubble(item: wishes[0]), "bubble")
+                        // 商品页的测评按这一款单独搜（只搜内容平台，不请求京东）；刚加入心愿单只有一个价格点
+                        let cc = CommerceController(sidecar: self.state.sidecar)
+                        for p in [products[3], products[0]] {
+                            cc.openDetail(p, contentPlatforms: self.state.searchPlatforms)
+                            try? await Task.sleep(for: .seconds(8))
+                            let rs = cc.detailReviews.visibleHits.map(CoverItem.init)
+                            for r in rs { if let s = r.cover { _ = await ImageLoader.shared.load(s).value } }
+                            AppLog.info("render product reviews", ["query": cc.detailMatch?.query ?? "", "all": cc.detailReviews.hits.count, "matched": rs.count,
+                                                                   "titles": rs.prefix(5).map { $0.title ?? "" }])
+                            let fresh = WishItem(product: p, history: [PricePoint(date: Date().addingTimeInterval(-2 * 3600), price: p.price)])
+                            save(ProductDetailView(product: p, reviews: Array(rs), wish: p.id == products[3].id ? fresh : nil, scrollable: false,
+                                                   reviewsTitle: "「\(cc.detailMatch?.query ?? "")」的测评"), "detail-\(p.id)")
+                        }
                         // 兜底：京东歇着时的搜索结果、心愿单
                         let rest = JDRest(kind: .resting, resumeAt: Date().addingTimeInterval(2 * 3600))
                         save(VStack(spacing: 14) {
@@ -391,7 +404,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             state.feed.pauseAll()
             state.search.player.pauseAll()
             state.libraryPlayer.pauseAll()
-            state.commerce.reviews.player.pauseAll()
+            state.commerce.pauseAll()
             panel.resignKey()
             updateMouse(NSEvent.mouseLocation)
         }
@@ -534,7 +547,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let ctx = KeyContext(fullscreen: state.fullscreen, commentsOpen: state.commentsOpen, onboarding: state.onboarding.step != nil,
                              savedPlaying: state.savedPlaying, searchActive: state.search.active, searchPlaying: state.search.playing,
                              typing: panel.firstResponder is NSTextView, overlay: state.overlay,
-                             commerceBrowsing: state.browsingCommerce, commercePlaying: state.section == .commerce && state.commerce.reviews.playing,
+                             commerceBrowsing: state.browsingCommerce, commercePlaying: state.section == .commerce && state.commerce.playing,
                              commerceBack: state.commerce.detail != nil || !state.commerce.submitted.isEmpty,
                              command: m.contains(.command), otherModifiers: !m.intersection([.control, .option]).isEmpty)
         let feed = state.activeFeed
@@ -552,7 +565,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .stopSaved: withAnimation(spring) { state.stopSaved() }
         case .closeOverlay: state.overlay = .none; state.feed.resume()
         case .stopSearchPlaying: withAnimation(spring) { state.search.stopPlaying() }
-        case .stopCommercePlaying: withAnimation(spring) { state.commerce.reviews.stopPlaying() }
+        case .stopCommercePlaying: withAnimation(spring) { state.commerce.stopPlaying() }
         case .commerceBack:
             withAnimation(spring) {
                 if state.commerce.detail != nil { state.commerce.detail = nil } else { state.commerce.query = ""; state.commerce.clear() }

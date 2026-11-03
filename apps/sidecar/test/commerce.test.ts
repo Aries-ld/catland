@@ -120,8 +120,11 @@ describe('CommerceService', () => {
     expect((await svc.search('机械键盘')).products[0]!.wished).toBe(true)
     expect(catbus.calls).toHaveLength(1)
     c.tick(31 * 60_000)
+    catbus.next = () => items(['1', '2']).map((it) => ({ ...it, price: { amount: 279, currency: 'CNY' } }))
     await svc.search('机械键盘')
     expect(catbus.calls).toHaveLength(2)
+    // 再搜到心愿单里的商品：顺手记下新价格，不多发请求
+    expect(svc.wishes().entries[0]!.history.map((h) => h.price)).toEqual([299.9, 279])
   })
 
   it('被风控：返回上次的结果和时间、不能翻页；之后歇着期间不再请求', async () => {

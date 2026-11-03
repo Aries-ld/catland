@@ -54,7 +54,12 @@ final class SearchController {
     }
 
     var searching: Bool { states.values.contains { $0.status == .loading } }
-    var visibleHits: [SearchHit] { filter.map { f in hits.filter { $0.platform == f } } ?? hits }
+    /// 额外的结果筛选（商品页只留这一款的测评）：显示和点开后上下刷都只在筛过的结果里。
+    var hitFilter: ((SearchHit) -> Bool)?
+    var visibleHits: [SearchHit] {
+        let byPlatform = filter.map { f in hits.filter { $0.platform == f } } ?? hits
+        return hitFilter.map { byPlatform.filter($0) } ?? byPlatform
+    }
     /// 当前筛选下还有没有下一页（含已预取、还没显示的）。
     var hasMore: Bool {
         let ps = filter.map { [$0] } ?? platforms

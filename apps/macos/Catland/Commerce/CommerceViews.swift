@@ -34,10 +34,17 @@ struct WishItem: Identifiable, Hashable {
     var highest: Double { history.map(\.price).max() ?? current }
     /// 和加入时比：负数是降价
     var change: Double { current - (history.first?.price ?? current) }
+    /// 加入心愿单的时间（第一个价格点）
+    var added: Date { history.first?.date ?? Date() }
     /// 记录了多少天
     var days: Int {
-        guard let a = history.first?.date, let b = history.last?.date else { return 0 }
-        return max(1, Calendar.current.dateComponents([.day], from: a, to: b).day ?? 0)
+        guard let a = history.first?.date else { return 0 }
+        return max(1, Calendar.current.dateComponents([.day], from: a, to: Date()).day ?? 0)
+    }
+    /// 画图用：最后一个价格一直延续到现在（价格没变时也能看到一条线，而不是一个点）
+    var chartPoints: [PricePoint] {
+        guard let last = history.last else { return [] }
+        return last.date < Date().addingTimeInterval(-60) || history.count == 1 ? history + [PricePoint(date: max(Date(), last.date.addingTimeInterval(3600)), price: last.price)] : history
     }
 }
 
@@ -199,11 +206,7 @@ struct WishRow: View {
                 }
             }
             Spacer(minLength: 4)
-            if item.history.count >= 2 {
-                PriceChart(item: item, compact: true).frame(width: 96, height: 44)
-            } else {
-                Text("刚加入\n箱箱开始盯了").font(.system(size: 9)).foregroundStyle(.white.opacity(0.4)).multilineTextAlignment(.trailing)
-            }
+            PriceChart(item: item, compact: true).frame(width: 96, height: 44)
         }
         .padding(8)
         .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.white.opacity(0.05)))
@@ -216,9 +219,13 @@ struct PriceChart: View {
     let item: WishItem
     var compact = false
 
-    private var points: [PricePoint] { item.history }
+    private var points: [PricePoint] { item.chartPoints }
     private var lowPoint: PricePoint? { points.min { $0.price < $1.price } }
     private var highPoint: PricePoint? { points.max { $0.price < $1.price } }
+    private var shortSpan: Bool {
+        guard let a = points.first?.date, let b = points.last?.date else { return true }
+        return b.timeIntervalSince(a) < 2 * 86400
+    }
     private var trend: Color { item.change < 0 ? dropGreen : (item.change > 0 ? priceRed : .white.opacity(0.7)) }
     /// 纵轴留白：曲线不贴边，标注放得下
     private var domain: ClosedRange<Double> {
@@ -262,7 +269,12 @@ struct PriceChart: View {
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 4)) { _ in
                 AxisGridLine().foregroundStyle(.white.opacity(0.06))
-                AxisValueLabel(format: .dateTime.month(.defaultDigits).day(), centered: false).foregroundStyle(.white.opacity(0.45)).font(.system(size: 9))
+                // 记录还不到两天：横轴标几点，不然会是一排一样的日期
+                if shortSpan {
+                    AxisValueLabel(format: .dateTime.hour(.defaultDigits(amPM: .omitted)).minute(), centered: false).foregroundStyle(.white.opacity(0.45)).font(.system(size: 9))
+                } else {
+                    AxisValueLabel(format: .dateTime.month(.defaultDigits).day(), centered: false).foregroundStyle(.white.opacity(0.45)).font(.system(size: 9))
+                }
             }
         }
         .chartYAxis {
@@ -290,7 +302,7 @@ struct PriceChart: View {
             .chartYScale(domain: domain)
             .chartXAxis(.hidden)
             .chartYAxis(.hidden)
-            Text("\(item.days) 天最低 \(PriceFormat.yuan(item.lowest))")
+            Text(item.history.count < 2 ? "刚开始盯" : "\(item.days) 天最低 \(PriceFormat.yuan(item.lowest))")
                 .font(.system(size: 9, weight: .medium)).foregroundStyle(.white.opacity(0.5)).lineLimit(1)
         }
     }
@@ -496,6 +508,8 @@ struct ProductDetailView: View {
     var scrollable = true
     /// 价格来自多久之前的搜索结果（京东歇着时显示「更新于」）
     var priceAt: Date? = nil
+    var reviewsTitle = "大家怎么说"
+    var reviewsNote: String? = nil
     var onBack: () -> Void = {}
     var onWish: () -> Void = {}
     var onBuy: () -> Void = {}
@@ -527,19 +541,34 @@ struct ProductDetailView: View {
                 Text(product.title).font(.system(size: 13)).foregroundStyle(.white.opacity(0.92)).lineLimit(3)
                 Text(product.shop).font(.system(size: 11)).foregroundStyle(.white.opacity(0.5))
             }
-            if let w = wish, w.history.count >= 2 {
+            if wish == nil {
+                HStack(spacing: 10) {
+                    Image(systemName: "chart.line.downtrend.xyaxis").font(.system(size: 16)).foregroundStyle(.white.opacity(0.5))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("价格走势").font(.system(size: 11, weight: .medium)).foregroundStyle(.white.opacity(0.7))
+                        Text("加入心愿单后，箱箱从今天开始记这件商品的价格，降价了告诉你").font(.system(size: 10)).foregroundStyle(.white.opacity(0.45))
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(10).background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(.white.opacity(0.05)))
+            }
+            if let w = wish {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text("价格走势").font(.system(size: 11, weight: .medium)).foregroundStyle(.white.opacity(0.7))
                         Spacer()
-                        Text("近 \(w.days) 天 · 最高 \(PriceFormat.yuan(w.highest)) · 最低 \(PriceFormat.yuan(w.lowest))").font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
+                        Text(w.history.count < 2 ? "\(Self.since(w.added)) 开始记录 · 加入时 \(PriceFormat.yuan(w.current))" : "近 \(w.days) 天 · 最高 \(PriceFormat.yuan(w.highest)) · 最低 \(PriceFormat.yuan(w.lowest))")
+                            .font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
                     }
                     PriceChart(item: w).frame(height: 150)
                 }
                 .padding(10).background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(.white.opacity(0.05)))
             }
+            SectionTitle(title: reviewsTitle, detail: "小红书 · B 站 · 抖音")
+            if let reviewsNote {
+                Text(reviewsNote).font(.system(size: 11)).foregroundStyle(.white.opacity(0.45))
+            }
             if !reviews.isEmpty {
-                SectionTitle(title: "大家怎么说")
                 ReviewStrip(reviews: Array(reviews.prefix(10)), scrollable: scrollable, onTap: onReview)
             }
             HStack(spacing: 10) {
@@ -562,6 +591,12 @@ struct ProductDetailView: View {
                 .buttonStyle(PressStyle())
             }
         }
+    }
+}
+
+extension ProductDetailView {
+    static func since(_ d: Date) -> String {
+        Calendar.current.isDateInToday(d) ? "今天" : d.formatted(.dateTime.month(.defaultDigits).day())
     }
 }
 

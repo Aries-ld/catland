@@ -34,11 +34,11 @@ final class AppState {
     var activeFeed: FeedController {
         if savedPlaying { return libraryPlayer }
         if search.playing { return search.player }
-        if section == .commerce && commerce.reviews.playing { return commerce.reviews.player }
+        if section == .commerce && commerce.playing { return commerce.player }
         return feed
     }
     /// 在电商板块里浏览（没在播测评）：方向键、滚轮交给页面自己。
-    var browsingCommerce: Bool { section == .commerce && !commerce.reviews.playing && !savedPlaying && overlay == .none && !search.active }
+    var browsingCommerce: Bool { section == .commerce && !commerce.playing && !savedPlaying && overlay == .none && !search.active }
     private let log = Logger(subsystem: "app.catland", category: "app")
 
     var phase: Phase = .starting
@@ -187,7 +187,7 @@ final class AppState {
         if s == .commerce {
             feed.pauseAll()
         } else {
-            commerce.reviews.stopPlaying()
+            commerce.stopPlaying()
             if expanded { feed.resume() }
         }
     }
@@ -303,7 +303,7 @@ final class AppState {
             feed.muted = settings.muted
             search.player.muted = settings.muted
             libraryPlayer.muted = settings.muted
-            commerce.reviews.player.muted = settings.muted
+            commerce.setMuted(settings.muted)
             phase = .ready
             startWeather()
             startEventWatcher()
@@ -472,7 +472,7 @@ final class AppState {
         feed.muted = muted
         search.player.muted = muted
         libraryPlayer.muted = muted
-        commerce.reviews.player.muted = muted
+        commerce.setMuted(muted)
         Task { let _: Settings? = try? await sidecar.call("settings.update", ["muted": muted]) }
     }
 
@@ -605,7 +605,7 @@ final class AppState {
         feed.pauseAll()
         search.player.pauseAll()
         libraryPlayer.pauseAll()
-        commerce.reviews.player.pauseAll()
+        commerce.pauseAll()
     }
 }
 
