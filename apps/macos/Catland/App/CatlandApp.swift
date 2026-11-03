@@ -45,6 +45,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 MainActor.assumeIsolated { self?.screenChanged() }
             }
         }
+        // 全屏时切到别的 App（⌘Tab、点 Dock）：全屏窗口层级很高会一直盖着，键盘也不归我们了，按 Esc 退不出来——直接退出全屏、收起小岛。
+        NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.state.fullscreen else { return }
+                AppLog.info("fullscreen exit", ["reason": "resign active"])
+                self.state.setFullscreen(false)
+                self.collapse()
+            }
+        }
         pager.onPage = { [weak self] dir in self?.page(dir) }
         pager.onHorizontal = { [weak self] dir in self?.state.activeFeed.carousel(dir) }
         #if DEBUG
@@ -384,12 +393,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } as Any)
         // 本 App 内的点击：收起态点刘海直接展开，在 AppKit 层处理，不依赖 SwiftUI 手势识别。
         monitors.append(NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] e in
-            guard let self, e.window === self.panel else { return e }
-            if self.state.expanded {
+            guard let self, let w = e.window, w === self.panel || w === self.fullscreenWindow else { return e }
+            if self.state.expanded || w === self.fullscreenWindow {
                 // 诊断：记录点击落在哪个视图上（排查「点不动」）。
-                let hit = self.panel.contentView?.hitTest(self.panel.contentView?.convert(e.locationInWindow, from: nil) ?? .zero)
+                let hit = w.contentView?.hitTest(w.contentView?.convert(e.locationInWindow, from: nil) ?? .zero)
                 AppLog.debug("click", ["x": Int(e.locationInWindow.x), "y": Int(e.locationInWindow.y), "hit": hit.map { String(describing: type(of: $0)) } ?? "nil",
-                                       "key": self.panel.isKeyWindow, "ignores": self.panel.ignoresMouseEvents])
+                                       "fullscreen": w === self.fullscreenWindow, "key": w.isKeyWindow, "ignores": w.ignoresMouseEvents])
                 return e
             }
             self.expand(source: "click")
@@ -438,48 +447,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// 键盘：↑↓ / J K 翻页，空格暂停，L 点赞，S 收藏，C 评论，M 静音，Esc 收起。
     private func handleKey(_ e: NSEvent) -> Bool {
-        // ⌘F：打开搜索
-        if e.modifierFlags.contains(.command), Int(e.keyCode) == kVK_ANSI_F {
+        let m = e.modifierFlags
+        let ctx = KeyContext(fullscreen: state.fullscreen, commentsOpen: state.commentsOpen, onboarding: state.onboarding.step != nil,
+                             savedPlaying: state.savedPlaying, searchActive: state.search.active, searchPlaying: state.search.playing,
+                             typing: panel.firstResponder is NSTextView, overlay: state.overlay,
+                             command: m.contains(.command), otherModifiers: !m.intersection([.control, .option]).isEmpty)
+        let feed = state.activeFeed
+        let spring = Animation.spring(response: 0.3, dampingFraction: 0.9)
+        switch KeyRouter.route(Int(e.keyCode), ctx) {
+        case .pass: return false
+        case .consume: break
+        case .openSearch:
             if state.search.playing { state.search.stopPlaying() }
             state.openSearch()
-            return true
+        case .toggleFullscreen: state.setFullscreen(!state.fullscreen)
+        case .exitFullscreen: state.setFullscreen(false)
+        case .skipOnboarding: withAnimation { state.onboarding.skip() }
+        case .closeComments: state.commentsOpen = false
+        case .stopSaved: withAnimation(spring) { state.stopSaved() }
+        case .closeOverlay: state.overlay = .none; state.feed.resume()
+        case .stopSearchPlaying: withAnimation(spring) { state.search.stopPlaying() }
+        case .closeSearch: state.closeSearch()
+        case .collapse: collapse()
+        case .page(let d): page(d)
+        case .carousel(let d): feed.carousel(d)
+        case .togglePause: feed.togglePause()
+        case .toggleMute: state.setMuted(!state.settings.muted)
+        case .like: if let c = feed.current { Task { await feed.setInteract(c, kind: "like", on: !(c.liked ?? false)) } }
+        case .collect: if let c = feed.current { Task { await feed.setInteract(c, kind: "collect", on: !(c.collected ?? false)) } }
+        case .toggleComments: withAnimation(.spring(response: 0.35, dampingFraction: 0.88)) { state.commentsOpen.toggle() }
         }
-        if e.modifierFlags.intersection([.command, .control, .option]).isEmpty == false { return false }
-        // 正在搜索框里打字：只接管 Esc，其余按键交给输入框
-        let typing = panel.firstResponder is NSTextView
-        if typing && Int(e.keyCode) != kVK_Escape { return false }
-        let feed = state.activeFeed
-        let browsingResults = state.search.active && !state.search.playing
-        switch Int(e.keyCode) {
-        case kVK_Escape where state.fullscreen && !state.commentsOpen:
-            state.setFullscreen(false)
-            return true
-        case kVK_ANSI_F where !browsingResults || state.fullscreen:
-            state.setFullscreen(!state.fullscreen)
-            return true
-        case kVK_Escape where state.onboarding.step != nil:
-            withAnimation { state.onboarding.skip() }
-            return true
-        case kVK_Escape:
-            if state.commentsOpen { state.commentsOpen = false }
-            else if state.savedPlaying { withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) { state.stopSaved() } }
-            else if state.overlay != .none { state.overlay = .none; state.feed.resume() }
-            else if state.search.playing { withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) { state.search.stopPlaying() } }
-            else if state.search.active { state.closeSearch() }
-            else { collapse() }
-            return true
-        case _ where browsingResults: return false
-        case kVK_DownArrow, kVK_ANSI_J: if state.overlay == .none || state.savedPlaying, !state.commentsOpen { page(1) }; return true
-        case kVK_UpArrow, kVK_ANSI_K: if state.overlay == .none || state.savedPlaying, !state.commentsOpen { page(-1) }; return true
-        case kVK_LeftArrow: feed.carousel(-1); return true
-        case kVK_RightArrow: feed.carousel(1); return true
-        case kVK_Space: feed.togglePause(); return true
-        case kVK_ANSI_M: state.setMuted(!state.settings.muted); return true
-        case kVK_ANSI_L: if let c = feed.current { Task { await feed.setInteract(c, kind: "like", on: !(c.liked ?? false)) } }; return true
-        case kVK_ANSI_S: if let c = feed.current { Task { await feed.setInteract(c, kind: "collect", on: !(c.collected ?? false)) } }; return true
-        case kVK_ANSI_C: withAnimation(.spring(response: 0.35, dampingFraction: 0.88)) { state.commentsOpen.toggle() }; return true
-        default: return false
-        }
+        return true
     }
 
     private func setupHotKeys() {
@@ -526,17 +524,22 @@ final class ScrollPager {
 
     /// 返回 true 表示事件已消费。
     func handle(_ e: NSEvent) -> Bool {
-        if !e.hasPreciseScrollingDeltas {
+        handle(precise: e.hasPreciseScrollingDeltas, momentum: e.momentumPhase != [], began: e.phase == .began || e.phase == .mayBegin,
+               ended: e.phase == .ended || e.phase == .cancelled, dx: e.scrollingDeltaX, dy: e.scrollingDeltaY)
+    }
+
+    func handle(precise: Bool, momentum: Bool, began: Bool, ended: Bool, dx: CGFloat, dy: CGFloat, now: Date = Date()) -> Bool {
+        if !precise {
             // 普通鼠标滚轮：每格翻一页，节流 300ms。
-            guard abs(e.scrollingDeltaY) > 0, Date().timeIntervalSince(lastWheel) > 0.3 else { return true }
-            lastWheel = Date()
-            onPage?(e.scrollingDeltaY < 0 ? 1 : -1)
+            guard abs(dy) > 0, now.timeIntervalSince(lastWheel) > 0.3 else { return true }
+            lastWheel = now
+            onPage?(dy < 0 ? 1 : -1)
             return true
         }
-        if e.momentumPhase != [] { return true } // 惯性阶段不翻页
-        if e.phase == .began || e.phase == .mayBegin { accY = 0; accX = 0; fired = false }
-        accY += e.scrollingDeltaY
-        accX += e.scrollingDeltaX
+        if momentum { return true } // 惯性阶段不翻页
+        if began { accY = 0; accX = 0; fired = false }
+        accY += dy
+        accX += dx
         if !fired {
             if abs(accY) > Self.threshold, abs(accY) > abs(accX) {
                 fired = true
@@ -546,7 +549,7 @@ final class ScrollPager {
                 onHorizontal?(accX < 0 ? 1 : -1)
             }
         }
-        if e.phase == .ended || e.phase == .cancelled { accY = 0; accX = 0; fired = false }
+        if ended { accY = 0; accX = 0; fired = false }
         return true
     }
 }

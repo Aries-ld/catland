@@ -1,3 +1,6 @@
+import AVFoundation
+import Carbon.HIToolbox
+import SwiftUI
 import XCTest
 @testable import Catland
 
@@ -311,5 +314,127 @@ final class DisplayOnlyHitTestTests: XCTestCase {
         let control = NSSegmentedControl(frame: player.frame) // 真正可交互的 AppKit 控件不受影响
         XCTAssertFalse(FirstMouseHostingView.isDisplayOnly(control))
         XCTAssertNil(player.hitTest(NSPoint(x: 10, y: 10)))
+    }
+
+    /// 真实的 SwiftUI 层级：视频铺满、按钮叠在上面，点按钮位置时 AppKit 不能把点击交给视频或它的容器。
+    @MainActor
+    func testButtonOverVideoGetsTheClick() {
+        let view = ZStack(alignment: .bottomTrailing) {
+            VideoLayer(player: AVPlayer(), fill: true)
+            Button("like") {}.frame(width: 44, height: 44)
+        }
+        .frame(width: 300, height: 500)
+        let host = hosting(view, CGSize(width: 300, height: 500))
+        XCTAssertTrue(containsPlayer(host), "测试层级里应有视频视图")
+        // NSHostingView 是翻转坐标：y 从上往下
+        for p in [NSPoint(x: 278, y: 478), NSPoint(x: 150, y: 250)] {
+            let hit = host.hitTest(p)
+            XCTAssertFalse(hit.map(FirstMouseHostingView.isDisplayOnly) ?? false, "\(p) 被视频抢走：\(String(describing: hit))")
+        }
+    }
+
+    /// 屏幕外预渲染的上一条（offset -1）会伸到顶栏下面：顶栏按钮的点击不能落进它的视频视图。
+    @MainActor
+    func testPrerenderedCardDoesNotStealTopBarClicks() {
+        let view = VStack(spacing: 0) {
+            Button("connect") {}.frame(height: 40)
+            ZStack {
+                VideoLayer(player: AVPlayer(), fill: true).frame(width: 300, height: 460).offset(y: -460).allowsHitTesting(false)
+                VideoLayer(player: AVPlayer(), fill: true).frame(width: 300, height: 460)
+            }
+            .frame(width: 300, height: 460)
+            .clipped()
+        }
+        let host = hosting(view, CGSize(width: 300, height: 500))
+        let hit = host.hitTest(NSPoint(x: 150, y: 20))
+        XCTAssertFalse(hit.map(FirstMouseHostingView.isDisplayOnly) ?? false, "顶栏被预渲染卡片抢走：\(String(describing: hit))")
+    }
+
+    @MainActor
+    private func hosting(_ v: some View, _ size: CGSize) -> FirstMouseHostingView {
+        let host = FirstMouseHostingView(rootView: AnyView(v))
+        host.frame = CGRect(origin: .zero, size: size)
+        let window = NSWindow(contentRect: host.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.contentView = host
+        host.layoutSubtreeIfNeeded()
+        return host
+    }
+
+    private func containsPlayer(_ v: NSView) -> Bool { v is VideoLayer.PlayerNSView || v.subviews.contains(where: containsPlayer) }
+}
+
+final class KeyRouterTests: XCTestCase {
+    func testEscapeUnwindsOneLayerAtATime() {
+        var c = KeyContext(fullscreen: true, commentsOpen: true, savedPlaying: true, searchActive: true, searchPlaying: true, overlay: .saved)
+        // 全屏里开着评论：Esc 先关评论，不退全屏
+        XCTAssertEqual(KeyRouter.route(kVK_Escape, c), .closeComments)
+        c.commentsOpen = false
+        XCTAssertEqual(KeyRouter.route(kVK_Escape, c), .exitFullscreen)
+        c.fullscreen = false
+        XCTAssertEqual(KeyRouter.route(kVK_Escape, c), .stopSaved)
+        c.savedPlaying = false
+        XCTAssertEqual(KeyRouter.route(kVK_Escape, c), .closeOverlay)
+        c.overlay = .none
+        XCTAssertEqual(KeyRouter.route(kVK_Escape, c), .stopSearchPlaying)
+        c.searchPlaying = false
+        XCTAssertEqual(KeyRouter.route(kVK_Escape, c), .closeSearch)
+        c.searchActive = false
+        XCTAssertEqual(KeyRouter.route(kVK_Escape, c), .collapse)
+        c.onboarding = true
+        XCTAssertEqual(KeyRouter.route(kVK_Escape, c), .skipOnboarding)
+    }
+
+    func testFullscreenKeyDoesNotFireWhileTypingOrBrowsingResults() {
+        XCTAssertEqual(KeyRouter.route(kVK_ANSI_F, KeyContext()), .toggleFullscreen)
+        XCTAssertEqual(KeyRouter.route(kVK_ANSI_F, KeyContext(typing: true)), .pass)
+        XCTAssertEqual(KeyRouter.route(kVK_ANSI_F, KeyContext(searchActive: true)), .pass)
+        XCTAssertEqual(KeyRouter.route(kVK_ANSI_F, KeyContext(searchActive: true, searchPlaying: true)), .toggleFullscreen)
+        XCTAssertEqual(KeyRouter.route(kVK_ANSI_F, KeyContext(fullscreen: true)), .toggleFullscreen)
+        XCTAssertEqual(KeyRouter.route(kVK_ANSI_F, KeyContext(typing: true, command: true)), .openSearch)
+        XCTAssertEqual(KeyRouter.route(kVK_Escape, KeyContext(searchActive: true, typing: true)), .closeSearch)
+    }
+
+    func testPagingRespectsOverlaysAndComments() {
+        XCTAssertEqual(KeyRouter.route(kVK_DownArrow, KeyContext()), .page(1))
+        XCTAssertEqual(KeyRouter.route(kVK_ANSI_K, KeyContext()), .page(-1))
+        XCTAssertEqual(KeyRouter.route(kVK_DownArrow, KeyContext(commentsOpen: true)), .consume)
+        XCTAssertEqual(KeyRouter.route(kVK_DownArrow, KeyContext(overlay: .settings)), .consume)
+        XCTAssertEqual(KeyRouter.route(kVK_DownArrow, KeyContext(savedPlaying: true, overlay: .saved)), .page(1))
+        XCTAssertEqual(KeyRouter.route(kVK_DownArrow, KeyContext(fullscreen: true)), .page(1))
+        // 搜索结果瀑布流里：方向键、空格交给瀑布流 / 系统
+        XCTAssertEqual(KeyRouter.route(kVK_DownArrow, KeyContext(searchActive: true)), .pass)
+        XCTAssertEqual(KeyRouter.route(kVK_Space, KeyContext(searchActive: true)), .pass)
+        XCTAssertEqual(KeyRouter.route(kVK_ANSI_L, KeyContext(fullscreen: true)), .like)
+        XCTAssertEqual(KeyRouter.route(kVK_ANSI_L, KeyContext(otherModifiers: true)), .pass)
+    }
+}
+
+final class ScrollPagerTests: XCTestCase {
+    @MainActor
+    func testOneTrackpadGesturePagesOnceAndIgnoresMomentum() {
+        let pager = ScrollPager()
+        var pages: [Int] = [], sideways: [Int] = []
+        pager.onPage = { pages.append($0) }
+        pager.onHorizontal = { sideways.append($0) }
+        _ = pager.handle(precise: true, momentum: false, began: true, ended: false, dx: 0, dy: -20)
+        for _ in 0..<5 { _ = pager.handle(precise: true, momentum: false, began: false, ended: false, dx: 0, dy: -20) }
+        _ = pager.handle(precise: true, momentum: false, began: false, ended: true, dx: 0, dy: 0)
+        for _ in 0..<10 { _ = pager.handle(precise: true, momentum: true, began: false, ended: false, dx: 0, dy: -60) }
+        XCTAssertEqual(pages, [1])
+        _ = pager.handle(precise: true, momentum: false, began: true, ended: false, dx: -50, dy: 3)
+        XCTAssertEqual(sideways, [1])
+        XCTAssertEqual(pages, [1])
+    }
+
+    @MainActor
+    func testMouseWheelThrottled() {
+        let pager = ScrollPager()
+        var pages: [Int] = []
+        pager.onPage = { pages.append($0) }
+        let t = Date()
+        _ = pager.handle(precise: false, momentum: false, began: false, ended: false, dx: 0, dy: 1, now: t)
+        _ = pager.handle(precise: false, momentum: false, began: false, ended: false, dx: 0, dy: 1, now: t.addingTimeInterval(0.1))
+        _ = pager.handle(precise: false, momentum: false, began: false, ended: false, dx: 0, dy: -1, now: t.addingTimeInterval(0.5))
+        XCTAssertEqual(pages, [-1, 1])
     }
 }
