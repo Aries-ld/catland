@@ -7,8 +7,9 @@ struct ConnectionsView: View {
     private var groups: [(String, [PlatformState])] {
         // 暂未开放的平台排在分组最后，不夹在可用平台中间。
         let content = state.platforms.filter { $0.sections.contains("content") }
+        let commerce = state.platforms.filter { $0.sections.contains("commerce") }
         return [("内容", content.filter { $0.unavailable == nil } + content.filter { $0.unavailable != nil }),
-                ("电商 · 下个版本", state.platforms.filter { $0.sections.contains("commerce") })]
+                ("电商 · 购物小助手", commerce.filter { $0.unavailable == nil } + commerce.filter { $0.unavailable != nil })]
     }
 
     var body: some View {
@@ -39,9 +40,8 @@ struct PlatformTile: View {
     let platform: PlatformState
     @State private var hovering = false
 
-    private var commerce: Bool { platform.sections.contains("commerce") }
-    /// 电商（下个版本）与暂未开放的平台都置灰、不能连接。
-    private var disabled: Bool { commerce || platform.unavailable != nil }
+    /// 暂未开放的平台置灰、不能连接（电商目前只开放京东）。
+    private var disabled: Bool { platform.unavailable != nil }
     private var statusText: String {
         if platform.unavailable != nil { return "暂未开放" }
         if platform.loginInProgress { return "登录中…" }
@@ -91,7 +91,6 @@ struct PlatformTile: View {
     }
 
     private func connect() {
-        guard !commerce else { return state.showToast("电商板块下个版本上线") }
         if let reason = platform.unavailable { return state.showToast(reason) }
         guard !platform.connected || platform.health == "expired" else { return }
         if platform.primaryLogin == "qrcode" {
