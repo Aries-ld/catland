@@ -153,10 +153,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         for p in products { if let s = p.cover { _ = await ImageLoader.shared.load(s).value } }
                         for r in reviews { if let s = r.cover { _ = await ImageLoader.shared.load(s).value } }
                         search.clearResults()
+                        // 示例价格历史：按天记录（盯价接口实测后换成真实数据）
+                        func hist(_ prices: [(Int, Double)]) -> [PricePoint] {
+                            prices.map { PricePoint(date: Calendar.current.date(byAdding: .day, value: -$0.0, to: Date())!, price: $0.1) }
+                        }
                         let wishes = [
-                            WishItem(product: products[3], history: [349, 349, 339, 329, 329, 319, 299.9]),
-                            WishItem(product: products[5], history: [299, 309, 315, 315, 315, 315]),
-                            WishItem(product: products[1], history: [329, 329, 319, 319, 299, 299]),
+                            WishItem(product: products[3], history: hist([(30, 349), (24, 349), (19, 339), (15, 359), (11, 329), (6, 319), (2, 309.9), (0, 299.9)])),
+                            WishItem(product: products[5], history: hist([(21, 299), (16, 309), (12, 315), (7, 315), (3, 319), (0, 315)])),
+                            WishItem(product: products[1], history: hist([(14, 329), (11, 329), (8, 319), (5, 319), (2, 299), (0, 299)])),
                         ]
                         let order = OrderStatus(id: "1", title: products[0].title, cover: products[0].cover, status: "运输中", detail: "预计明天送达", progress: 0.62)
                         @MainActor func save(_ v: some View, _ name: String, height: CGFloat? = nil) {
@@ -168,6 +172,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         save(CommerceResults(query: "机械键盘", reviews: Array(reviews), products: Array(products.prefix(4)), wished: [products[1].id], scrollable: false), "results")
                         save(ProductDetailView(product: products[3], reviews: Array(reviews), wish: wishes[0], scrollable: false), "detail")
                         save(PriceDropBubble(item: wishes[0]), "bubble")
+                        // 兜底：京东歇着时的搜索结果、心愿单
+                        let rest = JDRest(kind: .resting, resumeAt: Date().addingTimeInterval(2 * 3600))
+                        save(CommerceResults(query: "机械键盘", reviews: Array(reviews), products: Array(products.prefix(3)), wished: [], scrollable: false,
+                                             rest: rest, cachedAt: Date().addingTimeInterval(-3 * 3600)), "results-resting")
+                        save(CommerceHome(wishes: wishes, orders: [], recent: ["机械键盘", "降噪耳机", "猫砂"], rest: rest), "home-resting", height: 560)
                         AppLog.info("render commerce", ["products": products.count, "reviews": reviews.count])
                     }
                 case "render:update":
