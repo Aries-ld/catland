@@ -17,6 +17,7 @@ catbus 只提供 CLI（无库导出），单次调用数秒；feed 不带媒体�
 6. **互动数据只存本地**：点赞、收藏、历史存在本地 SQLite（`~/Library/Application Support/catland/`），不回写原平台。
 7. **MVP 范围**：连接面板 + 登录、灵动岛 + 小猫动画、视频/内容板块。电商板块延后到 v2。
 8. **catbus 版本**：0.2.1。
+9. **自动更新（2026-11-03 修订，第 1 条的例外）**：原先「不做自动更新」。改为用 Sparkle 每天匿名查一次 GitHub Releases 上的 `appcast-<架构>.xml`（不发送系统信息、不带任何用户信息），有新版时小猫在刘海里提醒，用户点「更新」后自动下载、校验（EdDSA 签名 + Developer ID 签名一致）、安装并重启。设置里可关「自动检查更新」。更新包与 appcast 都放在 GitHub Release，没有 catland 自己的服务器。EdDSA 私钥只在发版机的钥匙串里（账号 `catland`）。
 
 ## 影响
 

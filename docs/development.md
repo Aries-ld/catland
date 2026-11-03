@@ -27,6 +27,13 @@ scripts/package-dmg.sh x86_64     # 指定架构
 4. 没有证书时自动退回 ad-hoc 签名并跳过公证，适合自己构建自用。
 5. 依赖：conda env `catlands` 里的 `dmgbuild==1.6.7`。
 
+## 自动更新（Sparkle）
+
+- App 每天查一次 `https://github.com/Aries-ld/catland/releases/latest/download/appcast-<架构>.xml`（`SUFeedURL`，打包时按架构写入）。界面是自绘的（`AppUpdater` 实现 `SPUUserDriver`）：小猫在刘海里提醒 → 设置页最上面的「更新」卡片 → 点一下自动下载、校验、安装、重启。调试版不检查。
+- 签名密钥：EdDSA 私钥在发版机的登录钥匙串（账号 `catland`），公钥是 Info.plist 的 `SUPublicEDKey`。**私钥丢了就没法给老用户推更新**，请备份：`<Sparkle bin>/generate_keys --account catland -x <文件>`，存到安全的地方（不要进仓库）；换机器用 `-f <文件>` 导入。
+- 发版：先写 `docs/releases/<版本>.md`（同时用作 GitHub Release 正文和 App 里的更新说明），再跑 `scripts/package-dmg.sh`，产物多一个 `dist/appcast-<架构>.xml`；把 DMG 和 appcast 一起传到 `v<版本>` 的 Release。必须先把 `CFBundleVersion` 加一（Sparkle 按它比较新旧）。
+- 本地端到端测试（不碰线上）：把调试版复制两份到 `/tmp`，一份改 `SUFeedURL` 为 `http://127.0.0.1:8765/appcast.xml`，另一份再把版本号调大、打成 zip，用 `generate_appcast --account catland` 生成 appcast，`python3 -m http.server 8765` 托管；以 `CATLAND_UPDATER_TEST=1` 启动旧的那份，`catland-debug update:check` / `update:install` 驱动，确认版本号变了并自动重启。
+
 ## 阶段验收（每个阶段结束时做）
 
 - 平台实测：每个已接入的平台走一遍「连接 → 刷刷 → 评论 → 断开」，记录结果；目前待实测：快手、微博、TikTok、X（浏览器导入）。

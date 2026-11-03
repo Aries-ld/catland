@@ -34,5 +34,17 @@
 	<string>猫猫想知道你在哪座城市：这样小岛窗外的天色、晴雨都和你那边同步，还能看到你那儿的地标。位置只存在你的 Mac 上，查天气时只告诉天气服务一个大概的位置（约 10 公里）。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>猫猫想知道你在哪座城市：这样小岛窗外的天色、晴雨都和你那边同步，还能看到你那儿的地标。位置只存在你的 Mac 上，查天气时只告诉天气服务一个大概的位置（约 10 公里）。</string>
+	<key>SUAutomaticallyUpdate</key>
+	<false/>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://github.com/Aries-ld/catland/releases/latest/download/appcast-arm64.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>MyHXbW84dlO5lspWHO1ZUmjUsmgc8ECWDZkeqbbqFm8=</string>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
 </dict>
 </plist>

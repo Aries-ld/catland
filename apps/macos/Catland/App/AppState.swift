@@ -22,6 +22,10 @@ final class AppState {
     let search: SearchController
     /// 点赞 / 收藏页里点开的帖子：在 catland 里直接播放（不跳到网页），往下刷进入全局推荐流。
     let libraryPlayer: FeedController
+    /// 自动更新（每天查一次，有新版时小猫提醒，点一下就装）。
+    let updater = AppUpdater()
+    /// 小猫刚在刘海里报了新版本：这时点开小岛直接到设置页的「更新」。
+    private(set) var updateAnnounced = false
     private(set) var savedPlaying = false
     private(set) var savedPlayingTitle = ""
     /// 当前在播的那一套卡片：点赞 / 收藏 → 搜索结果 → 推荐流。
@@ -278,6 +282,7 @@ final class AppState {
             phase = .ready
             startWeather()
             startEventWatcher()
+            startUpdater()
         } catch {
             log.error("start failed: \(error.localizedDescription, privacy: .public)")
             phase = .failed(error.localizedDescription)
@@ -286,6 +291,42 @@ final class AppState {
 
     func stop() {
         sidecar.stop()
+    }
+
+    private func startUpdater() {
+        updater.onMessage = { [weak self] in self?.showToast($0) }
+        updater.onAvailable = { [weak self] version in
+            Task { [weak self] in
+                // 启动时就查到的：等平台加载完，让对应的小猫来说（不然总是箱箱）
+                for _ in 0..<30 where self?.platforms.isEmpty ?? false { try? await Task.sleep(for: .seconds(1)) }
+                self?.announceUpdate(version)
+            }
+        }
+        updater.start()
+        // 有新版一直没点：每天再提醒一次
+        Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(24 * 3600))
+                if case .available(let v, _) = self?.updater.phase { self?.announceUpdate(v) }
+            }
+        }
+    }
+
+    private func announceUpdate(_ version: String) {
+        announce("新版本 \(version) 来啦，点我一下就能更新", seconds: 12)
+        updateAnnounced = true
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(12))
+            self?.updateAnnounced = false
+        }
+    }
+
+    /// 展开小岛时：刚报过新版本就直接打开设置页（「更新」按钮在最上面）。
+    func expandedForUpdateIfAnnounced() {
+        guard updateAnnounced else { return }
+        updateAnnounced = false
+        overlay = .settings
+        feed.pauseAll()
     }
 
     private func onNotification(_ method: String, _ params: Data) {

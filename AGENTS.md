@@ -12,11 +12,11 @@
 
 ### 1.1 已定决策（详见 `docs/decisions/0001-architecture-and-mvp-scope.md`）
 
-- **纯本地（红线）**：无自有服务器、无账号体系、无遥测；网络请求只发往用户连接的平台。例外：刘海场景的天气联动（匿名 GET、不带用户信息、30 分钟缓存，设置里可关）——新加坡用 NEA（data.gov.sg），其他地区用 Open-Meteo，坐标先粗化到 0.1°。sidecar 与 App 走 stdio，不监听端口；新增密钥存钥匙串。
+- **纯本地（红线）**：无自有服务器、无账号体系、无遥测；网络请求只发往用户连接的平台。例外：① 刘海场景的天气联动（匿名 GET、不带用户信息、30 分钟缓存，设置里可关）——新加坡用 NEA（data.gov.sg），其他地区用 Open-Meteo，坐标先粗化到 0.1°；② 自动更新（Sparkle，每天匿名查一次 GitHub Release 上的 appcast，不发系统信息，设置里可关；见 ADR 0001 第 9 条）。sidecar 与 App 走 stdio，不监听端口；新增密钥存钥匙串。
 - 技术栈：Swift 原生客户端（刘海 NSPanel + AVPlayer）+ Node sidecar 包装 catbus。
 - MVP：连接面板 + 登录、灵动岛 + 小猫动画、视频/内容板块；电商延后到 v2。
 - 点赞 / 收藏 / 历史只存本地，不回写原平台。
-- 只做 macOS，不做云同步、不做自动更新。
+- 只做 macOS，不做云同步。自动更新走 Sparkle + GitHub Release（`apps/macos/Catland/App/AppUpdater.swift`，自绘界面、点一下就下载安装重启）。
 - 登录：支持扫码的平台（xhs / douyin / bilibili / kuaishou / xianyu / jd）在面板内扫码；只支持 cookie 的平台（tiktok / weibo / x / taobao）自动打开内嵌官方登录页，用户登录完成后自动获取登录态写入 catbus，用户不接触 cookie。
 - 美术：**像素风**，开发阶段用 Meowa 生成并打包进 App（运行时不联网生成）。小猫要有多套形象 × 多套动作，运行时随机组合展示，避免固定循环。审美把关：统一调色板、尺寸、光源与描边规范，每批素材按原生倍数检查后才入库。
 
@@ -86,6 +86,8 @@ cd apps/macos && xcodebuild -project Catland.xcodeproj -scheme Catland -derivedD
 apps/macos/build/catland-debug <pin|unpin|toggle|next|prev|right|pause|comments|connections|settings|saved|close|boss>  # 仅调试版：驱动界面
 apps/macos/build/catland-debug feed:rest:150       # 所有平台假装冷却 150 秒（不请求平台），验证「休息站」卡片和倒计时；feed:pause 插一张「在路上」卡
 apps/macos/build/shot-window /tmp/x.png             # 只截 catland 自己的窗口（不拍用户其他应用）
+apps/macos/build/catland-debug render:history|render:update  # 离屏渲染浏览历史 / 更新卡片到 /tmp（不弹面板）
+# 自动更新端到端：CATLAND_UPDATER_TEST=1 启动 + catland-debug update:check / update:install，步骤见 docs/development.md
 # App 日志：~/Library/Logs/catland/app.log；sidecar 日志：~/Library/Logs/catland/sidecar.log
 
 

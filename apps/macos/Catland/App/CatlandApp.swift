@@ -135,6 +135,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         if let cg = r.cgImage, let d = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) { try? d.write(to: URL(fileURLWithPath: "/tmp/history.png")) }
                         AppLog.info("render history", ["count": page.entries.count])
                     }
+                // 自动更新的本地端到端测试（需要 CATLAND_UPDATER_TEST=1 启动，见 docs/development.md）
+                case "update:check": self.state.updater.checkNow()
+                case "update:install": self.state.updater.install()
+                case "render:update":
+                    // 离屏渲染「更新」卡片的三种状态（不碰真实的更新流程）
+                    let u = AppUpdater()
+                    let phases: [(String, AppUpdater.Phase)] = [
+                        ("available", .available(version: "1.0.3", notes: "新功能\n· 浏览历史：顶栏新按钮，按天分组\n· 我的数据：导出 / 导入点赞、收藏和历史\n· 有新版时小猫提醒，点一下就更新")),
+                        ("downloading", .downloading(0.42)), ("installing", .installing),
+                    ]
+                    for (name, p) in phases {
+                        u.debugPhase(p)
+                        let r = ImageRenderer(content: UpdateCard(updater: u).padding(18).frame(width: 384).background(Color(white: 0.07)).environment(\.colorScheme, .dark))
+                        r.scale = 2
+                        if let cg = r.cgImage, let d = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) { try? d.write(to: URL(fileURLWithPath: "/tmp/update-\(name).png")) }
+                    }
                 case "feed:pause": self.state.feed.debugPause()
                 case "fullscreen": self.state.setFullscreen(!self.state.fullscreen)
                 case "render:comments":
@@ -441,7 +457,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if state.webLoginActive, WebLoginController.shared.bringToFront() { return }
         guard !state.expanded else { return }
         AppLog.info("expand", ["source": source])
-        withAnimation(.spring(response: 0.38, dampingFraction: 0.82)) { state.expanded = true }
+        withAnimation(.spring(response: 0.38, dampingFraction: 0.82)) {
+            state.expanded = true
+            state.expandedForUpdateIfAnnounced()
+        }
     }
 
     private func updateMouse(_ p: NSPoint) {

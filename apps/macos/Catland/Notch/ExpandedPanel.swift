@@ -127,7 +127,8 @@ struct ExpandedPanel: View {
             // 连接平台：和收藏、设置一样的图标按钮，不抢视觉；悬停显示已连接几个
             iconButton("person.crop.circle.badge.plus", active: state.overlay == .connections) { toggleOverlay(.connections) }
                 .help("连接平台（已连接 \(state.connectedContentPlatforms.count) 个）")
-            iconButton("slider.horizontal.3", active: state.overlay == .settings) { toggleOverlay(.settings) }
+            iconButton("slider.horizontal.3", active: state.overlay == .settings, dot: { if case .available = state.updater.phase { return true }; return false }()) { toggleOverlay(.settings) }
+                .help({ if case .available(let v, _) = state.updater.phase { return "设置 · 新版本 \(v) 可以更新" }; return "设置" }())
         }
         .padding(.horizontal, 18)
         .frame(height: 40)
@@ -144,7 +145,7 @@ struct ExpandedPanel: View {
         state.overlay == .none ? state.feed.resume() : state.feed.pauseAll()
     }
 
-    private func iconButton(_ name: String, active: Bool, badge: Int = 0, action: @escaping () -> Void) -> some View {
+    private func iconButton(_ name: String, active: Bool, badge: Int = 0, dot: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: name)
                 .font(.system(size: 13, weight: .medium))
@@ -155,6 +156,8 @@ struct ExpandedPanel: View {
                 .overlay(alignment: .topTrailing) {
                     if badge > 0 {
                         Text("\(badge)").font(.system(size: 8, weight: .bold)).padding(2).background(Circle().fill(.green)).offset(x: 3, y: -3)
+                    } else if dot {
+                        Circle().fill(Color(red: 1, green: 0.35, blue: 0.45)).frame(width: 7, height: 7).offset(x: 1, y: 1)
                     }
                 }
         }

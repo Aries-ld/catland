@@ -12,6 +12,7 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     Text("设置").font(.system(size: 16, weight: .semibold))
+                    UpdateCard(updater: state.updater)
                     section("播放") {
                         PillToggle(isOn: state.settings.muted, action: { state.setMuted(!state.settings.muted) }) { Text("默认静音").font(.system(size: 12)) }
                     }
@@ -52,6 +53,26 @@ struct SettingsView: View {
                         HStack(spacing: 8) {
                             Button("导出…") { exportLibrary() }.controlSize(.small)
                             Button("导入…") { importLibrary() }.controlSize(.small)
+                        }
+                    }
+                    section("版本") {
+                        HStack(spacing: 8) {
+                            Text("catland \(AppUpdater.currentVersion)").font(.system(size: 12))
+                            Spacer()
+                            if state.updater.enabled {
+                                Button(state.updater.phase == .checking ? "检查中…" : "检查更新") { state.updater.checkNow() }
+                                    .controlSize(.small).disabled(state.updater.phase != .idle)
+                            } else {
+                                Text("调试版不检查更新").font(.system(size: 11)).foregroundStyle(.secondary)
+                            }
+                        }
+                        if state.updater.enabled {
+                            PillToggle(isOn: state.updater.automaticChecks, action: { state.updater.automaticChecks.toggle() }) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("自动检查更新").font(.system(size: 12))
+                                    Text("每天看一次 GitHub 上有没有新版，不发送任何个人信息").font(.system(size: 10)).foregroundStyle(.secondary)
+                                }
+                            }
                         }
                     }
                     section("隐私") {
@@ -123,6 +144,83 @@ struct SettingsView: View {
             Text(key).font(.system(size: 11, design: .monospaced)).padding(.horizontal, 6).padding(.vertical, 2).background(RoundedRectangle(cornerRadius: 4).fill(.white.opacity(0.08)))
             Text(desc).font(.system(size: 12)).foregroundStyle(.secondary)
         }
+    }
+}
+
+/// 有新版时显示在设置页最上面：版本号、更新说明、一个「更新」按钮；点了之后显示下载进度，装好自动重启。
+struct UpdateCard: View {
+    let updater: AppUpdater
+
+    var body: some View {
+        switch updater.phase {
+        case .idle, .checking: EmptyView()
+        case .available(let version, let notes):
+            card {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("新版本 \(version)").font(.system(size: 13, weight: .semibold))
+                        Text("当前 \(AppUpdater.currentVersion) · 更新后点赞收藏和登录都还在").font(.system(size: 10)).foregroundStyle(.white.opacity(0.6))
+                    }
+                    Spacer()
+                    Button { updater.install() } label: {
+                        Text("更新").font(.system(size: 12, weight: .semibold)).foregroundStyle(.black)
+                            .padding(.horizontal, 16).frame(height: 26)
+                            .background(Capsule().fill(.white))
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(PressStyle())
+                }
+                if let notes {
+                    Text(notes).font(.system(size: 11)).foregroundStyle(.white.opacity(0.75)).lineLimit(6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        case .downloading(let p):
+            card {
+                HStack {
+                    Text("正在下载新版本…").font(.system(size: 12, weight: .medium))
+                    Spacer()
+                    if let p { Text("\(Int(p * 100))%").font(.system(size: 11, design: .monospaced)).foregroundStyle(.white.opacity(0.7)) }
+                }
+                ProgressBar(value: p)
+            }
+        case .installing:
+            card {
+                Text("正在安装，马上自动重启…").font(.system(size: 12, weight: .medium))
+                ProgressBar(value: nil)
+            }
+        }
+    }
+
+    private func card(@ViewBuilder _ content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 10, content: content)
+            .padding(12)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(LinearGradient(colors: [Color(red: 1, green: 0.42, blue: 0.5).opacity(0.28), Color(red: 0.55, green: 0.4, blue: 1).opacity(0.22)],
+                                     startPoint: .topLeading, endPoint: .bottomTrailing)))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(.white.opacity(0.12)))
+    }
+}
+
+/// 细进度条；不知道进度时来回滑动。
+struct ProgressBar: View {
+    let value: Double?
+
+    var body: some View {
+        GeometryReader { g in
+            ZStack(alignment: .leading) {
+                Capsule().fill(.white.opacity(0.15))
+                if let v = value {
+                    Capsule().fill(.white).frame(width: max(4, g.size.width * v))
+                } else {
+                    TimelineView(.animation) { t in
+                        let x = (sin(t.date.timeIntervalSinceReferenceDate * 2.4) + 1) / 2
+                        Capsule().fill(.white).frame(width: g.size.width * 0.3).offset(x: x * g.size.width * 0.7)
+                    }
+                }
+            }
+        }
+        .frame(height: 4)
     }
 }
 

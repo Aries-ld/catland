@@ -4,6 +4,11 @@ options:
   deploymentTarget:
     macOS: "14.0"
   createIntermediateGroups: true
+packages:
+  # 自动更新（每天查一次 GitHub Releases 上的 appcast，见 ADR 0001 的例外说明）。版本锁定。
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.10.1
 settings:
   base:
     SWIFT_VERSION: "5.0"
@@ -16,6 +21,8 @@ targets:
   Catland:
     type: application
     platform: macOS
+    dependencies:
+      - package: Sparkle
     sources:
       - path: Catland
       # 各平台官方图标（scripts/fetch_platform_icons.py 下载），按文件夹原样拷进 App
@@ -40,6 +47,14 @@ targets:
         NSHumanReadableCopyright: "MIT · 仅供学习研究，不商用"
         NSLocationUsageDescription: "猫猫想知道你在哪座城市：这样小岛窗外的天色、晴雨都和你那边同步，还能看到你那儿的地标。位置只存在你的 Mac 上，查天气时只告诉天气服务一个大概的位置（约 10 公里）。"
         NSLocationWhenInUseUsageDescription: "猫猫想知道你在哪座城市：这样小岛窗外的天色、晴雨都和你那边同步，还能看到你那儿的地标。位置只存在你的 Mac 上，查天气时只告诉天气服务一个大概的位置（约 10 公里）。"
+        # 自动更新（Sparkle）：每天查一次最新 Release 里的 appcast（打包时按架构改成 appcast-<arch>.xml）；
+        # 更新包用 EdDSA 签名校验（私钥只在发版机的钥匙串里，账号 catland），校验通过才解压
+        SUFeedURL: "https://github.com/Aries-ld/catland/releases/latest/download/appcast-arm64.xml"
+        SUPublicEDKey: "MyHXbW84dlO5lspWHO1ZUmjUsmgc8ECWDZkeqbbqFm8="
+        SUEnableAutomaticChecks: true
+        SUScheduledCheckInterval: 86400
+        SUAutomaticallyUpdate: false
+        SUVerifyUpdateBeforeExtraction: true
         # 开发期：sidecar 源码目录（Release 打包时改为 App 内置路径）
         CatlandSidecarDir: "$(SRCROOT)/../sidecar"
     settings:

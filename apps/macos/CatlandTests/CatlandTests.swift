@@ -427,6 +427,15 @@ final class HistoryGroupingTests: XCTestCase {
     }
 }
 
+final class UpdaterNotesTests: XCTestCase {
+    @MainActor
+    func testReleaseNotesBecomePlainLines() {
+        XCTAssertEqual(AppUpdater.plainNotes("<h2>新功能</h2><ul><li>浏览历史</li><li>导出 &amp; 导入</li></ul>"), "新功能\n· 浏览历史\n· 导出 & 导入")
+        XCTAssertEqual(AppUpdater.plainNotes("## 新功能\n\n- **浏览历史**：按天分组\n- 全屏"), "新功能\n· 浏览历史：按天分组\n· 全屏")
+        XCTAssertNil(AppUpdater.plainNotes(""))
+    }
+}
+
 final class ScrollPagerTests: XCTestCase {
     @MainActor
     func testOneTrackpadGesturePagesOnceAndIgnoresMomentum() {
