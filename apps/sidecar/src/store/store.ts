@@ -195,6 +195,25 @@ export class Store implements SeenStore {
     this.db.exec('DELETE FROM history')
   }
 
+  /** 导出用：全部点赞、收藏、浏览历史（时间为毫秒）。 */
+  dumpLibrary(): { saved: Array<{ kind: Collection; card: CardSnapshot; at: number }>; history: Array<{ card: CardSnapshot; at: number; dwellMs: number }> } {
+    const saved = this.db.prepare('SELECT kind, card, at FROM saved ORDER BY at DESC').all() as Array<{ kind: Collection; card: string; at: number }>
+    const history = this.db.prepare('SELECT card, at, dwell_ms FROM history ORDER BY at DESC').all() as Array<{ card: string; at: number; dwell_ms: number }>
+    return {
+      saved: saved.map((r) => ({ kind: r.kind, card: JSON.parse(r.card) as CardSnapshot, at: r.at })),
+      history: history.map((r) => ({ card: JSON.parse(r.card) as CardSnapshot, at: r.at, dwellMs: r.dwell_ms })),
+    }
+  }
+
+  /** 导入用：保留原来的时间；已经有的不覆盖。返回是否新增。 */
+  importSaved(kind: Collection, card: CardSnapshot, at: number): boolean {
+    return this.db.prepare('INSERT INTO saved (kind, key, card, at) VALUES (?, ?, ?, ?) ON CONFLICT (kind, key) DO NOTHING').run(kind, card.key, JSON.stringify(card), at).changes > 0
+  }
+
+  importHistory(card: CardSnapshot, at: number, dwellMs: number): boolean {
+    return this.db.prepare('INSERT INTO history (key, card, at, dwell_ms) VALUES (?, ?, ?, ?) ON CONFLICT (key) DO NOTHING').run(card.key, JSON.stringify(card), at, dwellMs).changes > 0
+  }
+
   /** 按 key 找回收藏夹或浏览历史里的快照（不限条数）。 */
   findSnapshot(key: string): CardSnapshot | undefined {
     const row = (this.db.prepare('SELECT card FROM saved WHERE key = ? LIMIT 1').get(key) ??

@@ -9,9 +9,10 @@ import type { FeedCard, PlatformAdapter } from './content/types.ts'
 import type { Logger } from './log.ts'
 import { bool, oneOf, optInt, optStr, ParamError, RpcServer, str } from './rpc/server.ts'
 import { CoverCache } from './store/covers.ts'
+import { exportLibrary, importLibrary, LibraryFileError } from './store/library.ts'
 import { defaultDataDir, snapshot, type CardSnapshot, type Settings, Store } from './store/store.ts'
 import type { Item } from './catbus/types.ts'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 import { WeatherService } from './weather/weather.ts'
 
 export const VERSION = '0.0.1'
@@ -257,6 +258,16 @@ export class App {
         this.store.removeHistory(str(p, 'key'))
         return null
       })
+      // 导出 / 导入点赞、收藏、浏览历史（含本机封面，不含登录凭证）；路径来自用户在系统存储面板里选的位置
+      .register('library.export', (p) => exportLibrary(this.store, this.covers, absPath(p)))
+      .register('library.import', (p) => {
+        try {
+          return importLibrary(this.store, this.covers, absPath(p))
+        } catch (err) {
+          if (err instanceof LibraryFileError || (err as NodeJS.ErrnoException).code === 'ENOENT') throw new ParamError((err as Error).message)
+          throw err
+        }
+      })
       .register('history.clear', () => {
         this.store.clearHistory()
         return null
@@ -282,4 +293,10 @@ export class App {
         return s
       })
   }
+}
+
+function absPath(p: Record<string, unknown>): string {
+  const path = str(p, 'path')
+  if (!isAbsolute(path)) throw new ParamError('path must be absolute')
+  return path
 }

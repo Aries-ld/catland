@@ -3,7 +3,7 @@
  * 小红书、抖音、快手的封面地址带签名、过一阵就失效，存下来列表里才一直有封面；只存在本机，不上传。
  */
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Logger } from '../log.ts'
 
@@ -49,6 +49,20 @@ export class CoverCache {
       this.log.info('cover not saved', { key, message: (err as Error).message })
       return false
     }
+  }
+
+  /** 导出用：读出本机封面，没有时为 null。 */
+  read(key: string): Buffer | null {
+    const p = this.path(key)
+    return existsSync(p) ? readFileSync(p) : null
+  }
+
+  /** 导入用：写入封面（超过大小上限的丢掉）。 */
+  write(key: string, buf: Buffer): boolean {
+    if (buf.length === 0 || buf.length > MAX_BYTES) return false
+    mkdirSync(this.dir, { recursive: true })
+    writeFileSync(this.path(key), buf)
+    return true
   }
 
   remove(key: string): void {

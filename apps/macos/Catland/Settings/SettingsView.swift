@@ -1,5 +1,7 @@
-// 设置：静音、快捷键说明、清空浏览历史；以及「我的」点赞 / 收藏列表。
+// 设置：静音、快捷键说明、导出 / 导入我的数据、清空浏览历史；以及「我的」点赞 / 收藏列表。
+import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
     let state: AppState
@@ -45,12 +47,66 @@ struct SettingsView: View {
                         }
                         .controlSize(.small)
                     }
+                    section("我的数据") {
+                        Text("把点赞、收藏、浏览历史（含封面）存成一个文件，换 Mac 或备份时导入。不包含登录状态。").font(.system(size: 11)).foregroundStyle(.secondary)
+                        HStack(spacing: 8) {
+                            Button("导出…") { exportLibrary() }.controlSize(.small)
+                            Button("导入…") { importLibrary() }.controlSize(.small)
+                        }
+                    }
                     section("隐私") {
                         Text("所有数据（点赞、收藏、历史、登录态）只保存在这台电脑上。").font(.system(size: 11)).foregroundStyle(.secondary)
                         Button("清空浏览历史") { Task { _ = try? await state.sidecar.callRaw("history.clear"); state.showToast("已清空浏览历史") } }.controlSize(.small)
                     }
                 }
                 .padding(18)
+            }
+        }
+    }
+
+    // MARK: - 导出 / 导入
+
+    struct LibraryCounts: Decodable { let likes: Int; let collects: Int; let history: Int; let covers: Int }
+
+    /// 系统存储 / 打开面板要盖过刘海面板（层级更高），并且让 catland 临时变成前台 App 才能接键盘。
+    private func present(_ p: NSSavePanel) -> URL? {
+        p.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 4)
+        NSApp.activate(ignoringOtherApps: true)
+        return p.runModal() == .OK ? p.url : nil
+    }
+
+    private func exportLibrary() {
+        let p = NSSavePanel()
+        let day = Date().formatted(.iso8601.year().month().day())
+        p.nameFieldStringValue = "catland-我的收藏-\(day).json"
+        p.allowedContentTypes = [.json]
+        p.message = "导出点赞、收藏和浏览历史（不包含登录状态）"
+        guard let url = present(p) else { return }
+        Task {
+            do {
+                let c: LibraryCounts = try await state.sidecar.call("library.export", ["path": url.path])
+                state.showToast("已导出 \(c.likes) 条点赞、\(c.collects) 条收藏、\(c.history) 条历史")
+                AppLog.info("library export", ["likes": c.likes, "collects": c.collects, "history": c.history, "covers": c.covers])
+            } catch {
+                state.showToast("导出失败：\(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func importLibrary() {
+        let p = NSOpenPanel()
+        p.allowedContentTypes = [.json]
+        p.allowsMultipleSelection = false
+        p.message = "选择 catland 导出的文件；已有的不会被覆盖"
+        guard let url = present(p) else { return }
+        Task {
+            do {
+                let c: LibraryCounts = try await state.sidecar.call("library.import", ["path": url.path])
+                let added = c.likes + c.collects + c.history
+                state.showToast(added == 0 ? "没有新内容，都已经在这台 Mac 上了" : "导入了 \(c.likes) 条点赞、\(c.collects) 条收藏、\(c.history) 条历史")
+                AppLog.info("library import", ["likes": c.likes, "collects": c.collects, "history": c.history, "covers": c.covers])
+            } catch {
+                state.showToast("导入失败：\(error.localizedDescription)")
             }
         }
     }
