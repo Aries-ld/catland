@@ -63,6 +63,8 @@ struct CoverMasonry: View {
     let open: (CoverItem) -> Void
     /// 某张卡片出现在屏幕上（参数是它在 items 里的位置）：搜索用它在滑到六成时取下一页。
     var appeared: ((Int) -> Void)? = nil
+    /// 右键菜单里额外的「删除」项（浏览历史用）。
+    var remove: (label: String, action: (CoverItem) -> Void)? = nil
 
     var body: some View {
         let cols = columns()
@@ -70,7 +72,7 @@ struct CoverMasonry: View {
             ForEach(0..<2, id: \.self) { c in
                 LazyVStack(spacing: 10) {
                     ForEach(cols[c]) { item in
-                        CoverTile(item: item, width: columnWidth)
+                        CoverTile(item: item, width: columnWidth, remove: remove.map { r in (r.label, { r.action(item) }) })
                             .onTapGesture { open(item) }
                             .onAppear { if let appeared, let i = items.firstIndex(of: item) { appeared(i) } }
                     }
@@ -95,6 +97,7 @@ struct CoverMasonry: View {
 struct CoverTile: View {
     let item: CoverItem
     let width: CGFloat
+    var remove: (label: String, action: () -> Void)? = nil
     @State private var hovering = false
 
     static func coverHeight(_ item: CoverItem, width: CGFloat) -> CGFloat {
@@ -152,6 +155,7 @@ struct CoverTile: View {
         .onHover { hovering = $0 }
         .contextMenu {
             if let s = item.url, let u = URL(string: s) { Button("在浏览器中打开原帖") { NSWorkspace.shared.open(u) } }
+            if let r = remove { Button(r.label, role: .destructive, action: r.action) }
         }
     }
 }

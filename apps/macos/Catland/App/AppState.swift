@@ -10,7 +10,7 @@ import os
 final class AppState {
     enum Phase: Equatable { case starting, ready, failed(String) }
     enum Section: String, CaseIterable { case content = "视频", commerce = "电商" }
-    enum Overlay: String, Equatable { case none, connections, settings, saved }
+    enum Overlay: String, Equatable { case none, connections, settings, saved, history }
 
     let sidecar = SidecarClient()
     let feed: FeedController

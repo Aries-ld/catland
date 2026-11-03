@@ -79,7 +79,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 case "right": self.state.activeFeed.carousel(1)
                 case "pause": self.state.activeFeed.togglePause()
                 case "comments": self.state.commentsOpen.toggle()
-                case "connections", "settings", "saved":
+                case "connections", "settings", "saved", "history":
                     if !self.state.expanded { self.toggle() }
                     self.state.overlay = AppState.Overlay(rawValue: cmd) ?? .none
                 case "close": self.state.overlay = .none
@@ -117,6 +117,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         }
                     }
                     if let j = try? JSONSerialization.data(withJSONObject: meta, options: [.prettyPrinted, .sortedKeys]) { try? j.write(to: dir.appendingPathComponent("cats.json")) }
+                case "render:history":
+                    // 离屏渲染浏览历史（只读本地数据，不弹面板），检查分组和瀑布流
+                    Task { @MainActor in
+                        guard let page: SavedPage = try? await self.state.sidecar.call("history.list", ["limit": 16]) else { return }
+                        let items = page.entries.map(CoverItem.init)
+                        for i in items { if let s = i.cover { _ = await ImageLoader.shared.load(s).value } }
+                        let w = (NotchGeometry.expandedSize.width - 28 - 8) / 2
+                        let view = VStack(alignment: .leading, spacing: 14) {
+                            ForEach(HistoryView.groups(page.entries), id: \.title) { g in
+                                Text(g.title).font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
+                                CoverMasonry(items: g.entries.map(CoverItem.init), columnWidth: w) { _ in }
+                            }
+                        }
+                        .padding(14).frame(width: 384, alignment: .topLeading).background(Color(white: 0.07)).environment(\.colorScheme, .dark)
+                        let r = ImageRenderer(content: view); r.scale = 2
+                        if let cg = r.cgImage, let d = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) { try? d.write(to: URL(fileURLWithPath: "/tmp/history.png")) }
+                        AppLog.info("render history", ["count": page.entries.count])
+                    }
                 case "feed:pause": self.state.feed.debugPause()
                 case "fullscreen": self.state.setFullscreen(!self.state.fullscreen)
                 case "render:comments":

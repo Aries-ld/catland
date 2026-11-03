@@ -409,6 +409,24 @@ final class KeyRouterTests: XCTestCase {
     }
 }
 
+final class HistoryGroupingTests: XCTestCase {
+    func testGroupsByDayWithFriendlyTitles() throws {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "Asia/Singapore")!
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-11-03T10:00:00+08:00"))
+        func entry(_ id: String, _ at: String) -> SavedEntry {
+            SavedEntry(card: CardSnapshot(key: "xhs:\(id)", platform: "xhs", url: "", kind: "video", title: nil, text: nil, author: nil, cover: nil, duration: nil),
+                       at: at, localCover: nil)
+        }
+        let groups = HistoryView.groups([
+            entry("a", "2026-11-03T01:30:00.000Z"), entry("b", "2026-11-02T20:00:00.000Z"),   // 新加坡 11-03 09:30、11-03 04:00
+            entry("c", "2026-11-02T10:00:00.000Z"), entry("d", "2026-10-20T10:00:00.000Z"), entry("e", "2025-12-31T10:00:00Z"),
+        ], now: now, calendar: cal)
+        XCTAssertEqual(groups.map(\.title), ["今天", "昨天", "10月20日 星期二", "2025年12月31日"])
+        XCTAssertEqual(groups[0].entries.map(\.card.key), ["xhs:a", "xhs:b"])
+    }
+}
+
 final class ScrollPagerTests: XCTestCase {
     @MainActor
     func testOneTrackpadGesturePagesOnceAndIgnoresMomentum() {

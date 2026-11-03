@@ -99,26 +99,7 @@ struct SavedView: View {
         ZStack {
             Color(white: 0.07)
             if state.savedPlaying {
-                // 点开的帖子在这里直接播放，往下刷接着是推荐流
-                VStack(spacing: 0) {
-                    HStack {
-                        Button { withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) { state.stopSaved() } } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "chevron.left").font(.system(size: 11, weight: .semibold))
-                                Text(state.savedPlayingTitle).font(.system(size: 13, weight: .medium))
-                            }
-                            .foregroundStyle(.white.opacity(0.9))
-                            .padding(.horizontal, 10).frame(height: 28)
-                            .background(Capsule().fill(.white.opacity(0.12)))
-                            .contentShape(Capsule())
-                        }
-                        .buttonStyle(PressStyle())
-                        Spacer()
-                    }
-                    .padding(.horizontal, 12).frame(height: 40)
-                    FeedView(state: state, feed: state.libraryPlayer)
-                }
-                .transition(.move(edge: .trailing).combined(with: .opacity))
+                LibraryPlayerView(state: state)
             } else {
             VStack(alignment: .leading, spacing: 12) {
                 Picker("", selection: $kind) {
@@ -145,5 +126,32 @@ struct SavedView: View {
             let page: SavedPage? = try? await state.sidecar.call("interact.list", ["kind": kind, "limit": 100])
             entries = page?.entries ?? []
         }
+    }
+}
+
+/// 点赞 / 收藏 / 浏览历史里点开的帖子：在这里直接播放，往下刷接着是推荐流。
+struct LibraryPlayerView: View {
+    let state: AppState
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Button { withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) { state.stopSaved() } } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left").font(.system(size: 11, weight: .semibold))
+                        Text(state.savedPlayingTitle).font(.system(size: 13, weight: .medium))
+                    }
+                    .foregroundStyle(.white.opacity(0.9))
+                    .padding(.horizontal, 10).frame(height: 28)
+                    .background(Capsule().fill(.white.opacity(0.12)))
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(PressStyle())
+                Spacer()
+            }
+            .padding(.horizontal, 12).frame(height: 40)
+            FeedView(state: state, feed: state.libraryPlayer)
+        }
+        .transition(.move(edge: .trailing).combined(with: .opacity))
     }
 }

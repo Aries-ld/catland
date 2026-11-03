@@ -101,17 +101,9 @@ export class App {
 
   /** 找回卡片快照：先查本次会话下发过的，再查收藏 / 历史里的。 */
   private lookup(key: string): CardSnapshot {
-    const s = this.snapshots.get(key) ?? this.findSaved(key)
+    const s = this.snapshots.get(key) ?? this.store.findSnapshot(key)
     if (!s) throw new ParamError(`unknown card: ${key}`)
     return s
-  }
-
-  private findSaved(key: string): CardSnapshot | undefined {
-    for (const kind of ['like', 'collect'] as const) {
-      const hit = this.store.listSaved(kind, { limit: 200 }).entries.find((e) => e.card.key === key)
-      if (hit) return hit.card
-    }
-    return this.store.listHistory({ limit: 200 }).entries.find((e) => e.card.key === key)?.card
   }
 
   private backfilling = false
@@ -256,7 +248,15 @@ export class App {
         return { ...card, ...this.store.states([card.key])[card.key]! }
       })
 
-      .register('history.list', (p) => this.store.listHistory({ limit: optInt(p, 'limit', 1, 200), before: optInt(p, 'before', 0, Number.MAX_SAFE_INTEGER) }))
+      .register('history.list', (p) => {
+        const page = this.store.listHistory({ limit: optInt(p, 'limit', 1, 200), before: optInt(p, 'before', 0, Number.MAX_SAFE_INTEGER) })
+        // 同时点赞 / 收藏过的，封面已存在本机，优先用它
+        return { ...page, entries: page.entries.map((e) => ({ ...e, localCover: this.covers.localUrl(e.card.key) })) }
+      })
+      .register('history.remove', (p) => {
+        this.store.removeHistory(str(p, 'key'))
+        return null
+      })
       .register('history.clear', () => {
         this.store.clearHistory()
         return null

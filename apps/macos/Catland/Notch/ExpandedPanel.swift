@@ -56,6 +56,7 @@ struct ExpandedPanel: View {
                 case .connections: ConnectionsView(state: state).transition(.move(edge: .bottom).combined(with: .opacity))
                 case .settings: SettingsView(state: state).transition(.move(edge: .bottom).combined(with: .opacity))
                 case .saved: SavedView(state: state).transition(.move(edge: .bottom).combined(with: .opacity))
+                case .history: HistoryView(state: state).transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -120,6 +121,9 @@ struct ExpandedPanel: View {
             .help("一次搜遍几个平台（⌘F）")
             .coachAnchor(.search)
             iconButton("heart.text.square", active: state.overlay == .saved) { toggleOverlay(.saved) }
+                .help("我的点赞和收藏")
+            iconButton("clock.arrow.circlepath", active: state.overlay == .history) { toggleOverlay(.history) }
+                .help("浏览历史")
             // 连接平台：和收藏、设置一样的图标按钮，不抢视觉；悬停显示已连接几个
             iconButton("person.crop.circle.badge.plus", active: state.overlay == .connections) { toggleOverlay(.connections) }
                 .help("连接平台（已连接 \(state.connectedContentPlatforms.count) 个）")

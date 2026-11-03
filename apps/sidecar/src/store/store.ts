@@ -187,8 +187,19 @@ export class Store implements SeenStore {
     return page(rows, limit, (r) => ({ card: JSON.parse(r.card) as CardSnapshot, at: new Date(r.at).toISOString(), dwellMs: r.dwell_ms }))
   }
 
+  removeHistory(key: string): void {
+    this.db.prepare('DELETE FROM history WHERE key = ?').run(key)
+  }
+
   clearHistory(): void {
     this.db.exec('DELETE FROM history')
+  }
+
+  /** 按 key 找回收藏夹或浏览历史里的快照（不限条数）。 */
+  findSnapshot(key: string): CardSnapshot | undefined {
+    const row = (this.db.prepare('SELECT card FROM saved WHERE key = ? LIMIT 1').get(key) ??
+      this.db.prepare('SELECT card FROM history WHERE key = ?').get(key)) as { card: string } | undefined
+    return row ? (JSON.parse(row.card) as CardSnapshot) : undefined
   }
 
   getSettings(): Settings {
