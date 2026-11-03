@@ -342,8 +342,15 @@ final class AppState {
             }
         case "accounts.login":
             if let e = try? dec.decode(LoginEvent.self, from: params), qrLogin?.platform == e.platform {
-                if e.type == "qrcode", let b64 = e.png { qrLogin?.png = Data(base64Encoded: b64) }
-                if e.type == "progress" { qrLogin?.message = e.message }
+                let name = PlatformBrand.shortName(e.platform)
+                if e.type == "qrcode", let b64 = e.png {
+                    qrLogin?.png = Data(base64Encoded: b64)
+                    qrLogin?.message = "打开\(name) App 扫一扫，再在手机上点确认"
+                }
+                if e.type == "progress", let m = e.message {
+                    // 扫码后 catbus 还要几秒去平台换登录凭证、校验登录态，这段时间没有新消息：提前告诉用户在等什么
+                    qrLogin?.message = m.contains("已扫码") ? "已扫码 ✓ 在手机上确认后，再等几秒就好（正在向\(name)确认登录）" : m
+                }
             }
         case "feed.source":
             if let s = try? dec.decode(SourceState.self, from: params) {
