@@ -371,6 +371,8 @@ struct CommerceResults: View {
     var loading = false
     var reviewsLoading = false
     var hasMore = false
+    var failed = false
+    var onRetry: () -> Void = {}
     var onSort: (String) -> Void = { _ in }
     var onOpen: (Product) -> Void = { _ in }
     var onWish: (Product) -> Void = { _ in }
@@ -405,6 +407,14 @@ struct CommerceResults: View {
             if let rest { JDRestCard(rest: rest, query: query, cachedAt: cachedAt, onSearchInJD: onSearchInJD) }
             if loading && products.isEmpty {
                 ProgressView().controlSize(.small).frame(maxWidth: .infinity, minHeight: 80)
+            } else if failed && rest == nil {
+                HStack(spacing: 10) {
+                    Text("京东这次没响应").font(.system(size: 12, weight: .medium))
+                    Spacer()
+                    Chip(text: "重试", action: onRetry)
+                    Chip(text: "在京东里搜", action: onSearchInJD)
+                }
+                .padding(10).background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.white.opacity(0.05)))
             } else if products.isEmpty && rest == nil {
                 Text("京东上没搜到「\(query)」，换个说法试试").font(.system(size: 11)).foregroundStyle(.white.opacity(0.45)).frame(maxWidth: .infinity, minHeight: 60)
             }

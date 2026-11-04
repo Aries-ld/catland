@@ -57,7 +57,7 @@ export class CommerceService {
     if (hit && this.now() - hit.at < CACHE_TTL_MS) return this.decorate(hit.page, null, null)
     try {
       const argv = ['jd', 'item', 'search', query, '--sort', sort, ...(cursor ? ['--cursor', cursor] : [])]
-      const r = await this.deps.gate.run('user', () => this.deps.catbus.run<Item[]>(argv))
+      const r = await this.deps.gate.run('user', () => this.runWatchingCaptcha<Item[]>(argv))
       const page = { products: r.data.map(toProduct).filter((p): p is ProductSnapshot => p !== null), cursor: r.page?.cursor ?? null, hasMore: !!r.page?.has_more }
       this.cache.delete(key)
       this.cache.set(key, { at: this.now(), page })
@@ -73,6 +73,31 @@ export class CommerceService {
       if (err instanceof CatbusCallError && (err.code === 'AUTH_REQUIRED' || err.code === 'AUTH_EXPIRED')) {
         return { products: [], cursor: null, hasMore: false, rest: null, cachedAt: null, auth: true }
       }
+      throw err
+    }
+  }
+
+  /**
+   * 京东要人机验证（code=605「验证一下，购物无忧」）时，catbus 会尝试自动过验证，过不了就一直卡着不返回。
+   * 看到它在 stderr 报「被风控拦下」就立刻结束进程，按 RISK_CONTROL（captcha）处理：总闸暂停、界面提示去浏览器验证。
+   */
+  private async runWatchingCaptcha<T>(argv: string[]) {
+    const ac = new AbortController()
+    let blocked = false
+    try {
+      return await this.deps.catbus.run<T>(argv, {
+        signal: ac.signal,
+        timeoutMs: 30_000,
+        onStderrLine: (line) => {
+          if (!blocked && /被风控拦下|code=605|京东验证/.test(line)) {
+            blocked = true
+            this.log.warn('jd captcha required, aborting catbus', { argv: argv.slice(0, 3) })
+            ac.abort()
+          }
+        },
+      })
+    } catch (err) {
+      if (blocked) throw new CatbusCallError('RISK_CONTROL', '京东要求人机验证', { detail: { kind: 'captcha' } })
       throw err
     }
   }

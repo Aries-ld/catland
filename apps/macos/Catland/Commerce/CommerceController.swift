@@ -62,6 +62,8 @@ final class CommerceController {
     private(set) var rest: JDRest?
     private(set) var cachedAt: Date?
     private(set) var needsLogin = false
+    /// 这次京东没响应（超时、网络）：显示「重试」，不当成「没搜到」
+    private(set) var failed = false
     /// 打开的商品页
     var detail: Product?
     private(set) var wishes: [WishItem] = []
@@ -145,6 +147,11 @@ final class CommerceController {
         Task { await fetch(reset: true) }
     }
 
+    func retry() {
+        guard !submitted.isEmpty else { return }
+        Task { await fetch(reset: true) }
+    }
+
     func loadMore() {
         guard hasMore, !loadingMore, !loading, cursor != nil else { return }
         Task { await fetch(reset: false) }
@@ -167,7 +174,7 @@ final class CommerceController {
     private func fetch(reset: Bool) async {
         generation += reset ? 1 : 0
         let gen = generation
-        if reset { loading = true; products = []; cursor = nil; hasMore = false } else { loadingMore = true }
+        if reset { loading = true; products = []; cursor = nil; hasMore = false; failed = false } else { loadingMore = true }
         defer { if gen == generation { loading = false; loadingMore = false } }
         var params: [String: Any] = ["query": submitted, "sort": sort]
         if !reset, let c = cursor { params["cursor"] = c }
@@ -182,6 +189,8 @@ final class CommerceController {
             cursor = page.cursor
             hasMore = page.hasMore
         } catch {
+            guard gen == generation else { return }
+            failed = reset
             AppLog.warn("commerce search failed", ["err": error.localizedDescription])
         }
     }

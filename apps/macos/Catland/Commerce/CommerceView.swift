@@ -48,7 +48,7 @@ struct CommerceView: View {
                          onRemoveWish: { w in toggleWish(w.product) })
         } else {
             CommerceResults(query: c.submitted, reviews: reviewItems, products: c.products, wished: c.wishedIDs,
-                            rest: c.rest, cachedAt: c.cachedAt, sort: c.sort, loading: c.loading, reviewsLoading: c.reviews.searching, hasMore: c.hasMore,
+                            rest: c.rest, cachedAt: c.cachedAt, sort: c.sort, loading: c.loading, reviewsLoading: c.reviews.searching, hasMore: c.hasMore, failed: c.failed, onRetry: c.retry,
                             onSort: c.setSort, onOpen: { c.openDetail($0, contentPlatforms: state.searchPlatforms) }, onWish: toggleWish, onReview: play,
                             onSearchInJD: { c.searchInJD(c.submitted) }, onLoadMore: c.loadMore)
         }

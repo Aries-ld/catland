@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CatbusClient } from '../src/accounts/service.ts'
-import { CatbusCallError, type CatbusResult } from '../src/catbus/runner.ts'
+import { CatbusCallError, type CatbusResult, type RunOptions } from '../src/catbus/runner.ts'
 import type { Item } from '../src/catbus/types.ts'
 import { BREAKER_STEPS_MS, JdGate, JdRestingError, type GateState } from '../src/commerce/gate.ts'
 import { CommerceService, parseProduct } from '../src/commerce/service.ts'
@@ -85,8 +85,16 @@ describe('JdGate', () => {
 class FakeCatbus implements CatbusClient {
   calls: string[] = []
   next: (() => unknown) | null = null
-  async run<T>(argv: readonly string[]): Promise<CatbusResult<T>> {
+  /** 模拟 catbus 卡在人机验证：报一行风控警告后一直不返回，直到被 abort */
+  hangOnCaptcha = false
+  async run<T>(argv: readonly string[], opts?: RunOptions): Promise<CatbusResult<T>> {
     this.calls.push(argv.join(' '))
+    if (this.hangOnCaptcha) {
+      return new Promise((_, reject) => {
+        opts?.signal?.addEventListener('abort', () => reject(new CatbusCallError('ABORTED', 'aborted')))
+        opts?.onStderrLine?.('[catbus] 警告：pc_search_searchWare 被风控拦下：code=605 京东验证 验证一下，购物无忧')
+      })
+    }
     const v = this.next ? this.next() : items(['1', '2'])
     return { data: v as T, page: { cursor: '#skip=20', has_more: true }, account: 'default' }
   }
@@ -142,6 +150,14 @@ describe('CommerceService', () => {
     const q = await svc.search('降噪耳机') // 没有缓存：空结果 + rest
     expect(q).toMatchObject({ products: [], rest: { kind: 'resting' }, cachedAt: null })
     expect(catbus.calls).toHaveLength(n)
+  })
+
+  it('京东要人机验证、catbus 卡住：立刻结束，按需要验证处理并熔断，不等超时', async () => {
+    const { catbus, svc, g } = commerce()
+    catbus.hangOnCaptcha = true
+    const p = await svc.search('skii')
+    expect(p).toMatchObject({ products: [], rest: { kind: 'verify' } })
+    expect(g.rest()).toMatchObject({ kind: 'verify' })
   })
 
   it('未登录京东：auth 标记，不算风控', async () => {
