@@ -7,9 +7,8 @@ struct ConnectionsView: View {
     private var groups: [(String, [PlatformState])] {
         // 暂未开放的平台排在分组最后，不夹在可用平台中间。
         let content = state.platforms.filter { $0.sections.contains("content") }
-        let commerce = state.platforms.filter { $0.sections.contains("commerce") }
-        return [("内容", content.filter { $0.unavailable == nil } + content.filter { $0.unavailable != nil }),
-                ("电商 · 购物小助手", commerce.filter { $0.unavailable == nil } + commerce.filter { $0.unavailable != nil })]
+        // 电商平台已下线，不在连接页出现
+        return [("内容", content.filter { $0.unavailable == nil } + content.filter { $0.unavailable != nil })]
     }
 
     var body: some View {
@@ -40,7 +39,7 @@ struct PlatformTile: View {
     let platform: PlatformState
     @State private var hovering = false
 
-    /// 暂未开放的平台置灰、不能连接（电商目前只开放京东）。
+    /// 暂未开放的平台置灰、不能连接。
     private var disabled: Bool { platform.unavailable != nil }
     private var statusText: String {
         if platform.unavailable != nil { return "暂未开放" }

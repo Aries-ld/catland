@@ -100,9 +100,6 @@ class FakeCatbus implements CatbusClient {
     const key = argv.join(' ')
     if (key === 'auth list') return { data: this.accounts as T, page: null, account: null }
     if (argv[1] === 'comment' && argv[2] === 'list') return { data: [{ id: 'c1', item_id: '1', parent_id: null, author: null, text: '好', created_at: null, stats: { likes: 1, replies: 0 } }] as T, page: { cursor: 'n', has_more: true }, account: null }
-    if (key.startsWith('jd item search')) {
-      return { data: [{ id: '100', kind: 'product', url: 'https://item.jd.com/100.html', title: '键盘', text: null, author: { id: 's', name: '京东京造自营旗舰店', url: null }, created_at: null, cover: 'https://img14.360buyimg.com/a.jpg', media: [], stats: { views: null, likes: null, comments: 50000, collects: null, shares: null }, price: { amount: 299.9, currency: 'CNY' }, status: null }] as T, page: { cursor: '#skip=20', has_more: true }, account: null }
-    }
     if (argv[1] === 'auth' && argv[2] === 'logout') {
       this.accounts = this.accounts.filter((a) => a.platform !== argv[0])
       return { data: null as T, page: null, account: null }
@@ -219,24 +216,6 @@ describe('App via RPC', () => {
     await client.ok('feed.view', { key: cards[0].key, dwellMs: 1 })
     await client.ok('history.clear')
     expect((await client.ok('history.list')).entries).toEqual([])
-    app.stop()
-  })
-
-  it('购物小助手：京东搜索、心愿单加入 / 列表 / 移出，参数校验', async () => {
-    const { app, client, catbus } = await startApp()
-    const page = await client.ok('commerce.search', { query: ' 机械键盘 ', sort: 'sales' })
-    expect(page).toMatchObject({ products: [{ sku: '100', price: 299.9, shop: '京东京造自营旗舰店', wished: false }], cursor: '#skip=20', hasMore: true, rest: null, auth: false })
-    expect(catbus.calls).toContain('jd item search 机械键盘 --sort sales')
-    expect((await client.call('commerce.search', { query: '键盘', sort: 'cheap' })).error.code).toBe(RPC_ERRORS.INVALID_PARAMS)
-    await client.ok('wish.add', { product: page.products[0] })
-    const list = await client.ok('wish.list')
-    expect(list.entries[0]).toMatchObject({ product: { sku: '100', title: '键盘' }, history: [{ price: 299.9 }] })
-    expect(list.rest).toBeNull()
-    expect((await client.ok('commerce.search', { query: '机械键盘', sort: 'sales' })).products[0].wished).toBe(true)
-    expect((await client.call('wish.add', { product: { sku: 'x', title: 'y' } })).error.code).toBe(RPC_ERRORS.INVALID_PARAMS)
-    await client.ok('wish.remove', { sku: '100' })
-    expect((await client.ok('wish.list')).entries).toEqual([])
-    expect(await client.ok('commerce.status')).toEqual({ rest: null })
     app.stop()
   })
 

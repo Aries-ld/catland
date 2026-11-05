@@ -10,8 +10,6 @@ import type { Logger } from './log.ts'
 import { bool, oneOf, optInt, optStr, ParamError, RpcServer, str } from './rpc/server.ts'
 import { CoverCache } from './store/covers.ts'
 import { exportLibrary, importLibrary, LibraryFileError } from './store/library.ts'
-import { JdGate, type GateState, type RestState } from './commerce/gate.ts'
-import { CommerceService, JD_SORTS, parseProduct, WishLimitError } from './commerce/service.ts'
 import { defaultDataDir, snapshot, type CardSnapshot, type Settings, Store } from './store/store.ts'
 import type { Item } from './catbus/types.ts'
 import { isAbsolute, join } from 'node:path'
@@ -30,8 +28,6 @@ export interface AppDeps {
   mixer?: FeedMixer
   weather?: WeatherService
   covers?: CoverCache
-  /** 测试注入：京东请求总闸（间隔、熔断）。 */
-  jdGate?: JdGate
 }
 
 export class App {
@@ -42,9 +38,6 @@ export class App {
   private readonly search: SearchService
   private readonly covers: CoverCache
   private readonly weather: WeatherService
-  readonly jdGate: JdGate
-  private readonly commerce: CommerceService
-  private notifyRest: (r: RestState) => void = () => {}
   private readonly log: Logger
   private readonly adapterFor: (platform: string) => PlatformAdapter
   private readonly adapters = new Map<string, PlatformAdapter>()
@@ -62,12 +55,6 @@ export class App {
     this.adapterFor = deps.adapterFor ?? ((p) => createAdapter(p, { catbus: deps.catbus, logger: deps.logger }))
     this.search = new SearchService({ logger: deps.logger, adapterFor: (p) => this.adapter(p), mixer: this.mixer })
     this.covers = deps.covers ?? new CoverCache({ dir: join(defaultDataDir(), 'covers'), logger: deps.logger })
-    this.jdGate = deps.jdGate ?? new JdGate({
-      logger: deps.logger,
-      storage: { load: () => deps.store.getKv<GateState>('jdGate'), save: (s) => deps.store.setKv('jdGate', s) },
-      onTrip: (r) => this.notifyRest(r),
-    })
-    this.commerce = new CommerceService({ catbus: deps.catbus, gate: this.jdGate, store: deps.store, logger: deps.logger })
   }
 
   async start(): Promise<void> {
@@ -134,7 +121,6 @@ export class App {
 
   register(rpc: RpcServer): void {
     this.accounts.on('changed', () => rpc.notify('accounts.changed', { platforms: this.accounts.platforms() }))
-    this.notifyRest = (r) => rpc.notify('commerce.rest', r)
     this.mixer.on('source', (s) => {
       rpc.notify('feed.source', s)
       if (s.status === 'auth') void this.accounts.checkHealth(s.platform).catch(() => {})
@@ -152,12 +138,9 @@ export class App {
       .register('accounts.list', () => this.accounts.platforms())
       .register('accounts.refresh', () => this.accounts.refresh())
       .register('accounts.checkHealth', (p) => this.accounts.checkHealth(platform(p)))
-      .register('accounts.loginQrcode', async (p, ctx) => {
-        const id = platform(p)
-        const account = await this.accounts.loginQrcode(id, { account: optStr(p, 'account'), onEvent: (e) => ctx.notify('accounts.login', e) })
-        if (id === 'jd') this.jdGate.noteLogin() // 刚登录的 10 分钟里不跑后台的京东请求
-        return account
-      })
+      .register('accounts.loginQrcode', (p, ctx) =>
+        this.accounts.loginQrcode(platform(p), { account: optStr(p, 'account'), onEvent: (e) => ctx.notify('accounts.login', e) }),
+      )
       .register('accounts.loginCookie', (p) => {
         const cookies = p.cookies
         const ok = typeof cookies === 'string' || (Array.isArray(cookies) && cookies.every((c) => c && typeof c.name === 'string' && typeof c.value === 'string'))
@@ -284,31 +267,6 @@ export class App {
           if (err instanceof LibraryFileError || (err as NodeJS.ErrnoException).code === 'ENOENT') throw new ParamError((err as Error).message)
           throw err
         }
-      })
-      // 购物小助手（ADR 0005）：京东搜索、心愿单
-      .register('commerce.search', (p) => {
-        const query = str(p, 'query').trim()
-        if (query.length === 0 || query.length > 60) throw new ParamError('query must be 1–60 characters')
-        const sort = (optStr(p, 'sort') ?? 'general') as (typeof JD_SORTS)[number]
-        if (!JD_SORTS.includes(sort)) throw new ParamError(`sort must be one of ${JD_SORTS.join(' / ')}`)
-        return this.commerce.search(query, sort, optStr(p, 'cursor') ?? null)
-      })
-      .register('commerce.status', () => ({ rest: this.commerce.rest() }))
-      .register('wish.list', () => this.commerce.wishes())
-      .register('wish.add', (p) => {
-        const product = parseProduct(p.product)
-        if (!product) throw new ParamError('product must be { sku, title, price, shop, cover, url, comments }')
-        try {
-          this.commerce.addWish(product)
-        } catch (err) {
-          if (err instanceof WishLimitError) throw new ParamError(err.message)
-          throw err
-        }
-        return null
-      })
-      .register('wish.remove', (p) => {
-        this.commerce.removeWish(str(p, 'sku'))
-        return null
       })
       .register('history.clear', () => {
         this.store.clearHistory()

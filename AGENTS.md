@@ -14,7 +14,7 @@
 
 - **纯本地（红线）**：无自有服务器、无账号体系、无遥测；网络请求只发往用户连接的平台。例外：① 刘海场景的天气联动（匿名 GET、不带用户信息、30 分钟缓存，设置里可关）——新加坡用 NEA（data.gov.sg），其他地区用 Open-Meteo，坐标先粗化到 0.1°；② 自动更新（Sparkle，每天匿名查一次 GitHub Release 上的 appcast，不发系统信息，设置里可关；见 ADR 0001 第 9 条）。sidecar 与 App 走 stdio，不监听端口；新增密钥存钥匙串。
 - 技术栈：Swift 原生客户端（刘海 NSPanel + AVPlayer）+ Node sidecar 包装 catbus。
-- MVP：连接面板 + 登录、灵动岛 + 小猫动画、视频/内容板块；电商延后到 v2。
+- MVP：连接面板 + 登录、灵动岛 + 小猫动画、视频/内容板块。电商已搁置：京东风控过严，实测期间产品负责人的账号被冻结（ADR 0005），相关代码已下线，不要重新接入京东 / 淘宝 / 闲鱼，除非产品负责人明确要求。
 - 点赞 / 收藏 / 历史只存本地，不回写原平台。
 - 只做 macOS，不做云同步。自动更新走 Sparkle + GitHub Release（`apps/macos/Catland/App/AppUpdater.swift`，自绘界面、点一下就下载安装重启）。
 - 登录：支持扫码的平台（xhs / douyin / bilibili / kuaishou / xianyu / jd）在面板内扫码；只支持 cookie 的平台（tiktok / weibo / x / taobao）自动打开内嵌官方登录页，用户登录完成后自动获取登录态写入 catbus，用户不接触 cookie。

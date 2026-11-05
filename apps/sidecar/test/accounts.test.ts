@@ -60,10 +60,10 @@ describe('AccountService.refresh / platforms', () => {
 })
 
 describe('置灰的平台', () => {
-  it('X、TikTok、微博、淘宝、闲鱼标记为暂未开放，且不能发起登录', async () => {
+  it('X、TikTok、微博标记为暂未开放，且不能发起登录', async () => {
     const { svc } = setup()
     const list = await svc.refresh()
-    expect(list.filter((p) => p.unavailable).map((p) => p.id)).toEqual(['x', 'tiktok', 'weibo', 'taobao', 'xianyu'])
+    expect(list.filter((p) => p.unavailable).map((p) => p.id)).toEqual(['x', 'tiktok', 'weibo', 'jd', 'taobao', 'xianyu'])
     expect(list.find((p) => p.id === 'xhs')!.unavailable).toBeNull()
     await expect(svc.loginCookie('x', 'auth_token=a; ct0=b')).rejects.toMatchObject({ code: 'USAGE' })
     await expect(svc.loginCookie('tiktok', 'sessionid=a')).rejects.toMatchObject({ code: 'USAGE' })

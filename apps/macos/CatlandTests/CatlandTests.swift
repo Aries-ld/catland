@@ -394,20 +394,6 @@ final class KeyRouterTests: XCTestCase {
         XCTAssertEqual(KeyRouter.route(kVK_Escape, KeyContext(searchActive: true, typing: true)), .closeSearch)
     }
 
-    func testCommerceEscapeAndKeys() {
-        // 电商里浏览：方向键、空格交给页面；F 不进全屏；Esc 先关商品页 / 结果，再收起
-        let browse = KeyContext(commerceBrowsing: true, commerceBack: true)
-        XCTAssertEqual(KeyRouter.route(kVK_DownArrow, browse), .pass)
-        XCTAssertEqual(KeyRouter.route(kVK_ANSI_F, browse), .pass)
-        XCTAssertEqual(KeyRouter.route(kVK_Escape, browse), .commerceBack)
-        XCTAssertEqual(KeyRouter.route(kVK_Escape, KeyContext(commerceBrowsing: true)), .collapse)
-        // 播测评：和刷视频一样，Esc 回到电商页
-        let playing = KeyContext(commercePlaying: true, commerceBack: true)
-        XCTAssertEqual(KeyRouter.route(kVK_DownArrow, playing), .page(1))
-        XCTAssertEqual(KeyRouter.route(kVK_ANSI_F, playing), .toggleFullscreen)
-        XCTAssertEqual(KeyRouter.route(kVK_Escape, playing), .stopCommercePlaying)
-    }
-
     func testPagingRespectsOverlaysAndComments() {
         XCTAssertEqual(KeyRouter.route(kVK_DownArrow, KeyContext()), .page(1))
         XCTAssertEqual(KeyRouter.route(kVK_ANSI_K, KeyContext()), .page(-1))
@@ -438,48 +424,6 @@ final class HistoryGroupingTests: XCTestCase {
         ], now: now, calendar: cal)
         XCTAssertEqual(groups.map(\.title), ["今天", "昨天", "10月20日 星期二", "2025年12月31日"])
         XCTAssertEqual(groups[0].entries.map(\.card.key), ["xhs:a", "xhs:b"])
-    }
-}
-
-final class ProductMatchTests: XCTestCase {
-    /// 标题取自 2026-11-03 真实的京东搜索结果
-    func testParsesBrandAndModelFromRealJDTitles() {
-        let cases: [(String, String, Bool)] = [
-            ("罗技（G）闪逸龙G316电竞版 8K客制化游戏键盘 98配列 机械键盘 FPS电竞 打瓦 三角洲 无畏契约必备 黑色L轴", "罗技 G316", true),
-            ("雷蛇（Razer）黑寡妇蜘蛛标准版 机械键盘 游戏键盘 绿色背光 游戏电竞 有线机械键盘 绿轴", "雷蛇 黑寡妇蜘蛛", true),
-            ("惠普（HP）机械键盘 办公电竞游戏专用有线 台式机笔记本电脑 侧刻渐变黑莓粉白光青轴 104键", "惠普 机械键盘", false),
-            ("京东京造JZ990Pro静音三模机械键盘游戏办公安静无线蓝牙有线键盘无线类红轴WIN/Mac办公游戏大配列数字区", "京东京造 JZ990Pro", true),
-            ("罗技（Logitech）K845机械键盘 有线键盘 办公电脑打字键盘  电竞游戏发光全尺寸个性化定制键帽 K845青轴+", "罗技 K845", true),
-            ("【万人购】京造JZ990Pro键盘", "京造 JZ990Pro", true),
-            ("狼蛛（AULA）F2088Air无线机械键盘鼠标套装蓝牙/2.4G/有线三模连接108键全键无冲电竞游戏办公笔记本电脑外", "狼蛛 F2088Air", true),
-            ("雷蛇（Razer）黑寡妇蜘蛛V3竞技版 机械键盘 87键 电脑游戏电竞 RGB背光 绿轴", "雷蛇 黑寡妇蜘蛛V3", true),
-            ("Apple/苹果 MacBook Air 13.6英寸 M3芯片 16GB 512GB 午夜色 笔记本电脑", "Apple M3", true),
-        ]
-        for (title, query, specific) in cases {
-            let m = ProductMatch.parse(title)
-            XCTAssertEqual(m.query, query, title)
-            XCTAssertEqual(m.specific, specific, title)
-        }
-    }
-
-    func testOnlyReviewsOfThisModelMatch() {
-        let g316 = ProductMatch.parse("罗技（G）闪逸龙G316电竞版 8K客制化游戏键盘")
-        XCTAssertTrue(g316.matches("罗技G316 一个月深度体验：8K 回报率到底有没有用"))
-        XCTAssertTrue(g316.matches("闪逸龙 g 316 开箱"))
-        XCTAssertFalse(g316.matches("2026 双十一机械键盘推荐清单"))
-        XCTAssertFalse(g316.matches("罗技 G502 鼠标测评"))
-        // 另一款（多了后缀）不算
-        XCTAssertFalse(g316.matches("【测评】罗技G316X大配列游戏键盘"))
-        XCTAssertFalse(ProductMatch.parse("京东京造JZ990Pro静音三模机械键盘").matches("京东京造JZ990ProV2鎏金黑开箱"))
-        XCTAssertTrue(ProductMatch.parse("京东京造JZ990Pro静音三模机械键盘").matches("京东京造JZ990 Pro真的手感拉满"))
-        // 短型号要求品牌也出现（括号里的英文名也算）
-        let v3 = ProductMatch.parse("雷蛇（Razer）黑寡妇蜘蛛V3竞技版 机械键盘")
-        XCTAssertTrue(v3.matches("Razer 黑寡妇 V3 值不值得买"))
-        XCTAssertFalse(v3.matches("小米 V3 扫地机器人"))
-        // 认不出型号：按品牌 + 品类，只算宽泛匹配
-        let hp = ProductMatch.parse("惠普（HP）机械键盘 办公电竞游戏专用有线")
-        XCTAssertTrue(hp.matches("HP 惠普机械键盘 百元入门"))
-        XCTAssertFalse(hp.matches("机械键盘入门指南"))
     }
 }
 

@@ -1,4 +1,4 @@
-// 展开面板：顶部板块切换（视频 / 电商）+ 右上角入口（搜索、收藏、连接、设置），下面是当前板块内容与浮层。
+// 展开面板：顶部板块（视频；电商已下线）+ 右上角入口（搜索、收藏、连接、设置），下面是当前板块内容与浮层。
 // 打开搜索后顶栏变成搜索框、内容区变成搜索页（ADR 0004）。
 import SwiftUI
 
@@ -20,7 +20,7 @@ struct ExpandedPanel: View {
                 }
             }
             .overlay(alignment: .topLeading) {
-                if showSources && !state.search.active && state.overlay == .none && state.section == .content {
+                if showSources && !state.search.active && state.overlay == .none {
                     SourcePicker(state: state) { withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { showSources = false } }
                         .offset(x: 12, y: 44)
                         .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .topLeading)))
@@ -91,7 +91,8 @@ struct ExpandedPanel: View {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { showSources.toggle() }
                         return
                     }
-                    state.setSection(s)
+                    state.section = s
+                    state.overlay = .none
                 } label: {
                     VStack(spacing: 4) {
                         HStack(spacing: 2) {
@@ -169,9 +170,7 @@ struct ExpandedPanel: View {
         case .failed(let msg):
             StatusView(text: "本地服务启动失败", detail: msg)
         case .ready:
-            if state.section == .commerce {
-                CommerceView(state: state)
-            } else if state.connectedContentPlatforms.isEmpty && !state.platforms.isEmpty {
+            if state.connectedContentPlatforms.isEmpty && !state.platforms.isEmpty {
                 if state.onboarding.done {
                     StatusView(text: "还没有连接任何平台", detail: "连接小红书、B 站、快手等账号后就能开刷", action: ("连接平台", { state.overlay = .connections }))
                 } else {

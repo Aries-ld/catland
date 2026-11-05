@@ -138,63 +138,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 // 自动更新的本地端到端测试（需要 CATLAND_UPDATER_TEST=1 启动，见 docs/development.md）
                 case "update:check": self.state.updater.checkNow()
                 case "update:install": self.state.updater.install()
-                case let c where c.hasPrefix("render:commerce:"):
-                    // 电商设计稿：京东商品读自 catbus 的搜索结果文件（不再请求京东），测评走一次正常的内容搜索
-                    let path = String(c.dropFirst(16))
-                    Task { @MainActor in
-                        struct Raw: Decodable { let data: [R]; struct R: Decodable { let id: String; let title: String; let url: String; let cover: String?; let author: UserRef?; let price: P?; let stats: ItemStats }; struct P: Decodable { let amount: Double } }
-                        guard let d = FileManager.default.contents(atPath: path), let raw = try? JSONDecoder().decode(Raw.self, from: d) else { return }
-                        let products = raw.data.map { r in Product(id: r.id, title: r.title, price: r.price?.amount ?? 0, shop: r.author?.name ?? "", cover: r.cover.map { ImageSource(url: $0, headers: [:], width: nil, height: nil) }, url: r.url, comments: r.stats.comments) }
-                        let search = self.state.search
-                        search.query = "机械键盘"
-                        search.submit(platforms: self.state.searchPlatforms.filter { ["xhs", "bilibili", "douyin"].contains($0) })
-                        try? await Task.sleep(for: .seconds(8))
-                        let reviews = search.hits.prefix(8).map(CoverItem.init)
-                        for p in products { if let s = p.cover { _ = await ImageLoader.shared.load(s).value } }
-                        for r in reviews { if let s = r.cover { _ = await ImageLoader.shared.load(s).value } }
-                        search.clearResults()
-                        // 示例价格历史：按天记录（盯价接口实测后换成真实数据）
-                        func hist(_ prices: [(Int, Double)]) -> [PricePoint] {
-                            prices.map { PricePoint(date: Calendar.current.date(byAdding: .day, value: -$0.0, to: Date())!, price: $0.1) }
-                        }
-                        let wishes = [
-                            WishItem(product: products[3], history: hist([(30, 349), (24, 349), (19, 339), (15, 359), (11, 329), (6, 319), (2, 309.9), (0, 299.9)])),
-                            WishItem(product: products[5], history: hist([(21, 299), (16, 309), (12, 315), (7, 315), (3, 319), (0, 315)])),
-                            WishItem(product: products[1], history: hist([(14, 329), (11, 329), (8, 319), (5, 319), (2, 299), (0, 299)])),
-                        ]
-                        let order = OrderStatus(id: "1", title: products[0].title, cover: products[0].cover, status: "运输中", detail: "预计明天送达", progress: 0.62)
-                        @MainActor func save(_ v: some View, _ name: String, height: CGFloat? = nil) {
-                            let r = ImageRenderer(content: v.padding(14).frame(width: 384, height: height, alignment: .top).background(Color(white: 0.07)).environment(\.colorScheme, .dark))
-                            r.scale = 2
-                            if let cg = r.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) { try? png.write(to: URL(fileURLWithPath: "/tmp/commerce-\(name).png")) }
-                        }
-                        save(VStack(spacing: 16) { CommerceSearchBar(query: ""); CommerceHome(wishes: wishes, orders: [order], recent: ["机械键盘", "降噪耳机", "猫砂"]) }, "home", height: 620)
-                        save(VStack(spacing: 14) { CommerceSearchBar(query: "机械键盘"); CommerceResults(query: "机械键盘", reviews: Array(reviews), products: Array(products.prefix(4)), wished: [products[1].id], scrollable: false) }, "results")
-                        save(ProductDetailView(product: products[3], reviews: Array(reviews), wish: wishes[0], scrollable: false), "detail")
-                        save(PriceDropBubble(item: wishes[0]), "bubble")
-                        // 商品页的测评按这一款单独搜（只搜内容平台，不请求京东）；刚加入心愿单只有一个价格点
-                        let cc = CommerceController(sidecar: self.state.sidecar)
-                        for p in [products[3], products[0]] {
-                            cc.openDetail(p, contentPlatforms: self.state.searchPlatforms)
-                            try? await Task.sleep(for: .seconds(8))
-                            let rs = cc.detailReviews.visibleHits.map(CoverItem.init)
-                            for r in rs { if let s = r.cover { _ = await ImageLoader.shared.load(s).value } }
-                            AppLog.info("render product reviews", ["query": cc.detailMatch?.query ?? "", "all": cc.detailReviews.hits.count, "matched": rs.count,
-                                                                   "titles": rs.prefix(5).map { $0.title ?? "" }])
-                            let fresh = WishItem(product: p, history: [PricePoint(date: Date().addingTimeInterval(-2 * 3600), price: p.price)])
-                            save(ProductDetailView(product: p, reviews: Array(rs), wish: p.id == products[3].id ? fresh : nil, scrollable: false,
-                                                   reviewsTitle: "「\(cc.detailMatch?.query ?? "")」的测评"), "detail-\(p.id)")
-                        }
-                        // 兜底：京东歇着时的搜索结果、心愿单
-                        let rest = JDRest(kind: .resting, resumeAt: Date().addingTimeInterval(2 * 3600))
-                        save(VStack(spacing: 14) {
-                            CommerceSearchBar(query: "机械键盘")
-                            CommerceResults(query: "机械键盘", reviews: Array(reviews), products: Array(products.prefix(3)), wished: [], scrollable: false,
-                                            rest: rest, cachedAt: Date().addingTimeInterval(-3 * 3600))
-                        }, "results-resting")
-                        save(VStack(spacing: 16) { CommerceSearchBar(query: ""); CommerceHome(wishes: wishes, orders: [], recent: ["机械键盘", "降噪耳机", "猫砂"], rest: rest) }, "home-resting", height: 560)
-                        AppLog.info("render commerce", ["products": products.count, "reviews": reviews.count])
-                    }
                 case "render:update":
                     // 离屏渲染「更新」卡片的三种状态（不碰真实的更新流程）
                     let u = AppUpdater()
@@ -280,7 +223,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     for step in 0..<Onboarding.total {
                         let mock = VStack(spacing: 0) {
                             HStack(spacing: 14) {
-                                Text("视频").font(.system(size: 14, weight: .semibold)); Text("电商").foregroundStyle(.secondary); Spacer()
+                                Text("视频").font(.system(size: 14, weight: .semibold)); Spacer()
                                 Image(systemName: "magnifyingglass").frame(width: 28, height: 28).coachAnchor(.search)
                                 Image(systemName: "heart.text.square").frame(width: 28, height: 28)
                                 Image(systemName: "person.crop.circle.badge.plus").frame(width: 28, height: 28)
@@ -399,12 +342,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             panel.ignoresMouseEvents = false
             panel.makeKey()
             // 搜索页开着但没在播：不恢复推荐流
-            if state.savedPlaying || (state.overlay == .none && (!state.search.active || state.search.playing) && !state.browsingCommerce) { state.activeFeed.resume() }
+            if state.savedPlaying || (state.overlay == .none && (!state.search.active || state.search.playing)) { state.activeFeed.resume() }
         } else {
             state.feed.pauseAll()
             state.search.player.pauseAll()
             state.libraryPlayer.pauseAll()
-            state.commerce.pauseAll()
             panel.resignKey()
             updateMouse(NSEvent.mouseLocation)
         }
@@ -502,7 +444,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self, (self.state.expanded && e.window === self.panel) || inFullscreen, self.state.overlay == .none || self.state.savedPlaying || inFullscreen, !self.state.commentsOpen else { return e }
             // 搜索结果瀑布流自己滚动；只有在播搜索结果时才按页翻
             if self.state.search.active && !self.state.search.playing { return e }
-            if self.state.browsingCommerce { return e }
             return self.pager.handle(e) ? nil : e
         } as Any)
         monitors.append(NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] e in
@@ -547,8 +488,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let ctx = KeyContext(fullscreen: state.fullscreen, commentsOpen: state.commentsOpen, onboarding: state.onboarding.step != nil,
                              savedPlaying: state.savedPlaying, searchActive: state.search.active, searchPlaying: state.search.playing,
                              typing: panel.firstResponder is NSTextView, overlay: state.overlay,
-                             commerceBrowsing: state.browsingCommerce, commercePlaying: state.section == .commerce && state.commerce.playing,
-                             commerceBack: state.commerce.detail != nil || !state.commerce.submitted.isEmpty,
                              command: m.contains(.command), otherModifiers: !m.intersection([.control, .option]).isEmpty)
         let feed = state.activeFeed
         let spring = Animation.spring(response: 0.3, dampingFraction: 0.9)
@@ -565,11 +504,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .stopSaved: withAnimation(spring) { state.stopSaved() }
         case .closeOverlay: state.overlay = .none; state.feed.resume()
         case .stopSearchPlaying: withAnimation(spring) { state.search.stopPlaying() }
-        case .stopCommercePlaying: withAnimation(spring) { state.commerce.stopPlaying() }
-        case .commerceBack:
-            withAnimation(spring) {
-                if state.commerce.detail != nil { state.commerce.detail = nil } else { state.commerce.query = ""; state.commerce.clear() }
-            }
         case .closeSearch: state.closeSearch()
         case .collapse: collapse()
         case .page(let d): page(d)

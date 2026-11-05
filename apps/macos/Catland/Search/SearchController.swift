@@ -39,27 +39,20 @@ final class SearchController {
     private var lastPlatform: String?
     private var run = 0
     private var playOffset = 0
-    /// 最近搜索存在哪个键（购物小助手的测评搜索用另一份，不和搜索页混在一起）
-    private let recentKey: String
+    private static let recentKey = "recentSearches"
     static let maxRun = 3
     /// 第一屏（两列各两张）：先回来的平台可以先把它铺满，让结果「一下子就出来」。
     static let firstScreen = 4
 
-    init(sidecar: SidecarClient, recentKey: String = "recentSearches") {
+    init(sidecar: SidecarClient) {
         self.sidecar = sidecar
-        self.recentKey = recentKey
-        recent = UserDefaults.standard.stringArray(forKey: recentKey) ?? []
+        recent = UserDefaults.standard.stringArray(forKey: Self.recentKey) ?? []
         player = FeedController(sidecar: sidecar)
         if let data = UserDefaults.standard.data(forKey: Self.hotKey), let words = try? JSONDecoder().decode([HotWord].self, from: data) { hotWords = words }
     }
 
     var searching: Bool { states.values.contains { $0.status == .loading } }
-    /// 额外的结果筛选（商品页只留这一款的测评）：显示和点开后上下刷都只在筛过的结果里。
-    var hitFilter: ((SearchHit) -> Bool)?
-    var visibleHits: [SearchHit] {
-        let byPlatform = filter.map { f in hits.filter { $0.platform == f } } ?? hits
-        return hitFilter.map { byPlatform.filter($0) } ?? byPlatform
-    }
+    var visibleHits: [SearchHit] { filter.map { f in hits.filter { $0.platform == f } } ?? hits }
     /// 当前筛选下还有没有下一页（含已预取、还没显示的）。
     var hasMore: Bool {
         let ps = filter.map { [$0] } ?? platforms
@@ -187,12 +180,12 @@ final class SearchController {
     func clearRecent() {
         recent = []
         editingRecent = false
-        UserDefaults.standard.removeObject(forKey: recentKey)
+        UserDefaults.standard.removeObject(forKey: Self.recentKey)
     }
 
     func removeRecent(_ q: String) {
         recent.removeAll { $0 == q }
-        UserDefaults.standard.set(recent, forKey: recentKey)
+        UserDefaults.standard.set(recent, forKey: Self.recentKey)
         if recent.isEmpty { editingRecent = false }
     }
 
@@ -312,6 +305,6 @@ final class SearchController {
     private func remember(_ q: String) {
         recent = [q] + recent.filter { $0 != q }
         recent = Array(recent.prefix(10))
-        UserDefaults.standard.set(recent, forKey: recentKey)
+        UserDefaults.standard.set(recent, forKey: Self.recentKey)
     }
 }

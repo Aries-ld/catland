@@ -32,9 +32,9 @@ export const PLATFORMS: readonly PlatformSpec[] = [
   { id: 'tiktok', name: 'TikTok', primaryLogin: 'cookie', catbusDefault: 'cookie', loginUrl: 'https://www.tiktok.com/login', requiredCookies: [['sessionid'], ['sid_tt'], ['multi_sids']], sections: ['content'], unavailable: '暂未开放：需要特定网络环境，且 Google / Apple 账号无法在 App 内登录' },
   // 微博：catbus 0.2.1 还没有实现微博的推荐流（feed list 返回 NOT_IMPLEMENTED），能登录但刷不出内容，先置灰。
   { id: 'weibo', name: '微博', primaryLogin: 'cookie', catbusDefault: 'cookie', loginUrl: 'https://weibo.com/login.php', requiredCookies: [['SUB']], sections: ['content'], unavailable: '暂未开放：catbus 还不支持微博推荐流，暂时刷不出内容' },
-  { id: 'jd', name: '京东', primaryLogin: 'qrcode', catbusDefault: 'qrcode', loginUrl: 'https://passport.jd.com/new/login.aspx', requiredCookies: [['thor', 'pin'], ['pt_key', 'pin']], sections: ['commerce'] },
-  { id: 'taobao', name: '淘宝', primaryLogin: 'cookie', catbusDefault: 'cookie', loginUrl: 'https://login.taobao.com', requiredCookies: [['unb', '_m_h5_tk', 'cookie2']], sections: ['commerce'], unavailable: '暂未开放：catbus 还拿不到淘宝的商品、价格和评价，先用京东' },
-  { id: 'xianyu', name: '闲鱼', primaryLogin: 'qrcode', catbusDefault: 'qrcode', loginUrl: 'https://www.goofish.com', requiredCookies: [['unb', '_m_h5_tk', 'cookie2']], sections: ['commerce'], unavailable: '暂未开放：catbus 还不能搜闲鱼的商品，先用京东' },
+  { id: 'jd', name: '京东', primaryLogin: 'qrcode', catbusDefault: 'qrcode', loginUrl: 'https://passport.jd.com/new/login.aspx', requiredCookies: [['thor', 'pin'], ['pt_key', 'pin']], sections: ['commerce'], unavailable: '电商板块已下线' },
+  { id: 'taobao', name: '淘宝', primaryLogin: 'cookie', catbusDefault: 'cookie', loginUrl: 'https://login.taobao.com', requiredCookies: [['unb', '_m_h5_tk', 'cookie2']], sections: ['commerce'], unavailable: '电商板块已下线' },
+  { id: 'xianyu', name: '闲鱼', primaryLogin: 'qrcode', catbusDefault: 'qrcode', loginUrl: 'https://www.goofish.com', requiredCookies: [['unb', '_m_h5_tk', 'cookie2']], sections: ['commerce'], unavailable: '电商板块已下线' },
 ]
 
 const BY_ID = new Map(PLATFORMS.map((p) => [p.id, p]))
