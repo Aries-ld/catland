@@ -40,8 +40,8 @@ targets:
       properties:
         CFBundleDisplayName: catland
         CFBundleIconFile: AppIcon
-        CFBundleShortVersionString: "1.0.3"
-        CFBundleVersion: "10"
+        CFBundleShortVersionString: "1.0.4"
+        CFBundleVersion: "11"
         LSUIElement: true
         LSMinimumSystemVersion: "14.0"
         NSHumanReadableCopyright: "MIT · 仅供学习研究，不商用"
