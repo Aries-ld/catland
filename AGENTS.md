@@ -47,6 +47,7 @@
 - 刘海创意（默认都开）：**猫洞**（猫走到刘海下方跳进去，洞口垂尾巴 / 扒爪子 / 飘 z，过一阵跳下来；`CatDirector` 的 toDen → climbing → inDen → dropping）和**地铁隧道**（刘海 = 隧道口，桥上跑什么由城市场景包决定：上海 / 新加坡是地铁，北京是长安街车流，`MetroLayer`）。切换：`catland-debug notch:den|tunnel|both|beam`，`catland-debug den` 强制一只猫进洞。
 - 所在地：Mac 系统定位（CoreLocation，与 VPN / IP 无关），未授权时按系统时区估计（`LocationProvider`）。太阳、天气、地标、节日地区都跟随所在地。
 - 事件：每次 10 分钟；开始前 6 小时 / 1 小时 / 10 分钟小猫主动探出刘海预告，悬停气泡最前面显示倒计时；开始时天气不允许就取消；进行中小猫坐着抬头看（`watch`）。
+- 实时热点：气泡里约每 6 句掺一句平台热搜（`Scene/HotCopy.swift`），数据是 sidecar 后台缓存的热搜，不新增联网；只说 6 小时内的、过滤灾难 / 伤亡 / 刑案 / 政治等字眼；话题用「」括起来，点刘海时正好显示这句就直接搜它。`catland-debug bubbles:dump` 把一组气泡打到日志。
 - 气泡语料在 `apps/macos/Catland/Scene/BubbleCopy.swift`：受众是打工人，做陪伴——不说教、不打鸡血，站在打工人这边，小红书风（可爱、有梗）。三类交错（闲聊 / 时间 / 戳我），每句停 5 秒，每次悬停从第一句开始；单句不超过 22 个字。
 - 平台图标：`scripts/fetch_platform_icons.py`，地址固定在 PINNED（人工确认的干净版本，不随活动图标变化）。界面统一用 `PlatformIcon` / `PlatformBadge`。
 - 调试命令见 ADR 0003（`catland-debug date: / scene: / event: / egg: / say: / hoverpin` 等）。

@@ -6,6 +6,7 @@
 //   a. 闲聊语：天气、季节、时段、星期几、打工共鸣（泛化，避免每句都「看穿你」显得刻意）
 //   b. 时间语：距下班 / 节假日 / 发薪，今日 / 本周 / 今年进度
 //   c. 戳我语：俏皮地邀请点一下（不直说「开刷」）
+//   e. 热点语：各平台的实时热搜，小猫顺嘴说一句（HotCopy），约每 6 句一句
 //   d. 情境语：此刻最贴切的话。强情境（凌晨还亮着屏、工作日晚上加班、雷雨暴雪、极端冷热）每次悬停的第一句必定是它；
 //      普通情境（周一早上、周五下午、早起、下雨、时段、季节）约一半悬停排第一句，之后和泛化语料按较低比例交错。
 // 事件预告 / 倒计时由 EventScheduler.bubbleLines 提供，排在轮播最前面（由第一只小猫说）。
@@ -24,6 +25,8 @@ enum BubbleCopy {
         var speakers: [Persona]
         /// 正在打盹（平台被风控暂停）的小猫。
         var sleeping: Set<Persona> = []
+        /// 新鲜、能说的实时热搜（HotCopy.topics 筛过）
+        var hot: [HotWord] = []
         var calendar: Calendar = .current
     }
 
@@ -151,16 +154,16 @@ enum BubbleCopy {
             if c.sleeping.contains(p) {
                 // 打盹的小猫：轮到它时不管哪一类，都只说累了、待会儿再来
                 let tired = shuffled(p.lines.tired)
-                pools[p] = ["tap": tired, "moment": tired, "chat": tired, "time": tired]
+                pools[p] = ["tap": tired, "moment": tired, "chat": tired, "time": tired, "hot": tired]
             } else {
                 let mo = moments(c, as: p)
                 hasStrong = hasStrong || !mo.strong.isEmpty
                 // popLast 先取末尾：强情境排在后面，先被说到
                 pools[p] = ["tap": shuffled(p.lines.tap), "time": shuffled(time(c, as: p)), "chat": shuffled(chat(c, as: p)),
-                            "moment": shuffled(mo.mild) + shuffled(mo.strong)]
+                            "moment": shuffled(mo.mild) + shuffled(mo.strong), "hot": shuffled(HotCopy.lines(for: p, topics: c.hot))]
             }
         }
-        let pattern = ["tap", "moment", "chat", "time", "chat"]
+        let pattern = ["tap", "moment", "chat", "hot", "time", "chat"]
         var out: [String] = []
         var seen = Set<String>()
         // 第一句：由第一只醒着的小猫说情境语（强情境必定，普通情境约一半）

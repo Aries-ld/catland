@@ -289,6 +289,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         self.state.checkEvents()
                     }
                 case let c where c.hasPrefix("say:"): self.state.announce(String(c.dropFirst(4)))
+                case "bubbles:dump":
+                    // 打一组悬停气泡到日志（含实时热点），不弹面板
+                    let env = self.state.sceneEnv(now: Date())
+                    let ctx = BubbleCopy.Context(now: env.date, region: RestDays.region(for: self.state.location), city: self.state.location.name,
+                                                 condition: self.state.weather?.condition, temperature: self.state.weather?.temperature,
+                                                 season: SceneSeason.of(env.date, latitude: self.state.location.latitude),
+                                                 speakers: self.state.speakers, sleeping: self.state.sleepingCats, hot: self.state.hotTopics)
+                    AppLog.info("bubbles", ["hot": self.state.hotTopics.map(\.text), "lines": BubbleCopy.rotation(ctx, seed: UInt64.random(in: 1...999_999), count: 12)])
                 case let c where c.hasPrefix("date:"):
                     // date:2026-12-24T21:00 覆盖日期与时间（看季节 / 节日）；date:off 恢复
                     let f = ISO8601DateFormatter(); f.formatOptions = [.withFullDate, .withTime, .withColonSeparatorInTime]; f.timeZone = .current
@@ -457,9 +465,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if state.webLoginActive, WebLoginController.shared.bringToFront() { return }
         guard !state.expanded else { return }
         AppLog.info("expand", ["source": source])
+        // 点的时候小猫正在说热点：直接打开搜索搜这个词
+        let topic = state.currentBubbleTopic()
         withAnimation(.spring(response: 0.38, dampingFraction: 0.82)) {
             state.expanded = true
             state.expandedForUpdateIfAnnounced()
+        }
+        if let topic, state.overlay == .none, !state.searchPlatforms.isEmpty {
+            AppLog.info("hot topic tapped", ["len": topic.count])
+            state.openSearch()
+            state.search.query = topic
+            state.search.submit(platforms: state.searchTargets)
         }
     }
 

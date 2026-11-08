@@ -49,6 +49,7 @@ final class SearchController {
         recent = UserDefaults.standard.stringArray(forKey: Self.recentKey) ?? []
         player = FeedController(sidecar: sidecar)
         if let data = UserDefaults.standard.data(forKey: Self.hotKey), let words = try? JSONDecoder().decode([HotWord].self, from: data) { hotWords = words }
+        hotWordsAt = UserDefaults.standard.object(forKey: Self.hotAtKey) as? Date
     }
 
     var searching: Bool { states.values.contains { $0.status == .loading } }
@@ -73,7 +74,9 @@ final class SearchController {
     /// 平台实时热搜：App 在后台定时从 sidecar 缓存里读（sidecar 每个平台最多 1 小时取一次），并存到本地，
     /// 下次启动、打开搜索页时直接显示，不闪；一个都没有时才用本地词兜底。
     private(set) var hotWords: [HotWord] = []
-    private static let hotKey = "hotWords"
+    /// 最近一次从 sidecar 拿到热搜的时间：小猫只说 6 小时内的热点（见 HotCopy）
+    private(set) var hotWordsAt: Date?
+    private static let hotKey = "hotWords", hotAtKey = "hotWordsAt"
 
     func open(platforms ids: [String]) {
         active = true
@@ -94,6 +97,8 @@ final class SearchController {
     /// 后台刷新热搜（启动后、之后每 30 分钟）：sidecar 只读缓存、不在这里发平台请求。
     func refreshHot(platforms ids: [String]) async {
         guard !ids.isEmpty, let words: [HotWord] = try? await sidecar.call("search.hot", ["platforms": ids]), !words.isEmpty else { return }
+        hotWordsAt = Date()
+        UserDefaults.standard.set(hotWordsAt, forKey: Self.hotAtKey)
         if words != hotWords {
             hotWords = words
             if let data = try? JSONEncoder().encode(words) { UserDefaults.standard.set(data, forKey: Self.hotKey) }

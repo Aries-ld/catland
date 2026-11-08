@@ -78,6 +78,38 @@ final class AppState {
     /// 调试：临时指定刘海里出场的角色（catland-debug cast:box / cast:off），不影响真实的平台连接。
     var castOverride: [Persona]?
 
+    /// 悬停时轮播：事件预告 / 倒计时排最前，后面是闲聊 / 时间 / 戳我 / 热点交错；每次悬停换一个随机顺序。
+    /// 没悬停但小猫主动探出来时，只说那一句。
+    func bubbleLines(now: Date = Date()) -> [String] {
+        if !hovering { return peekMessage.map { [$0] } ?? [] }
+        let env = sceneEnv(now: now)
+        let region = RestDays.region(for: location)
+        let events = EventScheduler.bubbleLines(now: env.date, region: region, latitude: location.latitude,
+                                                condition: env.condition, intensity: env.intensity, seed: hoverSession)
+        let ctx = BubbleCopy.Context(now: env.date, region: region, city: location.name,
+                                     condition: weather?.condition, temperature: weather?.temperature,
+                                     season: SceneSeason.of(env.date, latitude: location.latitude),
+                                     speakers: speakers, sleeping: sleepingCats, hot: hotTopics)
+        let host = speakers.first { !sleepingCats.contains($0) } ?? speakers.first ?? .box
+        // 推荐流在「休息站」：悬停第一句是还要歇多久
+        var rest: [String] = []
+        if let p = feed.pause, p.mode == .resting, !p.arrived, let r = p.resumeAt, r > env.date {
+            rest = [p.speaker.say("还要歇 \(EventScheduler.countdown(r.timeIntervalSince(env.date)))，先去忙吧")]
+        }
+        return rest + events.map(host.say) + BubbleCopy.rotation(ctx, seed: hoverSession)
+    }
+
+    /// 小猫能说的实时热搜：后台缓存的平台热搜里，6 小时内的、不涉及坏消息的
+    var hotTopics: [HotWord] { HotCopy.topics(search.hotWords, fetchedAt: search.hotWordsAt) }
+
+    /// 此刻气泡正好在说热点：返回话题（和 CatStage 一样每句停 3 秒）
+    func currentBubbleTopic(now: Date = Date()) -> String? {
+        let lines = bubbleLines(now: now)
+        guard hovering, !lines.isEmpty else { return nil }
+        let i = max(0, Int((now.timeIntervalSinceReferenceDate - hoverStartedAt) / 3)) % lines.count
+        return HotCopy.topic(in: lines[i], topics: hotTopics)
+    }
+
     func announce(_ text: String, seconds: Double = 8) {
         // 主动探头说话也带上名字（随机挑一只醒着的小猫）
         let awake = speakers.filter { !sleepingCats.contains($0) }

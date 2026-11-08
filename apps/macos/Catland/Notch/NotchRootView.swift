@@ -78,24 +78,7 @@ struct CollapsedView: View {
 
     /// 悬停时轮播：事件预告 / 倒计时排最前，后面是闲聊 / 时间 / 戳我三类交错；每次悬停换一个随机顺序。
     /// 没悬停但小猫主动探出来时，只说那一句。
-    private var bubbles: [String] {
-        if !state.hovering { return state.peekMessage.map { [$0] } ?? [] }
-        let env = state.sceneEnv(now: Date())
-        let region = RestDays.region(for: state.location)
-        let events = EventScheduler.bubbleLines(now: env.date, region: region, latitude: state.location.latitude,
-                                                condition: env.condition, intensity: env.intensity, seed: state.hoverSession)
-        let ctx = BubbleCopy.Context(now: env.date, region: RestDays.region(for: state.location), city: state.location.name,
-                                     condition: state.weather?.condition, temperature: state.weather?.temperature,
-                                     season: SceneSeason.of(env.date, latitude: state.location.latitude),
-                                     speakers: state.speakers, sleeping: state.sleepingCats)
-        let host = state.speakers.first { !state.sleepingCats.contains($0) } ?? state.speakers.first ?? .box
-        // 推荐流在「休息站」：悬停第一句是还要歇多久
-        var rest: [String] = []
-        if let p = state.feed.pause, p.mode == .resting, !p.arrived, let r = p.resumeAt, r > env.date {
-            rest = [p.speaker.say("还要歇 \(EventScheduler.countdown(r.timeIntervalSince(env.date)))，先去忙吧")]
-        }
-        return rest + events.map(host.say) + BubbleCopy.rotation(ctx, seed: state.hoverSession)
-    }
+    private var bubbles: [String] { state.bubbleLines() }
 
     var body: some View {
         ZStack {

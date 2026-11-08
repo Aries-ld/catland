@@ -427,6 +427,46 @@ final class HistoryGroupingTests: XCTestCase {
     }
 }
 
+final class HotCopyTests: XCTestCase {
+    private let words = [
+        HotWord(text: "秋天第一杯奶茶", platform: "xhs", heat: nil),
+        HotWord(text: "某地发生地震", platform: "xhs", heat: nil),
+        HotWord(text: "这个话题实在是太长了根本说不完的那种", platform: "xhs", heat: nil),
+        HotWord(text: "猫猫打工图鉴", platform: "bilibili", heat: nil),
+        HotWord(text: "秋天第一杯奶茶", platform: "douyin", heat: nil),
+    ]
+
+    func testOnlyFreshLightTopics() {
+        let now = Date()
+        let t = HotCopy.topics(words, fetchedAt: now.addingTimeInterval(-3600), now: now)
+        XCTAssertEqual(t.map(\.text), ["秋天第一杯奶茶", "猫猫打工图鉴"]) // 坏消息、太长、重复的都去掉
+        XCTAssertTrue(HotCopy.topics(words, fetchedAt: now.addingTimeInterval(-7 * 3600), now: now).isEmpty) // 超过 6 小时不说
+        XCTAssertTrue(HotCopy.topics(words, fetchedAt: nil, now: now).isEmpty)
+    }
+
+    func testEachCatSpeaksItsOwnPlatformAndLinesFit() {
+        let t = HotCopy.topics(words, fetchedAt: Date())
+        let shushu = HotCopy.lines(for: .shushu, topics: t)
+        XCTAssertTrue(shushu.first!.contains("「秋天第一杯奶茶」"))
+        XCTAssertTrue(shushu.contains("B站上在聊「猫猫打工图鉴」"))
+        XCTAssertTrue(HotCopy.lines(for: .bibi, topics: t).first!.contains("「猫猫打工图鉴」"))
+        for p in Persona.allCases { for l in HotCopy.lines(for: p, topics: t) { XCTAssertLessThanOrEqual(l.count, 22, l) } }
+        XCTAssertEqual(HotCopy.topic(in: "薯薯：小红书都在搜「秋天第一杯奶茶」，你看了吗", topics: t), "秋天第一杯奶茶")
+        XCTAssertNil(HotCopy.topic(in: "薯薯：「不是热搜」", topics: t))
+    }
+
+    func testRotationMixesInHotLines() {
+        var c = BubbleCopy.Context(now: Date(), region: .china, city: "上海", condition: "clear", temperature: 20, season: .autumn,
+                                   speakers: [.shushu, .bibi])
+        c.hot = HotCopy.topics(words, fetchedAt: Date())
+        let lines = BubbleCopy.rotation(c, seed: 7, count: 12)
+        XCTAssertTrue(lines.contains { HotCopy.topic(in: $0, topics: c.hot) != nil }, lines.joined(separator: "\n"))
+        // 没有热搜时照常轮播
+        c.hot = []
+        XCTAssertEqual(BubbleCopy.rotation(c, seed: 7, count: 12).count, 12)
+    }
+}
+
 final class UpdaterNotesTests: XCTestCase {
     @MainActor
     func testReleaseNotesBecomePlainLines() {
